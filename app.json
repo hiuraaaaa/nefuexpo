@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "NefuSoft",
+    "slug": "nefusoft-anime",
+    "version": "1.0.0",
+    "orientation": "default",
+    "userInterfaceStyle": "dark",
+    "icon": "./assets/icon.png",
+    "scheme": "nefusoft",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0a0a0c"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0a0a0c"
+      },
+      "package": "com.nefusoft.anime",
+      "permissions": []
+    },
+    "plugins": [
+      "expo-router",
+      "expo-av",
+      "expo-screen-orientation"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "ISI-DENGAN-PROJECT-ID-LO"
+      }
+    },
+    "owner": "ISI-DENGAN-USERNAME-EXPO-LO"
+  }
+}
