@@ -3,7 +3,7 @@ import { ExpoConfig, ConfigContext } from 'expo/config';
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: 'NefuSoft',
-  slug: 'nefusoft-anime',
+  slug: 'nefusoft',
   version: '1.0.0',
   orientation: 'default',
   icon: './assets/icon.png',
