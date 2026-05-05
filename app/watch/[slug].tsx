@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, Image,
   ActivityIndicator, FlatList, Share, Alert,
-  Dimensions, StatusBar,
+  Dimensions, StatusBar, Modal,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
@@ -17,6 +17,9 @@ import { WatchSkeleton } from '@/components/Skeleton';
 
 const { width } = Dimensions.get('window');
 
+// Kelompokkan server per resolusi: { '720p': [s1, s2], '480p': [...] }
+type ServerGroup = { [quality: string]: Server[] };
+
 export default function WatchScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const epParam = useLocalSearchParams<{ ep?: string }>().ep;
@@ -29,7 +32,8 @@ export default function WatchScreen() {
   const [anime, setAnime] = useState<AnimeDetail | null>(null);
   const [episodes, setEpisodes] = useState<Episode[]>([]);
   const [currentEpId, setCurrentEpId] = useState<string | null>(null);
-  const [servers, setServers] = useState<Server[]>([]);
+  const [serverGroup, setServerGroup] = useState<ServerGroup>({});
+  const [selectedQuality, setSelectedQuality] = useState<string>('');
   const [selectedServer, setSelectedServer] = useState<Server | null>(null);
   const [recommendations, setRecommendations] = useState<Anime[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -37,8 +41,8 @@ export default function WatchScreen() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [autoNext, setAutoNext] = useState(false);
   const [showControls, setShowControls] = useState(true);
+  const [showServerModal, setShowServerModal] = useState(false);
 
-  // Playback state
   const [isPlaying, setIsPlaying] = useState(false);
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -77,22 +81,30 @@ export default function WatchScreen() {
     if (!currentEpId) return;
     const load = async () => {
       setIsEpLoading(true);
-      setServers([]);
+      setServerGroup({});
+      setSelectedQuality('');
       setSelectedServer(null);
       setPosition(0);
       setIsPlaying(false);
       try {
         const res = await api.episode(currentEpId);
         if (res.status && res.data) {
-          const mp4 = (res.data.server || []).filter(
-            (s: Server) => s.link && s.type === 'direct' &&
-            !s.link.includes('embed=true') && s.link.split('?')[0].endsWith('.mp4')
-          );
-          const unique: Server[] = Array.from(new Map(mp4.map((s: Server) => [s.quality, s])).values());
-          setServers(unique);
-          if (unique.length > 0) {
-            setSelectedServer(unique.find(s => s.quality === '720p') ||
-              unique.reduce((p: Server, c: Server) => (parseInt(c.quality) > parseInt(p.quality) ? c : p)));
+          // Kelompokkan per resolusi — pakai SEMUA server, tidak filter ekstensi
+          const allServers: Server[] = res.data.server || [];
+          const group: ServerGroup = {};
+          allServers.forEach((s: Server, i: number) => {
+            const q = s.quality || 'AUTO';
+            if (!group[q]) group[q] = [];
+            group[q].push({ ...s, id: String(i) });
+          });
+          setServerGroup(group);
+
+          // Pilih kualitas terbaik secara default
+          const qualities = ['1080p', '720p', '480p', '360p'];
+          const bestQ = qualities.find(q => group[q]?.length > 0) || Object.keys(group)[0];
+          if (bestQ && group[bestQ]?.length > 0) {
+            setSelectedQuality(bestQ);
+            setSelectedServer(group[bestQ][0]);
           }
         }
       } catch {}
@@ -101,7 +113,6 @@ export default function WatchScreen() {
     load();
   }, [currentEpId]);
 
-  // Save to history when episode loads
   useEffect(() => {
     if (!anime || !currentEpId) return;
     const ep = episodes.find(e => e.id === currentEpId);
@@ -116,10 +127,19 @@ export default function WatchScreen() {
 
   const epIndex = episodes.findIndex(e => e.id === currentEpId);
   const currentEpNum = episodes.find(e => e.id === currentEpId)?.index || 0;
+  const availableQualities = Object.keys(serverGroup).filter(q => serverGroup[q]?.length > 0);
 
   const changeEpisode = (ep: Episode) => setCurrentEpId(ep.id);
   const handlePrev = () => { if (epIndex < episodes.length - 1) changeEpisode(episodes[epIndex + 1]); };
   const handleNext = () => { if (epIndex > 0) changeEpisode(episodes[epIndex - 1]); };
+
+  const selectQualityAndServer = (quality: string, server: Server) => {
+    const cur = position;
+    setSelectedQuality(quality);
+    setSelectedServer(server);
+    setShowServerModal(false);
+    setTimeout(() => videoRef.current?.setPositionAsync(cur * 1000), 300);
+  };
 
   const toggleFullscreen = async () => {
     if (isFullscreen) {
@@ -165,6 +185,42 @@ export default function WatchScreen() {
     <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
       <StatusBar hidden={isFullscreen} barStyle="light-content" />
 
+      {/* Server/Quality Picker Modal */}
+      <Modal visible={showServerModal} transparent animationType="slide" onRequestClose={() => setShowServerModal(false)}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' }} activeOpacity={1} onPress={() => setShowServerModal(false)}>
+          <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: COLORS.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 40 }}>
+            <Text style={{ color: '#fff', fontWeight: '900', fontSize: 14, marginBottom: 16, textTransform: 'uppercase', letterSpacing: 1 }}>
+              Pilih Kualitas & Server
+            </Text>
+            {availableQualities.map(quality => (
+              <View key={quality} style={{ marginBottom: 16 }}>
+                <Text style={{ color: COLORS.gold, fontWeight: '900', fontSize: 12, marginBottom: 8 }}>{quality}</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {serverGroup[quality].map((s, idx) => {
+                    const isActive = selectedServer?.id === s.id;
+                    return (
+                      <TouchableOpacity
+                        key={s.id}
+                        onPress={() => selectQualityAndServer(quality, s)}
+                        style={{
+                          paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8,
+                          backgroundColor: isActive ? COLORS.gold : COLORS.bg,
+                          borderWidth: 1,
+                          borderColor: isActive ? COLORS.gold : 'rgba(255,255,255,0.1)',
+                        }}>
+                        <Text style={{ color: isActive ? '#000' : '#fff', fontWeight: '900', fontSize: 12 }}>
+                          Server {idx + 1}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       {/* Video Player */}
       <TouchableOpacity
         activeOpacity={1}
@@ -193,60 +249,46 @@ export default function WatchScreen() {
         {/* Controls overlay */}
         {showControls && selectedServer && !isEpLoading && (
           <View style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)' }}>
-            {/* Back button */}
             <TouchableOpacity
-              onPress={() => {
-                if (isFullscreen) toggleFullscreen();
-                else router.back();
-              }}
+              onPress={() => { if (isFullscreen) toggleFullscreen(); else router.back(); }}
               style={{ position: 'absolute', top: 16, left: 16, width: 36, height: 36,
                 backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 18,
                 alignItems: 'center', justifyContent: 'center' }}>
-              {/* Back arrow: right-pointing border triangle flipped */}
-              <View style={{
-                width: 0, height: 0,
-                borderTopWidth: 7, borderBottomWidth: 7, borderRightWidth: 11,
-                borderTopColor: 'transparent', borderBottomColor: 'transparent',
-                borderRightColor: '#fff',
-                marginRight: 2,
-              }} />
+              <View style={{ width: 0, height: 0, borderTopWidth: 7, borderBottomWidth: 7, borderRightWidth: 11,
+                borderTopColor: 'transparent', borderBottomColor: 'transparent', borderRightColor: '#fff', marginRight: 2 }} />
             </TouchableOpacity>
 
-            {/* Title */}
             <View style={{ position: 'absolute', top: 16, left: 60, right: 60 }}>
               <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13 }} numberOfLines={1}>
                 {anime?.title} — Eps {currentEpNum}
               </Text>
             </View>
 
-            {/* Center controls */}
             <View style={{ position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 32 }}>
               <TouchableOpacity onPress={handlePrev} disabled={epIndex >= episodes.length - 1}
                 style={{ opacity: epIndex >= episodes.length - 1 ? 0.3 : 1, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 0 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <View style={{ width: 4, height: 22, backgroundColor: COLORS.gold, borderRadius: 2, marginRight: 4 }} />
                   <View style={{ width: 0, height: 0, borderTopWidth: 11, borderBottomWidth: 11, borderRightWidth: 14, borderTopColor: 'transparent', borderBottomColor: 'transparent', borderRightColor: COLORS.gold }} />
                   <View style={{ width: 0, height: 0, borderTopWidth: 11, borderBottomWidth: 11, borderRightWidth: 14, borderTopColor: 'transparent', borderBottomColor: 'transparent', borderRightColor: COLORS.gold, marginLeft: -5 }} />
                 </View>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => {
-                if (isPlaying) videoRef.current?.pauseAsync();
-                else videoRef.current?.playAsync();
-              }} style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.8)' }}>
+
+              <TouchableOpacity onPress={() => { if (isPlaying) videoRef.current?.pauseAsync(); else videoRef.current?.playAsync(); }}
+                style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.8)' }}>
                 {isPlaying ? (
-                  /* Pause: two vertical bars, perfectly centered */
-                  <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center' }}>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
                     <View style={{ width: 6, height: 26, backgroundColor: '#fff', borderRadius: 3 }} />
                     <View style={{ width: 6, height: 26, backgroundColor: '#fff', borderRadius: 3 }} />
                   </View>
                 ) : (
-                  /* Play: right-pointing triangle, shifted 3px right to optical center */
                   <View style={{ width: 0, height: 0, borderTopWidth: 15, borderBottomWidth: 15, borderLeftWidth: 24, borderTopColor: 'transparent', borderBottomColor: 'transparent', borderLeftColor: '#fff', marginLeft: 5 }} />
                 )}
               </TouchableOpacity>
+
               <TouchableOpacity onPress={handleNext} disabled={epIndex <= 0}
                 style={{ opacity: epIndex <= 0 ? 0.3 : 1, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 0 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <View style={{ width: 0, height: 0, borderTopWidth: 11, borderBottomWidth: 11, borderLeftWidth: 14, borderTopColor: 'transparent', borderBottomColor: 'transparent', borderLeftColor: COLORS.gold }} />
                   <View style={{ width: 0, height: 0, borderTopWidth: 11, borderBottomWidth: 11, borderLeftWidth: 14, borderTopColor: 'transparent', borderBottomColor: 'transparent', borderLeftColor: COLORS.gold, marginLeft: -5 }} />
                   <View style={{ width: 4, height: 22, backgroundColor: COLORS.gold, borderRadius: 2, marginLeft: 4 }} />
@@ -260,7 +302,6 @@ export default function WatchScreen() {
               </View>
             )}
 
-            {/* Bottom controls */}
             <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: 12 }}>
               <Slider
                 style={{ width: '100%', height: 20 }}
@@ -277,46 +318,24 @@ export default function WatchScreen() {
                   {formatTime(position)} / {formatTime(duration)}
                 </Text>
                 <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
-                  {/* Resolution picker */}
-                  <TouchableOpacity onPress={() => {
-                    const idx = servers.findIndex(s => s.id === selectedServer?.id);
-                    const next = servers[(idx + 1) % servers.length];
-                    if (next) {
-                      const cur = position;
-                      setSelectedServer(next);
-                      setTimeout(() => videoRef.current?.setPositionAsync(cur * 1000), 300);
-                    }
-                  }}>
+                  {/* Tombol kualitas — buka modal pilih resolusi & server */}
+                  <TouchableOpacity onPress={() => setShowServerModal(true)}
+                    style={{ backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: `${COLORS.gold}80` }}>
                     <Text style={{ color: COLORS.gold, fontSize: 11, fontWeight: '900' }}>
-                      {selectedServer?.quality || 'AUTO'}
+                      {selectedQuality || 'AUTO'}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={toggleFullscreen} style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
-                    {isFullscreen ? (
-                      /* Compress: inward-pointing corners */
-                      <View style={{ width: 18, height: 18, position: 'relative' }}>
-                        <View style={{ position: 'absolute', top: 0, left: 0, width: 7, height: 2, backgroundColor: '#fff' }} />
-                        <View style={{ position: 'absolute', top: 0, left: 0, width: 2, height: 7, backgroundColor: '#fff' }} />
-                        <View style={{ position: 'absolute', top: 0, right: 0, width: 7, height: 2, backgroundColor: '#fff' }} />
-                        <View style={{ position: 'absolute', top: 0, right: 0, width: 2, height: 7, backgroundColor: '#fff' }} />
-                        <View style={{ position: 'absolute', bottom: 0, left: 0, width: 7, height: 2, backgroundColor: '#fff' }} />
-                        <View style={{ position: 'absolute', bottom: 0, left: 0, width: 2, height: 7, backgroundColor: '#fff' }} />
-                        <View style={{ position: 'absolute', bottom: 0, right: 0, width: 7, height: 2, backgroundColor: '#fff' }} />
-                        <View style={{ position: 'absolute', bottom: 0, right: 0, width: 2, height: 7, backgroundColor: '#fff' }} />
-                      </View>
-                    ) : (
-                      /* Expand: outward-pointing corners */
-                      <View style={{ width: 18, height: 18, position: 'relative' }}>
-                        <View style={{ position: 'absolute', top: 0, left: 0, width: 7, height: 2, backgroundColor: '#fff' }} />
-                        <View style={{ position: 'absolute', top: 0, left: 0, width: 2, height: 7, backgroundColor: '#fff' }} />
-                        <View style={{ position: 'absolute', top: 0, right: 0, width: 7, height: 2, backgroundColor: '#fff' }} />
-                        <View style={{ position: 'absolute', top: 0, right: 0, width: 2, height: 7, backgroundColor: '#fff' }} />
-                        <View style={{ position: 'absolute', bottom: 0, left: 0, width: 7, height: 2, backgroundColor: '#fff' }} />
-                        <View style={{ position: 'absolute', bottom: 0, left: 0, width: 2, height: 7, backgroundColor: '#fff' }} />
-                        <View style={{ position: 'absolute', bottom: 0, right: 0, width: 7, height: 2, backgroundColor: '#fff' }} />
-                        <View style={{ position: 'absolute', bottom: 0, right: 0, width: 2, height: 7, backgroundColor: '#fff' }} />
-                      </View>
-                    )}
+                    <View style={{ width: 18, height: 18, position: 'relative' }}>
+                      <View style={{ position: 'absolute', top: 0, left: 0, width: 7, height: 2, backgroundColor: '#fff' }} />
+                      <View style={{ position: 'absolute', top: 0, left: 0, width: 2, height: 7, backgroundColor: '#fff' }} />
+                      <View style={{ position: 'absolute', top: 0, right: 0, width: 7, height: 2, backgroundColor: '#fff' }} />
+                      <View style={{ position: 'absolute', top: 0, right: 0, width: 2, height: 7, backgroundColor: '#fff' }} />
+                      <View style={{ position: 'absolute', bottom: 0, left: 0, width: 7, height: 2, backgroundColor: '#fff' }} />
+                      <View style={{ position: 'absolute', bottom: 0, left: 0, width: 2, height: 7, backgroundColor: '#fff' }} />
+                      <View style={{ position: 'absolute', bottom: 0, right: 0, width: 7, height: 2, backgroundColor: '#fff' }} />
+                      <View style={{ position: 'absolute', bottom: 0, right: 0, width: 2, height: 7, backgroundColor: '#fff' }} />
+                    </View>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -342,11 +361,9 @@ export default function WatchScreen() {
           </View>
 
           {/* AutoNext toggle */}
-          <TouchableOpacity
-            onPress={() => setAutoNext(p => !p)}
+          <TouchableOpacity onPress={() => setAutoNext(p => !p)}
             style={{ marginHorizontal: 16, marginBottom: 16, paddingVertical: 14, borderRadius: 12,
-              borderWidth: 1, borderColor: autoNext ? `${COLORS.gold}60` : 'rgba(255,255,255,0.1)',
-              alignItems: 'center' }}>
+              borderWidth: 1, borderColor: autoNext ? `${COLORS.gold}60` : 'rgba(255,255,255,0.1)', alignItems: 'center' }}>
             <Text style={{ color: autoNext ? COLORS.gold : 'rgba(255,255,255,0.4)', fontWeight: '900', fontSize: 13 }}>
               AutoNext {autoNext ? 'ON' : 'OFF'}
             </Text>
@@ -354,6 +371,37 @@ export default function WatchScreen() {
               hidupkan untuk memutar otomatis episode selanjutnya
             </Text>
           </TouchableOpacity>
+
+          {/* Server selector (below video, non-fullscreen) */}
+          {availableQualities.length > 0 && (
+            <View style={{ marginHorizontal: 16, backgroundColor: COLORS.card, borderRadius: 12,
+              borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', padding: 16, marginBottom: 16 }}>
+              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 }}>
+                Pilih Server
+              </Text>
+              {availableQualities.map(quality => (
+                <View key={quality} style={{ marginBottom: 12 }}>
+                  <Text style={{ color: COLORS.gold, fontWeight: '900', fontSize: 11, marginBottom: 6 }}>{quality}</Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                    {serverGroup[quality].map((s, idx) => {
+                      const isActive = selectedServer?.id === s.id;
+                      return (
+                        <TouchableOpacity key={s.id}
+                          onPress={() => selectQualityAndServer(quality, s)}
+                          style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8,
+                            backgroundColor: isActive ? COLORS.gold : COLORS.bg,
+                            borderWidth: 1, borderColor: isActive ? COLORS.gold : 'rgba(255,255,255,0.1)' }}>
+                          <Text style={{ color: isActive ? '#000' : '#fff', fontSize: 11, fontWeight: '900' }}>
+                            Server {idx + 1}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
 
           {/* Episode list */}
           <View style={{ marginHorizontal: 16, backgroundColor: COLORS.card, borderRadius: 12,
@@ -368,16 +416,11 @@ export default function WatchScreen() {
               scrollEnabled={false}
               columnWrapperStyle={{ gap: 6, marginBottom: 6 }}
               renderItem={({ item }) => (
-                <TouchableOpacity
-                  onPress={() => changeEpisode(item)}
-                  style={{
-                    flex: 1, aspectRatio: 1, borderRadius: 6, alignItems: 'center', justifyContent: 'center',
+                <TouchableOpacity onPress={() => changeEpisode(item)}
+                  style={{ flex: 1, aspectRatio: 1, borderRadius: 6, alignItems: 'center', justifyContent: 'center',
                     backgroundColor: currentEpId === item.id ? COLORS.gold : COLORS.bg,
-                    borderWidth: 1,
-                    borderColor: currentEpId === item.id ? COLORS.gold : 'rgba(255,255,255,0.05)',
-                  }}>
-                  <Text style={{ fontSize: 11, fontWeight: '900',
-                    color: currentEpId === item.id ? '#000' : 'rgba(255,255,255,0.5)' }}>
+                    borderWidth: 1, borderColor: currentEpId === item.id ? COLORS.gold : 'rgba(255,255,255,0.05)' }}>
+                  <Text style={{ fontSize: 11, fontWeight: '900', color: currentEpId === item.id ? '#000' : 'rgba(255,255,255,0.5)' }}>
                     {item.index}
                   </Text>
                 </TouchableOpacity>
@@ -417,26 +460,6 @@ export default function WatchScreen() {
             </View>
           )}
 
-          {/* Download options */}
-          {servers.length > 0 && (
-            <View style={{ marginHorizontal: 16, backgroundColor: COLORS.card, borderRadius: 12,
-              borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', padding: 16, marginBottom: 16 }}>
-              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 }}>
-                Download Eps {currentEpNum}
-              </Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                {servers.map(s => (
-                  <TouchableOpacity key={s.id}
-                    onPress={() => Alert.alert('Download', `Download ${s.quality} akan dimulai di browser.`)}
-                    style={{ paddingHorizontal: 14, paddingVertical: 8, backgroundColor: COLORS.bg,
-                      borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', borderRadius: 6 }}>
-                    <Text style={{ color: '#fff', fontSize: 11, fontWeight: '900' }}>↓ {s.quality}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          )}
-
           {/* Share */}
           <TouchableOpacity onPress={handleShare}
             style={{ marginHorizontal: 16, marginBottom: 16, paddingVertical: 14, borderRadius: 12,
@@ -461,9 +484,7 @@ export default function WatchScreen() {
                   <Image source={{ uri: a.image_poster }} style={{ width: 48, borderRadius: 8 }}
                     resizeMode="cover" aspectRatio={3 / 4.2} />
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }} numberOfLines={1}>
-                      {a.title}
-                    </Text>
+                    <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }} numberOfLines={1}>{a.title}</Text>
                     <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, marginTop: 4 }}>
                       {a.type} • {a.status}
                     </Text>
