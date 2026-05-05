@@ -142,8 +142,10 @@ export const api = {
 
 export const getProxyUrl = (url: string) => `${PROXY_BASE}${url}`;
 
+// Format: {id}--{title-kebab} — pakai double dash sebagai separator
+// sehingga animeId bisa diambil kembali dengan split('--')[0]
 export const getAnimeSlug = (anime: Anime) =>
-  `${anime.id}-${(anime.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+  `${anime.id}--${(anime.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
 
 export const shuffleArray = <T>(array: T[]): T[] => {
   const arr = [...array];
