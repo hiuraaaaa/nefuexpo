@@ -97,13 +97,12 @@ export default function HomeScreen() {
 
       {/* Navbar */}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        paddingHorizontal: 16, paddingVertical: 12, position: 'absolute', top: 44, left: 0, right: 0,
-        zIndex: 50, backgroundColor: 'rgba(10,10,12,0.8)' }}>
-        <Image source={{ uri: LOGO_URL }} style={{ width: 48, height: 48 }} resizeMode="contain" />
+        paddingHorizontal: 16, paddingVertical: 10 }}>
+        <Image source={{ uri: LOGO_URL }} style={{ width: 44, height: 44 }} resizeMode="contain" />
         <TouchableOpacity onPress={() => setSearchOpen(true)}
           style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center',
             borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', backgroundColor: COLORS.whiteDim }}>
-          <Text style={{ fontSize: 16 }}>🔍</Text>
+          <View style={{ width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: 'rgba(255,255,255,0.6)' }} />
         </TouchableOpacity>
       </View>
 
@@ -114,7 +113,7 @@ export default function HomeScreen() {
         contentContainerStyle={{ paddingBottom: 100 }}
       >
         {/* ── Hero Carousel ── */}
-        <View style={{ width, height: width * 0.625, backgroundColor: '#0f0f12', marginTop: 0 }}>
+        <View style={{ width, height: width * 0.58, backgroundColor: '#0f0f12' }}>
           {isLoading ? <HeroSkeleton /> : (
             <>
               <ScrollView
@@ -127,7 +126,7 @@ export default function HomeScreen() {
               >
                 {carouselItems.map((a, i) => (
                   <TouchableOpacity key={i} activeOpacity={0.9} onPress={() => goToAnime(a)}
-                    style={{ width, height: width * 0.625, position: 'relative' }}>
+                    style={{ width, height: width * 0.58, position: 'relative' }}>
                     <Image source={{ uri: a.image_cover || a.image_poster }}
                       style={{ width: '100%', height: '100%', opacity: 0.6 }} resizeMode="cover" />
                     {/* Gradient overlay bottom */}
