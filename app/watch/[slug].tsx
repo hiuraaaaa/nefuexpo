@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, Image,
-  ActivityIndicator, FlatList, Share,
+  ActivityIndicator, Share,
   Dimensions, StatusBar, Modal,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -276,8 +276,12 @@ export default function WatchScreen() {
               <TouchableOpacity
                 onPress={handlePrev}
                 disabled={epIndex >= episodes.length - 1}
-                style={{ opacity: epIndex >= episodes.length - 1 ? 0.3 : 1, alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ color: '#fff', fontSize: 28 }}>⏮</Text>
+                style={{ opacity: epIndex >= episodes.length - 1 ? 0.3 : 1, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <View style={{ width: 3, height: 20, backgroundColor: '#fff', borderRadius: 2, marginRight: 3 }} />
+                  <View style={{ width: 0, height: 0, borderTopWidth: 10, borderBottomWidth: 10, borderRightWidth: 14, borderTopColor: 'transparent', borderBottomColor: 'transparent', borderRightColor: '#fff' }} />
+                  <View style={{ width: 0, height: 0, borderTopWidth: 10, borderBottomWidth: 10, borderRightWidth: 14, borderTopColor: 'transparent', borderBottomColor: 'transparent', borderRightColor: '#fff', marginLeft: -5 }} />
+                </View>
               </TouchableOpacity>
 
               {/* Play/Pause */}
@@ -289,15 +293,26 @@ export default function WatchScreen() {
                   borderWidth: 2, borderColor: 'rgba(255,255,255,0.6)',
                   alignItems: 'center', justifyContent: 'center',
                 }}>
-                <Text style={{ color: '#fff', fontSize: 28 }}>{isPlaying ? '⏸' : '▶'}</Text>
+                {isPlaying ? (
+                  <View style={{ flexDirection: 'row', gap: 7 }}>
+                    <View style={{ width: 5, height: 24, backgroundColor: '#fff', borderRadius: 2 }} />
+                    <View style={{ width: 5, height: 24, backgroundColor: '#fff', borderRadius: 2 }} />
+                  </View>
+                ) : (
+                  <View style={{ width: 0, height: 0, borderTopWidth: 14, borderBottomWidth: 14, borderLeftWidth: 22, borderTopColor: 'transparent', borderBottomColor: 'transparent', borderLeftColor: '#fff', marginLeft: 4 }} />
+                )}
               </TouchableOpacity>
 
               {/* Next */}
               <TouchableOpacity
                 onPress={handleNext}
                 disabled={epIndex <= 0}
-                style={{ opacity: epIndex <= 0 ? 0.3 : 1, alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ color: '#fff', fontSize: 28 }}>⏭</Text>
+                style={{ opacity: epIndex <= 0 ? 0.3 : 1, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <View style={{ width: 0, height: 0, borderTopWidth: 10, borderBottomWidth: 10, borderLeftWidth: 14, borderTopColor: 'transparent', borderBottomColor: 'transparent', borderLeftColor: '#fff' }} />
+                  <View style={{ width: 0, height: 0, borderTopWidth: 10, borderBottomWidth: 10, borderLeftWidth: 14, borderTopColor: 'transparent', borderBottomColor: 'transparent', borderLeftColor: '#fff', marginLeft: -5 }} />
+                  <View style={{ width: 3, height: 20, backgroundColor: '#fff', borderRadius: 2, marginLeft: 3 }} />
+                </View>
               </TouchableOpacity>
             </View>
 
@@ -460,19 +475,16 @@ export default function WatchScreen() {
                 <View style={{ width: 3, height: 16, backgroundColor: COLORS.gold, borderRadius: 2 }} />
                 <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13, letterSpacing: 0.5 }}>DAFTAR EPISODE</Text>
               </View>
-              <FlatList
-                data={[...episodes].reverse()}
-                keyExtractor={e => e.id}
-                numColumns={6}
-                scrollEnabled={false}
-                columnWrapperStyle={{ gap: 6, marginBottom: 6 }}
-                renderItem={({ item }) => {
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                {[...episodes].reverse().map(item => {
                   const isActive = currentEpId === item.id;
+                  const chipSize = (width - 32 - 32 - 6 * 5) / 6;
                   return (
                     <TouchableOpacity
+                      key={item.id}
                       onPress={() => changeEpisode(item)}
                       style={{
-                        flex: 1, aspectRatio: 1, borderRadius: 8,
+                        width: chipSize, height: chipSize, borderRadius: 8,
                         alignItems: 'center', justifyContent: 'center',
                         backgroundColor: isActive ? COLORS.gold : 'rgba(255,255,255,0.05)',
                         borderWidth: 1,
@@ -486,8 +498,8 @@ export default function WatchScreen() {
                       </Text>
                     </TouchableOpacity>
                   );
-                }}
-              />
+                })}
+              </View>
             </View>
           </View>
 
