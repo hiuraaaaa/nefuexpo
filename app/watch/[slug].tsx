@@ -5,7 +5,7 @@ import {
   Dimensions, StatusBar, Modal,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
+import { Video, ResizeMode, AVPlaybackStatus, Audio } from 'expo-av';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Slider from '@react-native-community/slider';
@@ -51,6 +51,18 @@ export default function WatchScreen() {
   const [isBuffering, setIsBuffering] = useState(false);
 
   const controlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Disable Android media session notification
+  useEffect(() => {
+    Audio.setAudioModeAsync({
+      staysActiveInBackground: false,
+      shouldDuckAndroid: false,
+      playThroughEarpieceAndroid: false,
+      allowsRecordingIOS: false,
+      interruptionModeIOS: 0,
+      interruptionModeAndroid: 1,
+    }).catch(() => {});
+  }, []);
 
   // Load detail
   useEffect(() => {
