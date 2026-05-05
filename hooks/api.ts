@@ -10,7 +10,7 @@ const get = async <T>(path: string): Promise<T> => {
 
 function mapAnime(raw: any): Anime {
   return {
-    id:           raw.url ?? raw.series_id ?? String(raw.id ?? ''),
+    id:           (raw.url ?? raw.series_id ?? String(raw.id ?? '')).replace(/\/+$/, ''),
     title:        raw.judul ?? raw.anime_name ?? '',
     image_poster: raw.cover ?? '',
     image_cover:  raw.cover ?? '',
@@ -142,10 +142,22 @@ export const api = {
 
 export const getProxyUrl = (url: string) => `${PROXY_BASE}${url}`;
 
-// Format: {id}--{title-kebab} — pakai double dash sebagai separator
-// sehingga animeId bisa diambil kembali dengan split('--')[0]
-export const getAnimeSlug = (anime: Anime) =>
-  `${anime.id}--${(anime.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+// Format: {id-base64encoded}--{title-kebab}
+// id di-encode base64 supaya karakter seperti : tidak merusak route Expo
+export const getAnimeSlug = (anime: Anime) => {
+  const encodedId = Buffer.from(anime.id).toString('base64').replace(/=/g, '');
+  const titleKebab = (anime.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  return `${encodedId}--${titleKebab}`;
+};
+
+export const decodeAnimeId = (slug: string): string => {
+  const encoded = slug.split('--')[0];
+  try {
+    return Buffer.from(encoded, 'base64').toString('utf-8');
+  } catch {
+    return encoded;
+  }
+};
 
 export const shuffleArray = <T>(array: T[]): T[] => {
   const arr = [...array];
