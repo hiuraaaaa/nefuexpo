@@ -95,19 +95,6 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* Navbar — floating pill */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        marginHorizontal: 16, marginVertical: 10, paddingHorizontal: 16, paddingVertical: 10,
-        borderRadius: 999, backgroundColor: 'rgba(22,22,26,0.75)',
-        borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }}>
-        <Image source={{ uri: LOGO_URL }} style={{ width: 36, height: 36 }} resizeMode="contain" />
-        <TouchableOpacity onPress={() => setSearchOpen(true)}
-          style={{ width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center',
-            borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(255,255,255,0.06)' }}>
-          <View style={{ width: 13, height: 13, borderRadius: 6.5, borderWidth: 2,
-            borderColor: 'rgba(255,255,255,0.55)' }} />
-        </TouchableOpacity>
-      </View>
 
       <ScrollView
         style={{ flex: 1 }}
@@ -116,7 +103,19 @@ export default function HomeScreen() {
         contentContainerStyle={{ paddingBottom: 100 }}
       >
         {/* ── Hero Carousel ── */}
-        <View style={{ width, height: width * 0.58, backgroundColor: '#0f0f12' }}>
+        <View style={{ width, height: width * 0.7, backgroundColor: '#0f0f12' }}>
+          {/* Navbar overlay di dalam hero */}
+          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 30,
+            flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+            paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10 }}>
+            <Image source={{ uri: LOGO_URL }} style={{ width: 40, height: 40 }} resizeMode="contain" />
+            <TouchableOpacity onPress={() => setSearchOpen(true)}
+              style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center',
+                backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}>
+              <View style={{ width: 13, height: 13, borderRadius: 6.5, borderWidth: 2,
+                borderColor: 'rgba(255,255,255,0.8)' }} />
+            </TouchableOpacity>
+          </View>
           {isLoading ? <HeroSkeleton /> : (
             <>
               <ScrollView
@@ -129,7 +128,7 @@ export default function HomeScreen() {
               >
                 {carouselItems.map((a, i) => (
                   <TouchableOpacity key={i} activeOpacity={0.9} onPress={() => goToAnime(a)}
-                    style={{ width, height: width * 0.58, position: 'relative' }}>
+                    style={{ width, height: width * 0.7, position: 'relative' }}>
                     <Image source={{ uri: a.image_cover || a.image_poster }}
                       style={{ width: '100%', height: '100%', opacity: 0.6 }} resizeMode="cover" />
                     {/* Gradient overlay — 3 layer supaya smooth tanpa garis */}
@@ -252,15 +251,18 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
           </View>
-          <ScrollView ref={ongoingRef} horizontal showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingLeft: 16, paddingRight: 24, gap: 10 }}>
-            {isLoading
-              ? [...Array(6)].map((_, i) => <HorizontalCardSkeleton key={i} />)
-              : ongoing.map(item => (
-                <AnimeCard key={item.id} anime={item} onPress={() => goToAnime(item)} width={100} />
-              ))
-            }
-          </ScrollView>
+          <View style={{ paddingHorizontal: 16 }}>
+            <ScrollView ref={ongoingRef} horizontal showsHorizontalScrollIndicator={false}
+              snapToInterval={110} decelerationRate="fast" snapToAlignment="start"
+              contentContainerStyle={{ gap: 10 }}>
+              {isLoading
+                ? [...Array(6)].map((_, i) => <HorizontalCardSkeleton key={i} />)
+                : ongoing.map(item => (
+                  <AnimeCard key={item.id} anime={item} onPress={() => goToAnime(item)} width={100} />
+                ))
+              }
+            </ScrollView>
+          </View>
         </View>
 
         {/* ── Terbaru Section (ongoing.slice 0-8, sama kayak web) ── */}
@@ -291,15 +293,18 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
           </View>
-          <ScrollView ref={terbaruRef} horizontal showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingLeft: 16, paddingRight: 24, gap: 10 }}>
-            {isLoading
-              ? [...Array(6)].map((_, i) => <HorizontalCardSkeleton key={i} />)
-              : ongoing.slice(0, 8).map(item => (
-                <AnimeCard key={item.id} anime={item} onPress={() => goToAnime(item)} width={100} />
-              ))
-            }
-          </ScrollView>
+          <View style={{ paddingHorizontal: 16 }}>
+            <ScrollView ref={terbaruRef} horizontal showsHorizontalScrollIndicator={false}
+              snapToInterval={110} decelerationRate="fast" snapToAlignment="start"
+              contentContainerStyle={{ gap: 10 }}>
+              {isLoading
+                ? [...Array(6)].map((_, i) => <HorizontalCardSkeleton key={i} />)
+                : ongoing.slice(0, 8).map(item => (
+                  <AnimeCard key={item.id} anime={item} onPress={() => goToAnime(item)} width={100} />
+                ))
+              }
+            </ScrollView>
+          </View>
         </View>
 
         {/* ── Top 10 Anime ── */}
