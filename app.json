@@ -7,6 +7,12 @@
     "userInterfaceStyle": "dark",
     "icon": "./assets/icon.png",
     "scheme": "nefusoft",
+    "updates": {
+      "url": "https://u.expo.dev/77dcd7b2-4f36-4f1e-92a9-fc8aa7915d1c"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
