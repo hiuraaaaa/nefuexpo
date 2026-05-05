@@ -95,14 +95,17 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* Navbar */}
+      {/* Navbar — floating pill */}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        paddingHorizontal: 16, paddingVertical: 10 }}>
-        <Image source={{ uri: LOGO_URL }} style={{ width: 44, height: 44 }} resizeMode="contain" />
+        marginHorizontal: 16, marginVertical: 10, paddingHorizontal: 16, paddingVertical: 10,
+        borderRadius: 999, backgroundColor: 'rgba(22,22,26,0.75)',
+        borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }}>
+        <Image source={{ uri: LOGO_URL }} style={{ width: 36, height: 36 }} resizeMode="contain" />
         <TouchableOpacity onPress={() => setSearchOpen(true)}
-          style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center',
-            borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', backgroundColor: COLORS.whiteDim }}>
-          <View style={{ width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: 'rgba(255,255,255,0.6)' }} />
+          style={{ width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center',
+            borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(255,255,255,0.06)' }}>
+          <View style={{ width: 13, height: 13, borderRadius: 6.5, borderWidth: 2,
+            borderColor: 'rgba(255,255,255,0.55)' }} />
         </TouchableOpacity>
       </View>
 
@@ -129,13 +132,13 @@ export default function HomeScreen() {
                     style={{ width, height: width * 0.58, position: 'relative' }}>
                     <Image source={{ uri: a.image_cover || a.image_poster }}
                       style={{ width: '100%', height: '100%', opacity: 0.6 }} resizeMode="cover" />
-                    {/* Gradient overlay bottom */}
-                    <View style={{ position: 'absolute', inset: 0,
-                      backgroundColor: 'transparent',
-                      // gradient simulated via multiple layers
-                    }} />
-                    <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '70%',
-                      backgroundColor: 'rgba(10,10,12,0.7)' }} />
+                    {/* Gradient overlay — 3 layer supaya smooth tanpa garis */}
+                    <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '30%',
+                      backgroundColor: 'rgba(10,10,12,0.3)' }} />
+                    <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '50%',
+                      backgroundColor: 'rgba(10,10,12,0.5)' }} />
+                    <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '65%',
+                      backgroundColor: 'rgba(10,10,12,0.65)' }} />
                     {/* Content */}
                     <View style={{ position: 'absolute', bottom: 24, left: 24, right: 24,
                       flexDirection: 'row', alignItems: 'flex-end', gap: 16 }}>
@@ -183,37 +186,39 @@ export default function HomeScreen() {
           )}
         </View>
 
-        {/* ── Share Banner ── */}
-        <View style={{ marginHorizontal: 16, marginTop: 20, borderRadius: 16,
-          borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', overflow: 'hidden' }}>
+        {/* ── Share Banner — pill modern style ── */}
+        <View style={{ marginHorizontal: 16, marginTop: 20, borderRadius: 24,
+          overflow: 'hidden', backgroundColor: 'rgba(22,22,26,0.6)',
+          borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+          backdropFilter: 'blur(20px)' }}>
           <Image source={{ uri: 'https://raw.githubusercontent.com/alip-jmbd/alipp/main/bc.jpg' }}
-            style={{ position: 'absolute', width: '100%', height: '100%', opacity: 0.4 }}
+            style={{ position: 'absolute', width: '100%', height: '100%', opacity: 0.15 }}
             resizeMode="cover" />
-          <View style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(22,22,26,0.92)' }} />
-          <View style={{ position: 'relative', padding: 20 }}>
+          <View style={{ padding: 18 }}>
             <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13,
-              textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
+              textTransform: 'uppercase', letterSpacing: 1, marginBottom: 3 }}>
               Sebarkan Keseruan Ini!
             </Text>
-            <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, marginBottom: 16 }}>
+            <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, marginBottom: 14 }}>
               Ajak teman-temanmu marathon anime favorit bareng di NefuSoft.
             </Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               <TouchableOpacity onPress={handleCopy}
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
-                  paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8,
-                  backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1,
-                  borderColor: 'rgba(255,255,255,0.1)' }}>
-                <Text style={{ fontSize: 11 }}>🔗</Text>
-                <Text style={{ color: '#fff', fontWeight: '900', fontSize: 11 }}>Salin Link</Text>
+                  paddingHorizontal: 16, paddingVertical: 9, borderRadius: 999,
+                  backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1,
+                  borderColor: 'rgba(255,255,255,0.12)' }}>
+                <View style={{ width: 10, height: 10, borderRadius: 2, borderWidth: 1.5,
+                  borderColor: 'rgba(255,255,255,0.6)' }} />
+                <Text style={{ color: '#fff', fontWeight: '800', fontSize: 11 }}>Salin Link</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={handleShare}
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
-                  paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8,
-                  backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1,
-                  borderColor: 'rgba(255,255,255,0.1)' }}>
-                <Text style={{ fontSize: 11 }}>↗</Text>
-                <Text style={{ color: '#fff', fontWeight: '900', fontSize: 11 }}>Lainnya</Text>
+                  paddingHorizontal: 16, paddingVertical: 9, borderRadius: 999,
+                  backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1,
+                  borderColor: 'rgba(255,255,255,0.12)' }}>
+                <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>&#8599;</Text>
+                <Text style={{ color: '#fff', fontWeight: '800', fontSize: 11 }}>Lainnya</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -248,7 +253,7 @@ export default function HomeScreen() {
             </View>
           </View>
           <ScrollView ref={ongoingRef} horizontal showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}>
+            contentContainerStyle={{ paddingLeft: 16, paddingRight: 24, gap: 10 }}>
             {isLoading
               ? [...Array(6)].map((_, i) => <HorizontalCardSkeleton key={i} />)
               : ongoing.map(item => (
@@ -287,7 +292,7 @@ export default function HomeScreen() {
             </View>
           </View>
           <ScrollView ref={terbaruRef} horizontal showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}>
+            contentContainerStyle={{ paddingLeft: 16, paddingRight: 24, gap: 10 }}>
             {isLoading
               ? [...Array(6)].map((_, i) => <HorizontalCardSkeleton key={i} />)
               : ongoing.slice(0, 8).map(item => (
