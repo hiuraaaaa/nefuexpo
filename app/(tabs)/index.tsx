@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, Image, TouchableOpacity, ScrollView,
-  FlatList, ActivityIndicator, Dimensions, RefreshControl,
+  FlatList, Dimensions, RefreshControl, Animated,
+  Share, Clipboard,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,33 +11,32 @@ import { api, shuffleArray, getAnimeSlug } from '@/hooks/api';
 import { Anime, ScheduleDay } from '@/types';
 import AnimeCard from '@/components/AnimeCard';
 import SearchModal from '@/components/SearchModal';
-import {
-  HeroSkeleton,
-  HorizontalCardSkeleton,
-  RankSkeleton,
-} from '@/components/Skeleton';
+import { HeroSkeleton, HorizontalCardSkeleton, RankSkeleton } from '@/components/Skeleton';
 
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen() {
   const router = useRouter();
-  const [schedule, setSchedule] = useState<ScheduleDay>({});
   const [ongoing, setOngoing] = useState<Anime[]>([]);
   const [popular, setPopular] = useState<Anime[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [heroIndex, setHeroIndex] = useState(0);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [copyToast, setCopyToast] = useState(false);
 
-  const today = DAY_KEYS[new Date().getDay()];
-  // Fix: API jadwal tidak return field status, hapus filter status === 'ONGOING'
-  const todayAnime = schedule[today] || [];
+  const heroRef = useRef<ScrollView>(null);
+  const ongoingRef = useRef<ScrollView>(null);
+  const terbaruRef = useRef<ScrollView>(null);
+
+  // Hero pakai ongoing (sama kayak web)
+  const carouselItems = ongoing.slice(0, 8);
 
   const fetchData = useCallback(async () => {
     try {
-      const [schRes, ongRes, popRes] = await api.home();
-      setSchedule(schRes.data || {});
-      setOngoing(shuffleArray(ongRes.data || []));
+      const [, ongRes, popRes] = await api.home();
+      const shuffled = shuffleArray(ongRes.data || []);
+      setOngoing(shuffled);
       setPopular(popRes.data || []);
     } catch {}
     setIsLoading(false);
@@ -45,167 +45,302 @@ export default function HomeScreen() {
 
   useEffect(() => { fetchData(); }, []);
 
+  // Auto-advance hero
   useEffect(() => {
-    if (todayAnime.length === 0) return;
-    const itv = setInterval(() => setHeroIndex(p => (p + 1) % todayAnime.length), 6000);
+    if (carouselItems.length === 0) return;
+    const itv = setInterval(() => {
+      setHeroIndex(p => {
+        const next = (p + 1) % carouselItems.length;
+        heroRef.current?.scrollTo({ x: next * width, animated: true });
+        return next;
+      });
+    }, 6000);
     return () => clearInterval(itv);
-  }, [todayAnime.length]);
+  }, [carouselItems.length]);
+
+  const goToAnime = (a: Anime) => router.push(`/watch/${getAnimeSlug(a)}`);
+
+  const handleHeroNext = () => {
+    const next = (heroIndex + 1) % carouselItems.length;
+    setHeroIndex(next);
+    heroRef.current?.scrollTo({ x: next * width, animated: true });
+  };
+
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        message: 'Ajak temanmu nonton anime favorit bareng di NefuSoft, gratis dan tanpa iklan!!\n\nhttps://nefusoft.eu.cc',
+        title: 'NefuSoft',
+      });
+    } catch {}
+  };
+
+  const handleCopy = () => {
+    Clipboard.setString('https://nefusoft.eu.cc');
+    setCopyToast(true);
+    setTimeout(() => setCopyToast(false), 2000);
+  };
 
   const onRefresh = () => { setRefreshing(true); fetchData(); };
-  const goToAnime = (a: Anime) => router.push(`/watch/${getAnimeSlug(a)}`);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.bg }} edges={['top']}>
+      {/* Copy toast */}
+      {copyToast && (
+        <View style={{ position: 'absolute', top: 80, left: width / 2 - 120, zIndex: 999,
+          backgroundColor: COLORS.gold, paddingHorizontal: 24, paddingVertical: 12,
+          borderRadius: 999, width: 240, alignItems: 'center',
+          shadowColor: COLORS.gold, shadowOpacity: 0.4, shadowRadius: 20 }}>
+          <Text style={{ color: '#000', fontWeight: '900', fontSize: 12 }}>Tautan berhasil disalin!</Text>
+        </View>
+      )}
+
       {/* Navbar */}
-      <View className="flex-row items-center justify-between px-4 py-3 absolute top-0 left-0 right-0 z-50"
-        style={{ backgroundColor: 'rgba(10,10,12,0.8)' }}>
-        <Image source={{ uri: LOGO_URL }} className="w-12 h-12" resizeMode="contain" />
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        paddingHorizontal: 16, paddingVertical: 12, position: 'absolute', top: 44, left: 0, right: 0,
+        zIndex: 50, backgroundColor: 'rgba(10,10,12,0.8)' }}>
+        <Image source={{ uri: LOGO_URL }} style={{ width: 48, height: 48 }} resizeMode="contain" />
         <TouchableOpacity onPress={() => setSearchOpen(true)}
-          className="w-9 h-9 rounded-full items-center justify-center border border-white/10"
-          style={{ backgroundColor: COLORS.whiteDim }}>
+          style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center',
+            borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', backgroundColor: COLORS.whiteDim }}>
           <Text style={{ fontSize: 16 }}>🔍</Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView
-        className="flex-1"
+        style={{ flex: 1 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.gold} />}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingTop: 60, paddingBottom: 100 }}
+        contentContainerStyle={{ paddingBottom: 100 }}
       >
-        {/* Hero Carousel */}
-        {isLoading ? (
-          <HeroSkeleton />
-        ) : todayAnime.length > 0 ? (
-          <TouchableOpacity
-            activeOpacity={0.9}
-            onPress={() => goToAnime(todayAnime[heroIndex])}
-            style={{ width, height: width * 0.6, position: 'relative' }}>
-            <Image
-              source={{ uri: todayAnime[heroIndex].image_cover || todayAnime[heroIndex].image_poster }}
-              style={{ width: '100%', height: '100%', opacity: 0.6 }}
-              resizeMode="cover"
-            />
-            <View style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(10,10,12,0.5)' }} />
-            <View className="absolute bottom-6 left-4 right-4 flex-row items-end gap-4">
-              <Image
-                source={{ uri: todayAnime[heroIndex].image_poster }}
-                className="w-20 rounded-lg shadow-2xl"
-                style={{ aspectRatio: 3 / 4.2 }}
-                resizeMode="cover"
-              />
-              <View className="flex-1 mb-1">
-                <Text className="text-white font-black text-lg leading-tight" numberOfLines={2}>
-                  {todayAnime[heroIndex].title}
-                </Text>
-                <Text className="text-white/50 text-xs mt-1" numberOfLines={2}>
-                  {todayAnime[heroIndex].synopsis}
-                </Text>
-                <TouchableOpacity
-                  onPress={() => goToAnime(todayAnime[heroIndex])}
-                  className="mt-3 px-5 py-2 rounded items-center justify-center flex-row gap-2 self-start"
-                  style={{ backgroundColor: COLORS.gold }}>
-                  <Text style={{ fontSize: 12 }}>▶</Text>
-                  <Text className="text-black font-black text-xs tracking-widest">TONTON</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-            <View className="absolute bottom-3 right-4 flex-row gap-1">
-              {todayAnime.map((_, i) => (
-                <View key={i} className={`h-1 rounded-full ${i === heroIndex ? 'w-4' : 'w-1'}`}
-                  style={{ backgroundColor: i === heroIndex ? COLORS.gold : 'rgba(255,255,255,0.3)' }} />
-              ))}
-            </View>
-          </TouchableOpacity>
-        ) : null}
+        {/* ── Hero Carousel ── */}
+        <View style={{ width, height: width * 0.625, backgroundColor: '#0f0f12', marginTop: 0 }}>
+          {isLoading ? <HeroSkeleton /> : (
+            <>
+              <ScrollView
+                ref={heroRef}
+                horizontal
+                pagingEnabled
+                scrollEnabled={false}
+                showsHorizontalScrollIndicator={false}
+                style={{ width, height: '100%' }}
+              >
+                {carouselItems.map((a, i) => (
+                  <TouchableOpacity key={i} activeOpacity={0.9} onPress={() => goToAnime(a)}
+                    style={{ width, height: width * 0.625, position: 'relative' }}>
+                    <Image source={{ uri: a.image_cover || a.image_poster }}
+                      style={{ width: '100%', height: '100%', opacity: 0.6 }} resizeMode="cover" />
+                    {/* Gradient overlay bottom */}
+                    <View style={{ position: 'absolute', inset: 0,
+                      backgroundColor: 'transparent',
+                      // gradient simulated via multiple layers
+                    }} />
+                    <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '70%',
+                      backgroundColor: 'rgba(10,10,12,0.7)' }} />
+                    {/* Content */}
+                    <View style={{ position: 'absolute', bottom: 24, left: 24, right: 24,
+                      flexDirection: 'row', alignItems: 'flex-end', gap: 16 }}>
+                      <Image source={{ uri: a.image_poster }}
+                        style={{ width: 80, aspectRatio: 3/4.2, borderRadius: 8 }}
+                        resizeMode="cover" />
+                      <View style={{ flex: 1, marginBottom: 4 }}>
+                        <Text style={{ color: '#fff', fontWeight: '900', fontSize: 18,
+                          lineHeight: 22, marginBottom: 4 }} numberOfLines={2}>
+                          {a.title}
+                        </Text>
+                        <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10,
+                          lineHeight: 14, marginBottom: 8 }} numberOfLines={2}>
+                          {a.synopsis}
+                        </Text>
+                        <TouchableOpacity onPress={() => goToAnime(a)}
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
+                            backgroundColor: COLORS.gold, paddingHorizontal: 20, paddingVertical: 8,
+                            borderRadius: 4, alignSelf: 'flex-start' }}>
+                          <Text style={{ fontSize: 10 }}>▶</Text>
+                          <Text style={{ color: '#000', fontWeight: '900', fontSize: 10,
+                            letterSpacing: 1 }}>TONTON</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
 
-        {/* Ongoing Section */}
-        <View className="mt-8 px-4">
-          <View className="flex-row items-center justify-between mb-4">
-            <TouchableOpacity onPress={() => router.push('/(tabs)/ongoing')}>
-              <Text className="text-white font-black text-base uppercase tracking-tight">Ongoing</Text>
-              <Text className="text-white/40 text-xs font-bold uppercase tracking-widest mt-1">Anime yang sedang tayang</Text>
-            </TouchableOpacity>
-          </View>
-          {isLoading ? (
-            <FlatList
-              data={[...Array(6)]}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              keyExtractor={(_, i) => String(i)}
-              renderItem={() => <HorizontalCardSkeleton />}
-            />
-          ) : (
-            <FlatList
-              data={ongoing}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              keyExtractor={i => i.id}
-              ItemSeparatorComponent={() => <View style={{ width: 10 }} />}
-              renderItem={({ item }) => (
-                <AnimeCard anime={item} onPress={() => goToAnime(item)} width={100} />
+              {/* Counter + next button — bottom right */}
+              {carouselItems.length > 0 && (
+                <View style={{ position: 'absolute', bottom: 24, right: 24,
+                  flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 20 }}>
+                  <Text style={{ color: '#fff', fontWeight: '900', fontSize: 10 }}>
+                    {heroIndex + 1} / {carouselItems.length}
+                  </Text>
+                  <View style={{ width: 32, height: 2, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 1 }} />
+                  <TouchableOpacity onPress={handleHeroNext}
+                    style={{ width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ color: '#fff', fontSize: 18, fontWeight: '900' }}>›</Text>
+                  </TouchableOpacity>
+                </View>
               )}
-            />
+            </>
           )}
         </View>
 
-        {/* Today Section */}
-        {todayAnime.length > 0 && (
-          <View className="mt-8 px-4">
-            <View className="flex-row items-center justify-between mb-4">
-              <TouchableOpacity onPress={() => router.push('/(tabs)/schedule')}>
-                <Text className="text-white font-black text-base uppercase tracking-tight">Today</Text>
-                <Text className="text-white/40 text-xs font-bold uppercase tracking-widest mt-1">
-                  Anime hari ini — {DAY_NAMES[new Date().getDay()]}
-                </Text>
+        {/* ── Share Banner ── */}
+        <View style={{ marginHorizontal: 16, marginTop: 20, borderRadius: 16,
+          borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', overflow: 'hidden' }}>
+          <Image source={{ uri: 'https://raw.githubusercontent.com/alip-jmbd/alipp/main/bc.jpg' }}
+            style={{ position: 'absolute', width: '100%', height: '100%', opacity: 0.4 }}
+            resizeMode="cover" />
+          <View style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(22,22,26,0.92)' }} />
+          <View style={{ position: 'relative', padding: 20 }}>
+            <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13,
+              textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
+              Sebarkan Keseruan Ini!
+            </Text>
+            <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, marginBottom: 16 }}>
+              Ajak teman-temanmu marathon anime favorit bareng di NefuSoft.
+            </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              <TouchableOpacity onPress={handleCopy}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
+                  paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8,
+                  backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1,
+                  borderColor: 'rgba(255,255,255,0.1)' }}>
+                <Text style={{ fontSize: 11 }}>🔗</Text>
+                <Text style={{ color: '#fff', fontWeight: '900', fontSize: 11 }}>Salin Link</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleShare}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
+                  paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8,
+                  backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1,
+                  borderColor: 'rgba(255,255,255,0.1)' }}>
+                <Text style={{ fontSize: 11 }}>↗</Text>
+                <Text style={{ color: '#fff', fontWeight: '900', fontSize: 11 }}>Lainnya</Text>
               </TouchableOpacity>
             </View>
-            <FlatList
-              data={todayAnime}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              keyExtractor={i => i.id}
-              ItemSeparatorComponent={() => <View style={{ width: 10 }} />}
-              renderItem={({ item }) => (
-                <AnimeCard anime={item} onPress={() => goToAnime(item)} width={100} />
-              )}
-            />
           </View>
-        )}
+        </View>
 
-        {/* Top 10 Popular */}
-        <View className="mt-8 px-4">
-          <Text className="text-white font-black text-base uppercase tracking-tight mb-1">Top 10 Anime</Text>
-          <Text className="text-white/40 text-xs font-bold uppercase tracking-widest mb-5">Anime populer sepanjang waktu</Text>
-          {isLoading ? (
-            [...Array(5)].map((_, i) => <RankSkeleton key={i} />)
-          ) : (
-            popular.slice(0, 10).map((anime, index) => (
-              <TouchableOpacity
-                key={anime.id}
-                onPress={() => goToAnime(anime)}
-                className="mb-3 rounded-2xl overflow-hidden flex-row items-center h-24 px-4"
-                style={{
+        {/* ── Ongoing Section ── */}
+        <View style={{ marginTop: 28 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+            paddingHorizontal: 16, marginBottom: 14 }}>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/ongoing')}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={{ color: '#fff', fontWeight: '900', fontSize: 16,
+                  textTransform: 'uppercase', letterSpacing: -0.5 }}>Ongoing</Text>
+                <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 16, fontWeight: '900' }}>›</Text>
+              </View>
+              <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '700',
+                textTransform: 'uppercase', letterSpacing: 2, marginTop: 2 }}>
+                Anime yang sedang tayang
+              </Text>
+            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity onPress={() => ongoingRef.current?.scrollTo({ x: -300, animated: true })}
+                style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
+                  backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
+                <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 16 }}>‹</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => ongoingRef.current?.scrollTo({ x: 300, animated: true })}
+                style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
+                  backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
+                <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 16 }}>›</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+          <ScrollView ref={ongoingRef} horizontal showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}>
+            {isLoading
+              ? [...Array(6)].map((_, i) => <HorizontalCardSkeleton key={i} />)
+              : ongoing.map(item => (
+                <AnimeCard key={item.id} anime={item} onPress={() => goToAnime(item)} width={100} />
+              ))
+            }
+          </ScrollView>
+        </View>
+
+        {/* ── Terbaru Section (ongoing.slice 0-8, sama kayak web) ── */}
+        <View style={{ marginTop: 24 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+            paddingHorizontal: 16, marginBottom: 14 }}>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/schedule')}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={{ color: '#fff', fontWeight: '900', fontSize: 16,
+                  textTransform: 'uppercase', letterSpacing: -0.5 }}>Terbaru</Text>
+                <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 16, fontWeight: '900' }}>›</Text>
+              </View>
+              <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '700',
+                textTransform: 'uppercase', letterSpacing: 2, marginTop: 2 }}>
+                Episode terbaru minggu ini
+              </Text>
+            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity onPress={() => terbaruRef.current?.scrollTo({ x: -300, animated: true })}
+                style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
+                  backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
+                <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 16 }}>‹</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => terbaruRef.current?.scrollTo({ x: 300, animated: true })}
+                style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
+                  backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
+                <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 16 }}>›</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+          <ScrollView ref={terbaruRef} horizontal showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}>
+            {isLoading
+              ? [...Array(6)].map((_, i) => <HorizontalCardSkeleton key={i} />)
+              : ongoing.slice(0, 8).map(item => (
+                <AnimeCard key={item.id} anime={item} onPress={() => goToAnime(item)} width={100} />
+              ))
+            }
+          </ScrollView>
+        </View>
+
+        {/* ── Top 10 Anime ── */}
+        <View style={{ marginTop: 28, paddingHorizontal: 16 }}>
+          <Text style={{ color: '#fff', fontWeight: '900', fontSize: 16,
+            textTransform: 'uppercase', letterSpacing: -0.5, marginBottom: 2 }}>
+            Top 10 Anime
+          </Text>
+          <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '700',
+            textTransform: 'uppercase', letterSpacing: 2, marginBottom: 20 }}>
+            Anime populer sepanjang waktu
+          </Text>
+          {isLoading
+            ? [...Array(5)].map((_, i) => <RankSkeleton key={i} />)
+            : popular.slice(0, 10).map((anime, index) => (
+              <TouchableOpacity key={anime.id} onPress={() => goToAnime(anime)}
+                activeOpacity={0.8}
+                style={{ marginBottom: 12, borderRadius: 16, overflow: 'hidden',
+                  flexDirection: 'row', alignItems: 'center', height: 88, paddingHorizontal: 16,
                   backgroundColor: COLORS.card,
                   borderWidth: 1,
                   borderColor: index < 3 ? 'rgba(246,207,128,0.2)' : 'rgba(255,255,255,0.05)',
-                }}
-                activeOpacity={0.8}
-              >
-                <Image
-                  source={{ uri: anime.image_cover }}
-                  style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '40%', opacity: 0.4 }}
-                  resizeMode="cover"
-                />
-                <View style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '40%', backgroundColor: 'rgba(22,22,26,0.8)' }} />
-                <View className="w-10 h-10 rounded-full items-center justify-center mr-4"
-                  style={{ backgroundColor: index < 3 ? COLORS.gold : 'rgba(255,255,255,0.05)' }}>
-                  <Text className={`font-black text-sm ${index < 3 ? 'text-black' : 'text-white/30'}`}>{index + 1}</Text>
+                  ...(index < 3 ? {} : {}) }}>
+                {/* BG image right */}
+                <Image source={{ uri: anime.image_cover || anime.image_poster }}
+                  style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '45%', opacity: 0.5 }}
+                  resizeMode="cover" />
+                <View style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '45%',
+                  backgroundColor: 'rgba(22,22,26,0.85)' }} />
+                {/* Rank */}
+                <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center',
+                  justifyContent: 'center', marginRight: 16,
+                  backgroundColor: index < 3 ? COLORS.gold : 'rgba(255,255,255,0.05)',
+                  borderWidth: index < 3 ? 0 : 1,
+                  borderColor: 'rgba(255,255,255,0.1)' }}>
+                  <Text style={{ fontWeight: '900', fontSize: 14,
+                    color: index < 3 ? '#000' : 'rgba(255,255,255,0.3)' }}>
+                    {index + 1}
+                  </Text>
                 </View>
-                <Text className="text-white font-bold text-sm flex-1" numberOfLines={1}>{anime.title}</Text>
+                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13, flex: 1 }}
+                  numberOfLines={1}>{anime.title}</Text>
               </TouchableOpacity>
             ))
-          )}
+          }
         </View>
       </ScrollView>
 
