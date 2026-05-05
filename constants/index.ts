@@ -1,4 +1,4 @@
-export const API_BASE = 'https://api.nefusoft.cloud/v1';
+export const API_BASE = 'https://api.nefusoft.eu.cc/api';
 export const PROXY_BASE = 'https://cf.elainaa.workers.dev/';
 export const LOGO_URL = 'https://raw.githubusercontent.com/alip-jmbd/alipp/main/icon-rbg.png';
 export const KAGUYA_URL = 'https://raw.githubusercontent.com/alip-jmbd/alipp/main/irohaplenger.jpg';
