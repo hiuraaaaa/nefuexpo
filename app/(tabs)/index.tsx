@@ -29,7 +29,8 @@ export default function HomeScreen() {
   const [searchOpen, setSearchOpen] = useState(false);
 
   const today = DAY_KEYS[new Date().getDay()];
-  const todayAnime = (schedule[today] || []).filter(a => a.status === 'ONGOING');
+  // Fix: API jadwal tidak return field status, hapus filter status === 'ONGOING'
+  const todayAnime = schedule[today] || [];
 
   const fetchData = useCallback(async () => {
     try {
@@ -44,7 +45,6 @@ export default function HomeScreen() {
 
   useEffect(() => { fetchData(); }, []);
 
-  // Hero carousel auto-advance
   useEffect(() => {
     if (todayAnime.length === 0) return;
     const itv = setInterval(() => setHeroIndex(p => (p + 1) % todayAnime.length), 6000);
@@ -110,7 +110,6 @@ export default function HomeScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-            {/* Indicator dots */}
             <View className="absolute bottom-3 right-4 flex-row gap-1">
               {todayAnime.map((_, i) => (
                 <View key={i} className={`h-1 rounded-full ${i === heroIndex ? 'w-4' : 'w-1'}`}
@@ -193,15 +192,12 @@ export default function HomeScreen() {
                 }}
                 activeOpacity={0.8}
               >
-                {/* Cover blurred bg */}
                 <Image
                   source={{ uri: anime.image_cover }}
                   style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '40%', opacity: 0.4 }}
                   resizeMode="cover"
                 />
                 <View style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '40%', backgroundColor: 'rgba(22,22,26,0.8)' }} />
-                
-                {/* Rank number */}
                 <View className="w-10 h-10 rounded-full items-center justify-center mr-4"
                   style={{ backgroundColor: index < 3 ? COLORS.gold : 'rgba(255,255,255,0.05)' }}>
                   <Text className={`font-black text-sm ${index < 3 ? 'text-black' : 'text-white/30'}`}>{index + 1}</Text>
