@@ -27,7 +27,8 @@ export default function WatchScreen() {
   const insets = useSafeAreaInsets();
   const videoRef = useRef<Video>(null);
 
-  const animeId = slug?.split('-')[0] || '';
+  // slug format: "{id}--{title-kebab}" — split("--")[0] untuk ambil id asli
+  const animeId = (slug ?? "").split("--")[0];
 
   const [anime, setAnime] = useState<AnimeDetail | null>(null);
   const [episodes, setEpisodes] = useState<Episode[]>([]);
