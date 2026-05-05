@@ -142,18 +142,25 @@ export const api = {
 
 export const getProxyUrl = (url: string) => `${PROXY_BASE}${url}`;
 
-// Format: {id-base64encoded}--{title-kebab}
-// id di-encode base64 supaya karakter seperti : tidak merusak route Expo
-export const getAnimeSlug = (anime: Anime) => {
-  const encodedId = Buffer.from(anime.id).toString('base64').replace(/=/g, '');
-  const titleKebab = (anime.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
-  return `${encodedId}--${titleKebab}`;
+// ─── Slug encode/decode pakai btoa/atob (React Native safe, tanpa Buffer) ─────
+
+export const getAnimeSlug = (anime: Anime): string => {
+  try {
+    // encodeURIComponent dulu supaya karakter non-ASCII aman di btoa
+    const encodedId = btoa(unescape(encodeURIComponent(anime.id))).replace(/=/g, '');
+    const titleKebab = (anime.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    return `${encodedId}--${titleKebab}`;
+  } catch {
+    // fallback: langsung pakai id tanpa encode jika btoa gagal
+    const titleKebab = (anime.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    return `${anime.id}--${titleKebab}`;
+  }
 };
 
 export const decodeAnimeId = (slug: string): string => {
   const encoded = slug.split('--')[0];
   try {
-    return Buffer.from(encoded, 'base64').toString('utf-8');
+    return decodeURIComponent(escape(atob(encoded)));
   } catch {
     return encoded;
   }
