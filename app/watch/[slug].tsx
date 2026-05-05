@@ -10,7 +10,7 @@ import * as ScreenOrientation from 'expo-screen-orientation';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Slider from '@react-native-community/slider';
 import { COLORS } from '@/constants';
-import { api, getProxyUrl, getAnimeSlug, formatTime } from '@/hooks/api';
+import { api, getProxyUrl, getAnimeSlug, decodeAnimeId, formatTime } from '@/hooks/api';
 import { historyStorage } from '@/hooks/storage';
 import { AnimeDetail, Episode, Server, Anime } from '@/types';
 import { WatchSkeleton } from '@/components/Skeleton';
@@ -28,7 +28,8 @@ export default function WatchScreen() {
   const videoRef = useRef<Video>(null);
 
   // slug format: "{id}--{title-kebab}" — split("--")[0] untuk ambil id asli
-  const animeId = (slug ?? "").split("--")[0];
+  // slug format: "{base64(id)}--{title-kebab}" — decode base64 untuk ambil id asli
+  const animeId = decodeAnimeId(slug ?? '');
 
   const [anime, setAnime] = useState<AnimeDetail | null>(null);
   const [episodes, setEpisodes] = useState<Episode[]>([]);
