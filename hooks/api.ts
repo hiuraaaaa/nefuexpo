@@ -8,7 +8,7 @@ const get = async <T>(path: string): Promise<T> => {
 
 // ─── Mappers ──────────────────────────────────────────────────────────────────
 
-// Untuk /latest dan /movies
+// Untuk /latest, /movies, /search
 // Response: [{ id, url, judul, cover, genre[], sinopsis, studio, score, status, rilis, total_episode }]
 function mapAnime(raw: any): Anime {
   return {
@@ -32,10 +32,10 @@ function mapAnime(raw: any): Anime {
 }
 
 // Untuk item dalam schedule animeList
-// Response: [{ anime_name, cover, link }]
+// Response: [{ anime_name, id, link, cover }]
 function mapScheduleItem(raw: any): Anime {
   return {
-    id:           (raw.link || raw.anime_name || '').replace(/\/+$/, ''),
+    id:           (raw.link ?? raw.anime_name ?? '').replace(/\/+$/, ''),
     title:        raw.anime_name ?? '',
     image_poster: raw.cover ?? '',
     image_cover:  raw.cover ?? '',
@@ -103,22 +103,24 @@ const fetchPopular = async (_page = 0): Promise<ApiResponse<Anime[]>> => {
 };
 
 // GET /schedule
-// Response: { data: [{ day, animeList: [{ anime_name, cover, link }] }] }
+// Response: { data: [{ day: "Minggu"|"Senin"|..., animeList: [{ anime_name, id, link, cover }] }] }
+// day pakai huruf kapital pertama → toUpperCase() supaya match DAY_KEYS
 const fetchSchedule = async (): Promise<ApiResponse<ScheduleDay>> => {
   const json = await get<any>('/schedule');
-  const raw = json?.data ?? (Array.isArray(json) ? json : []);
+  const raw: any[] = json?.data ?? (Array.isArray(json) ? json : []);
   const days: ScheduleDay = {};
   for (const item of raw) {
-    const key = (item.day ?? '').toUpperCase();
+    const key = (item.day ?? '').toUpperCase(); // "Minggu" → "MINGGU"
     days[key] = (item.animeList ?? []).map(mapScheduleItem);
   }
   return { status: true, data: days };
 };
 
 // GET /search?q=&page=1
+// Response: { data: [{ jumlah, result: [...], pagination: {} }] }
 const fetchSearch = async (q: string, page = 0): Promise<ApiResponse<Anime[]>> => {
   const json = await get<any>(`/search?q=${encodeURIComponent(q)}&page=${page + 1}`);
-  const result = Array.isArray(json) ? json : (json?.data?.result ?? json?.data ?? []);
+  const result: any[] = json?.data?.[0]?.result ?? [];
   return { status: true, data: result.map(mapAnime) };
 };
 
@@ -133,20 +135,15 @@ const fetchDetail = async (id: string): Promise<ApiResponse<AnimeDetail>> => {
 
 // GET /episode?url=&reso=720p
 // Response: { data: [{ stream: [{ reso, link, provide, id }] }] }
-// Prioritas: .mp4 dulu (bisa diputar langsung), fallback ke .m3u8
+// Prioritas: .mp4 dulu (direct play), fallback .m3u8 (HLS)
 const fetchEpisode = async (id: string): Promise<any> => {
   const json = await get<any>(`/episode?url=${encodeURIComponent(id)}&reso=720p`);
   const streamData: any[] = json?.data?.[0]?.stream ?? [];
 
-  // Pisahkan mp4 dan m3u8
-  const mp4s = streamData.filter((s: any) =>
-    s.link && s.link.split('?')[0].endsWith('.mp4')
-  );
-  const m3u8s = streamData.filter((s: any) =>
-    s.link && s.link.includes('.m3u8')
-  );
+  const mp4s  = streamData.filter((s: any) => s.link && s.link.split('?')[0].endsWith('.mp4'));
+  const m3u8s = streamData.filter((s: any) => s.link && s.link.includes('.m3u8'));
 
-  // Gabung: mp4 dulu, m3u8 nyusul sebagai fallback
+  // mp4 prioritas, m3u8 fallback
   const combined = [...mp4s, ...m3u8s];
 
   const server = combined.map((s: any, i: number) => ({
