@@ -4,7 +4,7 @@ import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
 // Web client ID dari Firebase Console →
 // Project Settings → your app → OAuth 2.0 client ID
 GoogleSignin.configure({
-  webClientId: 'GANTI_DENGAN_WEB_CLIENT_ID_DARI_FIREBASE',
+  webClientId: '206619940359-r4c4arj7mkq2pip24cn8i365er8p57i0.apps.googleusercontent.com',
 });
 
 export const signInWithGoogle = async (): Promise<FirebaseAuthTypes.User | null> => {
