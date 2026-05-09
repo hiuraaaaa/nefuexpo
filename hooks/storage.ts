@@ -1,4 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import firestore from '@react-native-firebase/firestore';
+import auth from '@react-native-firebase/auth';
 import { Anime, HistoryItem } from '@/types';
 
 const HISTORY_KEY = 'nefusoft_history';
@@ -76,4 +78,63 @@ export const clearSearchHistory = async (): Promise<void> => {
   try {
     await AsyncStorage.removeItem(SEARCH_HISTORY_KEY);
   } catch {}
+};
+
+// ─── Favorit (Firestore) ─────────────────────────────────────────────────────
+
+const getUserFavRef = () => {
+  const user = auth().currentUser;
+  if (!user) return null;
+  return firestore().collection('users').doc(user.uid).collection('favorites');
+};
+
+export const favoritStorage = {
+  getAll: async (): Promise<Anime[]> => {
+    try {
+      const ref = getUserFavRef();
+      if (!ref) return [];
+      const snap = await ref.orderBy('savedAt', 'desc').get();
+      return snap.docs.map(d => d.data().anime as Anime);
+    } catch {
+      return [];
+    }
+  },
+
+  add: async (anime: Anime): Promise<void> => {
+    try {
+      const ref = getUserFavRef();
+      if (!ref) return;
+      await ref.doc(anime.id).set({ anime, savedAt: Date.now() });
+    } catch {}
+  },
+
+  remove: async (animeId: string): Promise<void> => {
+    try {
+      const ref = getUserFavRef();
+      if (!ref) return;
+      await ref.doc(animeId).delete();
+    } catch {}
+  },
+
+  isFavorited: async (animeId: string): Promise<boolean> => {
+    try {
+      const ref = getUserFavRef();
+      if (!ref) return false;
+      const doc = await ref.doc(animeId).get();
+      return doc.exists;
+    } catch {
+      return false;
+    }
+  },
+
+  toggle: async (anime: Anime): Promise<boolean> => {
+    const isFav = await favoritStorage.isFavorited(anime.id);
+    if (isFav) {
+      await favoritStorage.remove(anime.id);
+      return false;
+    } else {
+      await favoritStorage.add(anime);
+      return true;
+    }
+  },
 };
