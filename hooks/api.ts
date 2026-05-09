@@ -184,20 +184,15 @@ export const getProxyUrl = (url: string) => `${PROXY_BASE}${url}`;
 // ─── Slug encode/decode pakai btoa/atob (React Native safe, tanpa Buffer) ─────
 
 export const getAnimeSlug = (anime: Anime): string => {
-  try {
-    const encodedId = btoa(unescape(encodeURIComponent(anime.id))).replace(/=/g, '');
-    const titleKebab = (anime.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
-    return `${encodedId}--${titleKebab}`;
-  } catch {
-    const titleKebab = (anime.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
-    return `${anime.id}--${titleKebab}`;
-  }
+  const encodedId = encodeURIComponent(anime.id).replace(/%/g, '_');
+  const titleKebab = (anime.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  return `${encodedId}---${titleKebab}`;
 };
 
 export const decodeAnimeId = (slug: string): string => {
-  const encoded = slug.split('--')[0];
+  const encoded = slug.split('---')[0];
   try {
-    return decodeURIComponent(escape(atob(encoded)));
+    return decodeURIComponent(encoded.replace(/_/g, '%'));
   } catch {
     return encoded;
   }
