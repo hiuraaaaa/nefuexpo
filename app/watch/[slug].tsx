@@ -15,6 +15,9 @@ import { historyStorage } from '@/hooks/storage';
 import { xpStorage } from '@/hooks/xp';
 import { AnimeDetail, Episode, Server, Anime } from '@/types';
 import { WatchSkeleton } from '@/components/Skeleton';
+import { Ionicons } from '@expo/vector-icons';
+import { favoritStorage } from '@/hooks/storage';
+import { getCurrentUser } from '@/hooks/auth';
 
 const { width } = Dimensions.get('window');
 
@@ -130,6 +133,7 @@ export default function WatchScreen() {
   const [position, setPosition]       = useState(0);
   const [duration, setDuration]       = useState(0);
   const [isBuffering, setIsBuffering] = useState(false);
+  const [isFavorited, setIsFavorited] = useState(false);
 
   const controlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -213,6 +217,11 @@ export default function WatchScreen() {
     }
   }, [currentEpId, anime]);
 
+  useEffect(() => {
+  if (!anime) return;
+  favoritStorage.isFavorited(anime.id).then(setIsFavorited);
+}, [anime]);
+
   const resetControlsTimer = useCallback(() => {
     setShowControls(true);
     if (controlsTimer.current) clearTimeout(controlsTimer.current);
@@ -261,6 +270,16 @@ export default function WatchScreen() {
       });
     } catch {}
   };
+
+  const handleBookmark = async () => {
+  if (!getCurrentUser()) {
+    Alert.alert('Login Dulu', 'Login untuk menyimpan favorit');
+    return;
+  }
+  if (!anime) return;
+  const result = await favoritStorage.toggle(anime as any);
+  setIsFavorited(result);
+};
 
   const videoHeight = isFullscreen ? Dimensions.get('window').height : width * (9 / 16);
 
@@ -392,6 +411,12 @@ export default function WatchScreen() {
                 {anime?.title}{'  '}
                 <Text style={{ color: COLORS.gold, fontWeight: '900' }}>Eps {currentEpNum}</Text>
               </Text>
+              <TouchableOpacity
+               onPress={handleBookmark}
+               style={{ width: 36, height: 36, borderRadius: 18,
+               backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name={isFavorited ? 'bookmark' : 'bookmark-outline'} size={18} color={COLORS.gold} />
+              </TouchableOpacity>
             </View>
 
             {/* Center controls: Prev / Play-Pause / Next */}
