@@ -1,14 +1,17 @@
 import { Tabs } from 'expo-router';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Animated } from 'react-native';
+import { useRef, useEffect } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '@/constants';
 
 const ACTIVE = COLORS.gold;
 const INACTIVE = 'rgba(255,255,255,0.35)';
-const BAR_BG = 'rgba(10,10,12,0.92)';
+const BAR_BG = 'rgba(10,10,12,0.97)';
 const LABEL_COLOR = COLORS.gold;
 const TAB_HEIGHT = 64;
-const BUBBLE_SIZE = 60;
+const BUBBLE_SIZE = 58;
+
+// ─── Icons ────────────────────────────────────────────────────────────────────
 
 function HomeIcon({ color }: { color: string }) {
   return (
@@ -68,7 +71,35 @@ function HistoryIcon({ color }: { color: string }) {
   );
 }
 
+// ─── TabIcon dengan animasi ───────────────────────────────────────────────────
+
 function TabIcon({ focused, label }: { focused: boolean; label: string }) {
+  const scale = useRef(new Animated.Value(focused ? 1 : 0.85)).current;
+  const translateY = useRef(new Animated.Value(focused ? 0 : 4)).current;
+  const opacity = useRef(new Animated.Value(focused ? 1 : 0.6)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(scale, {
+        toValue: focused ? 1 : 0.85,
+        useNativeDriver: true,
+        tension: 120,
+        friction: 8,
+      }),
+      Animated.spring(translateY, {
+        toValue: focused ? 0 : 4,
+        useNativeDriver: true,
+        tension: 120,
+        friction: 8,
+      }),
+      Animated.timing(opacity, {
+        toValue: focused ? 1 : 0.6,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [focused]);
+
   const iconColor = focused ? BAR_BG : INACTIVE;
 
   const Icon = () => {
@@ -84,21 +115,31 @@ function TabIcon({ focused, label }: { focused: boolean; label: string }) {
 
   if (focused) {
     return (
-      <View style={styles.activeBubbleWrapper}>
+      <Animated.View style={[
+        styles.activeBubbleWrapper,
+        { transform: [{ scale }, { translateY }] },
+      ]}>
         <View style={styles.activeBubble}>
           <Icon />
         </View>
-        <Text style={styles.activeLabel}>{label}</Text>
-      </View>
+        <Animated.Text style={[styles.activeLabel, { opacity }]}>
+          {label.toUpperCase()}
+        </Animated.Text>
+      </Animated.View>
     );
   }
 
   return (
-    <View style={styles.inactiveWrapper}>
+    <Animated.View style={[
+      styles.inactiveWrapper,
+      { opacity, transform: [{ scale }, { translateY }] },
+    ]}>
       <Icon />
-    </View>
+    </Animated.View>
   );
 }
+
+// ─── Layout ───────────────────────────────────────────────────────────────────
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
@@ -109,18 +150,11 @@ export default function TabLayout() {
         headerShown: false,
         tabBarStyle: {
           backgroundColor: BAR_BG,
-          borderTopWidth: 0,
+          borderTopWidth: 1,
+          borderTopColor: 'rgba(255,255,255,0.06)',
           height: TAB_HEIGHT + insets.bottom,
           paddingBottom: insets.bottom,
           paddingTop: 0,
-          position: 'absolute',
-          left: 16, right: 16, bottom: 16,
-          borderRadius: 24,
-          shadowColor: '#000',
-          shadowOpacity: 0.4,
-          shadowRadius: 24,
-          elevation: 16,
-          overflow: 'visible',
         },
         tabBarShowLabel: false,
         tabBarActiveTintColor: ACTIVE,
@@ -136,6 +170,8 @@ export default function TabLayout() {
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   activeBubbleWrapper: {
     alignItems: 'center',
@@ -150,17 +186,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: ACTIVE,
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
     shadowOffset: { width: 0, height: 4 },
-    elevation: 10,
+    elevation: 12,
   },
   activeLabel: {
     color: LABEL_COLOR,
-    fontSize: 11,
-    fontWeight: '600',
-    marginTop: 6,
-    letterSpacing: 0.2,
+    fontSize: 9,
+    fontWeight: '900',
+    marginTop: 5,
+    letterSpacing: 0.5,
   },
   inactiveWrapper: {
     alignItems: 'center',
