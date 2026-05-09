@@ -8,15 +8,17 @@ const get = async <T>(path: string): Promise<T> => {
 
 // ─── Mappers ──────────────────────────────────────────────────────────────────
 
+// Untuk /latest dan /movies
+// Response: [{ judul, cover, url, genre[], synopsis, sinopsis, status }]
 function mapAnime(raw: any): Anime {
   return {
-    id:           (raw.url ?? raw.series_id ?? String(raw.id ?? '')).replace(/\/+$/, ''),
+    id:           (raw.url || raw.judul || raw.anime_name || '').replace(/\/+$/, ''),
     title:        raw.judul ?? raw.anime_name ?? '',
     image_poster: raw.cover ?? '',
     image_cover:  raw.cover ?? '',
-    synopsis:     raw.sinopsis ?? '',
+    synopsis:     raw.synopsis ?? raw.sinopsis ?? '',
     type:         raw.type ?? '',
-    status:       raw.status ?? '',
+    status:       raw.status ?? 'ONGOING',
     year:         raw.rilis ?? '',
     aired_start:  raw.rilis ?? '',
     studio:       raw.author ?? raw.studio ?? '',
@@ -29,12 +31,31 @@ function mapAnime(raw: any): Anime {
   };
 }
 
+// Untuk item dalam schedule animeList
+// Response: [{ anime_name, cover, link }]
+function mapScheduleItem(raw: any): Anime {
+  return {
+    id:           (raw.link || raw.anime_name || '').replace(/\/+$/, ''),
+    title:        raw.anime_name ?? '',
+    image_poster: raw.cover ?? '',
+    image_cover:  raw.cover ?? '',
+    synopsis:     '',
+    type:         '',
+    status:       'ONGOING',
+    year:         '',
+    aired_start:  '',
+    studio:       '',
+    genre:        '',
+    day:          '',
+    time:         '',
+    key_time:     '',
+  };
+}
+
 function mapAnimeDetail(raw: any): AnimeDetail {
   const base = mapAnime(raw);
-  // chapters dibalik supaya ep 1 di index 0
   const chapters: any[] = [...(raw.chapter ?? [])].reverse();
   const episode_list = chapters.map((ch: any) => ({
-    // encode: chapterUrl|seriesSlug|epNumber — dipakai fetchEpisode
     id:    `${ch.url}|${raw.series_id}|${ch.ch}`,
     index: Number(ch.ch),
     title: `Episode ${ch.ch}`,
@@ -44,63 +65,55 @@ function mapAnimeDetail(raw: any): AnimeDetail {
 
 // ─── Endpoints ────────────────────────────────────────────────────────────────
 
-// GET /ongoing?page=1
-// data: [{ url, judul, cover, ... }]
+// GET /latest?page=1
+// Response: array of { judul, cover, url, genre[], synopsis }
 const fetchOngoing = async (page = 0): Promise<ApiResponse<Anime[]>> => {
-  const json = await get<any>(`/ongoing?page=${page + 1}`);
-  return { status: json?.status === 'ok', data: (json?.data ?? []).map(mapAnime) };
+  const json = await get<any>(`/latest?page=${page + 1}`);
+  const list = Array.isArray(json) ? json : (json?.data ?? []);
+  return { status: true, data: list.map(mapAnime) };
 };
 
-// GET /rekomendasi
-// data: [{ id, url, judul, cover, genre[], sinopsis, ... }]
+// GET /movies
+// Response: array of { judul, cover, url, genre[], synopsis }
 const fetchPopular = async (_page = 0): Promise<ApiResponse<Anime[]>> => {
-  const json = await get<any>('/rekomendasi');
-  return { status: json?.status === 'ok', data: (json?.data ?? []).map(mapAnime) };
+  const json = await get<any>('/movies');
+  const list = Array.isArray(json) ? json : (json?.data ?? []);
+  return { status: true, data: list.map(mapAnime) };
 };
 
-// GET /jadwal
-// data: [{ day, date, animeList: [{ anime_name, id, link, cover }] }]
+// GET /schedule
+// Response: { data: [{ day, animeList: [{ anime_name, cover, link }] }] }
 const fetchSchedule = async (): Promise<ApiResponse<ScheduleDay>> => {
-  const json = await get<any>('/jadwal');
+  const json = await get<any>('/schedule');
+  const raw = json?.data ?? (Array.isArray(json) ? json : []);
   const days: ScheduleDay = {};
-  for (const item of json?.data ?? []) {
-    const key = (item.day ?? '').toUpperCase(); // "SELASA", "RABU", dst
-    days[key] = (item.animeList ?? []).map((a: any) => mapAnime({
-      url:   a.link,
-      judul: a.anime_name,
-      cover: a.cover,
-      id:    a.id,
-    }));
+  for (const item of raw) {
+    const key = (item.day ?? '').toUpperCase(); // "SENIN", "SELASA", dst
+    days[key] = (item.animeList ?? []).map(mapScheduleItem);
   }
-  return { status: json?.status === 'ok', data: days };
+  return { status: true, data: days };
 };
 
 // GET /search?q=&page=1
-// data: { result: [...], pagination: {} }
 const fetchSearch = async (q: string, page = 0): Promise<ApiResponse<Anime[]>> => {
   const json = await get<any>(`/search?q=${encodeURIComponent(q)}&page=${page + 1}`);
-  const result = json?.data?.result ?? [];
-  return { status: json?.status === 'ok', data: result.map(mapAnime) };
+  const result = Array.isArray(json) ? json : (json?.data?.result ?? json?.data ?? []);
+  return { status: true, data: result.map(mapAnime) };
 };
 
 // GET /series?slug=
-// data: { id, series_id, judul, cover, chapter: [{ id, ch, url }] }
 const fetchDetail = async (id: string): Promise<ApiResponse<AnimeDetail>> => {
   const json = await get<any>(`/series?slug=${encodeURIComponent(id)}`);
   if (!json?.data) return { status: false, data: null as any };
-  return { status: json?.status === 'ok', data: mapAnimeDetail(json.data) };
+  return { status: true, data: mapAnimeDetail(json.data) };
 };
 
-// GET /stream?post_id=al-153610-5&slug=liar-game-sub-indo&episode=5
-// data: { "360p": [{link, ...}], "720p": [...], ... }
-// Episode.id encoded sebagai "chUrl|seriesSlug|epNum"
+// GET /stream
 const fetchEpisode = async (combinedId: string): Promise<any> => {
   const [chUrl, slug, episode] = combinedId.split('|');
   const json = await get<any>(
     `/stream?post_id=${encodeURIComponent(chUrl)}&slug=${encodeURIComponent(slug)}&episode=${encodeURIComponent(episode)}`
   );
-
-  // Normalize ke format lama: { status, data: { server: [{id, quality, link, type}] } }
   const data = json?.data ?? {};
   const server: any[] = [];
   let i = 0;
@@ -118,15 +131,13 @@ const fetchEpisode = async (combinedId: string): Promise<any> => {
       }
     }
   }
-
-  return { status: json?.status === 'ok', data: { server } };
+  return { status: true, data: { server } };
 };
 
-// Genre tidak tersedia di API baru — return kosong aman
 const fetchGenre = async (): Promise<ApiResponse<Genre[]>> => ({ status: true, data: [] });
 const fetchGenreFilter = async (_ids: string[], _page = 0): Promise<ApiResponse<Anime[]>> => ({ status: true, data: [] });
 
-// ─── Public API (interface sama persis seperti sebelumnya) ────────────────────
+// ─── Public API ────────────────────────────────────────────────────────────────
 
 export const api = {
   home: () => Promise.all([fetchSchedule(), fetchOngoing(), fetchPopular()]),
@@ -146,12 +157,10 @@ export const getProxyUrl = (url: string) => `${PROXY_BASE}${url}`;
 
 export const getAnimeSlug = (anime: Anime): string => {
   try {
-    // encodeURIComponent dulu supaya karakter non-ASCII aman di btoa
     const encodedId = btoa(unescape(encodeURIComponent(anime.id))).replace(/=/g, '');
     const titleKebab = (anime.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
     return `${encodedId}--${titleKebab}`;
   } catch {
-    // fallback: langsung pakai id tanpa encode jika btoa gagal
     const titleKebab = (anime.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
     return `${anime.id}--${titleKebab}`;
   }
