@@ -26,9 +26,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-router',
     'expo-av',
     'expo-screen-orientation',
-    '@react-native-firebase/app',     // ← tambah
-    '@react-native-firebase/auth',    // ← tambah
-    '@react-native-google-signin/google-signin', // ← tambah
+    '@react-native-firebase/app',
+    '@react-native-firebase/auth',
+    '@react-native-firebase/firestore',
+    '@react-native-google-signin/google-signin',
     [
       'expo-font',
       { fonts: [] }
