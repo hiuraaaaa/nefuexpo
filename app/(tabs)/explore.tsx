@@ -1,15 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, FlatList,
-  ActivityIndicator, ScrollView,
+  View, Text, TextInput, TouchableOpacity, FlatList, ScrollView,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants';
 import { api, getAnimeSlug } from '@/hooks/api';
 import { Anime, Genre } from '@/types';
 import AnimeCard from '@/components/AnimeCard';
 import { CardSkeleton } from '@/components/Skeleton';
+
+const NUM_COLUMNS = 3;
+const H_PAD = 12;
+const GAP = 8;
 
 export default function ExploreScreen() {
   const params = useLocalSearchParams<{ q?: string }>();
@@ -47,80 +51,106 @@ export default function ExploreScreen() {
   const toggleGenre = (id: string) =>
     setSelectedGenres(p => p.includes(id) ? p.filter(g => g !== id) : [...p, id]);
 
-  const numColumns = 3;
+  const cardWidth = `${(100 - ((NUM_COLUMNS - 1) * GAP * 100 / (375 - H_PAD * 2))) / NUM_COLUMNS}%`;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.bg }} edges={['top']}>
-      {/* Search bar */}
-      <View className="px-4 pt-4 pb-3">
-        <View className="flex-row items-center bg-card rounded-2xl px-4 py-3 border border-white/5">
-          <Text style={{ fontSize: 16, marginRight: 8 }}>🔍</Text>
+
+      {/* ── Search bar ── */}
+      <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 }}>
+        <View style={{
+          flexDirection: 'row', alignItems: 'center',
+          backgroundColor: COLORS.card, borderRadius: 14,
+          paddingHorizontal: 14, paddingVertical: 11,
+          borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+          gap: 10,
+        }}>
+          <Ionicons name="search-outline" size={18} color={COLORS.gold} />
           <TextInput
-            className="flex-1 text-white font-bold text-sm"
+            style={{ flex: 1, color: '#fff', fontWeight: '600', fontSize: 14, paddingVertical: 0 }}
             placeholder="Cari anime..."
-            placeholderTextColor="rgba(255,255,255,0.3)"
+            placeholderTextColor="rgba(255,255,255,0.25)"
             value={query}
             onChangeText={t => { setQuery(t); setSelectedGenres([]); }}
             returnKeyType="search"
+            selectionColor={COLORS.gold}
           />
           {query.length > 0 && (
             <TouchableOpacity onPress={() => setQuery('')}>
-              <Text className="text-white/40 text-lg">✕</Text>
+              <Ionicons name="close-circle" size={18} color="rgba(255,255,255,0.3)" />
             </TouchableOpacity>
           )}
         </View>
       </View>
 
-      {/* Genre filter chips */}
+      {/* ── Genre chips ── */}
       {!query && genres.length > 0 && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="px-4 mb-3" style={{ maxHeight: 44 }}>
-          {genres.map(g => (
-            <TouchableOpacity
-              key={g.id}
-              onPress={() => toggleGenre(g.id)}
-              className="mr-2 px-4 py-2 rounded-xl"
-              style={{
-                backgroundColor: selectedGenres.includes(g.id) ? COLORS.gold : 'rgba(255,255,255,0.05)',
-                borderWidth: 1,
-                borderColor: selectedGenres.includes(g.id) ? COLORS.gold : 'rgba(255,255,255,0.1)',
-              }}>
-              <Text style={{
-                color: selectedGenres.includes(g.id) ? '#000' : 'rgba(255,255,255,0.5)',
-                fontSize: 10, fontWeight: '700',
-              }}>{g.name}</Text>
-            </TouchableOpacity>
-          ))}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
+          style={{ maxHeight: 44, marginBottom: 12 }}
+        >
+          {genres.map(g => {
+            const active = selectedGenres.includes(g.id);
+            return (
+              <TouchableOpacity
+                key={g.id}
+                onPress={() => toggleGenre(g.id)}
+                style={{
+                  paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10,
+                  backgroundColor: active ? COLORS.gold : 'rgba(255,255,255,0.05)',
+                  borderWidth: 1,
+                  borderColor: active ? COLORS.gold : 'rgba(255,255,255,0.08)',
+                }}
+              >
+                <Text style={{
+                  color: active ? '#000' : 'rgba(255,255,255,0.5)',
+                  fontSize: 10, fontWeight: '700',
+                }}>{g.name}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
       )}
 
+      {/* ── Query label ── */}
       {query.length > 0 && (
-        <View className="px-4 mb-3">
-          <Text className="text-white/40 text-xs font-bold uppercase tracking-widest">Hasil untuk:</Text>
-          <Text className="font-black text-xl uppercase tracking-tighter" style={{ color: COLORS.gold }}>"{query}"</Text>
+        <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
+          <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' }}>
+            Hasil untuk
+          </Text>
+          <Text style={{ color: COLORS.gold, fontSize: 20, fontWeight: '900', letterSpacing: -0.5 }} numberOfLines={1}>
+            "{query}"
+          </Text>
         </View>
       )}
 
+      {/* ── Content ── */}
       {isLoading ? (
         <FlatList
           data={[...Array(12)]}
           keyExtractor={(_, i) => String(i)}
-          numColumns={3}
-          contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 100 }}
-          columnWrapperStyle={{ gap: 8, marginBottom: 12 }}
+          numColumns={NUM_COLUMNS}
+          contentContainerStyle={{ paddingHorizontal: H_PAD, paddingBottom: 100 }}
+          columnWrapperStyle={{ gap: GAP, marginBottom: GAP }}
           renderItem={() => <View style={{ flex: 1 }}><CardSkeleton /></View>}
           scrollEnabled={false}
         />
       ) : results.length === 0 ? (
-        <View className="flex-1 items-center justify-center">
-          <Text className="text-white/20 font-bold uppercase tracking-widest text-sm">Tidak ditemukan</Text>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <Ionicons name="search-outline" size={40} color="rgba(255,255,255,0.08)" />
+          <Text style={{ color: 'rgba(255,255,255,0.2)', fontWeight: '700', fontSize: 13 }}>
+            Tidak ditemukan
+          </Text>
         </View>
       ) : (
         <FlatList
           data={results}
           keyExtractor={i => i.id}
-          numColumns={numColumns}
-          contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 100 }}
-          columnWrapperStyle={{ gap: 8, marginBottom: 12 }}
+          numColumns={NUM_COLUMNS}
+          contentContainerStyle={{ paddingHorizontal: H_PAD, paddingBottom: 100 }}
+          columnWrapperStyle={{ gap: GAP, marginBottom: GAP }}
           renderItem={({ item }) => (
             <View style={{ flex: 1 }}>
               <AnimeCard
@@ -130,23 +160,34 @@ export default function ExploreScreen() {
             </View>
           )}
           ListFooterComponent={() => (
-            <View className="flex-row justify-center gap-4 mt-4 mb-4">
+            <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 12, marginTop: 8, marginBottom: 16 }}>
               <TouchableOpacity
                 onPress={() => setPage(p => Math.max(0, p - 1))}
                 disabled={page === 0}
-                className="px-6 py-3 rounded-xl"
-                style={{ backgroundColor: COLORS.card, opacity: page === 0 ? 0.3 : 1 }}>
-                <Text className="text-white font-black">‹ Prev</Text>
+                style={{
+                  paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10,
+                  backgroundColor: COLORS.card, opacity: page === 0 ? 0.3 : 1,
+                }}
+              >
+                <Ionicons name="chevron-back" size={16} color="#fff" />
               </TouchableOpacity>
-              <View className="px-4 py-3 rounded-xl items-center justify-center" style={{ backgroundColor: COLORS.gold }}>
-                <Text className="text-black font-black">{page + 1}</Text>
+
+              <View style={{
+                paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10,
+                backgroundColor: COLORS.gold, minWidth: 40, alignItems: 'center',
+              }}>
+                <Text style={{ color: '#000', fontWeight: '900', fontSize: 13 }}>{page + 1}</Text>
               </View>
+
               <TouchableOpacity
                 onPress={() => setPage(p => p + 1)}
                 disabled={results.length === 0}
-                className="px-6 py-3 rounded-xl"
-                style={{ backgroundColor: COLORS.card }}>
-                <Text className="text-white font-black">Next ›</Text>
+                style={{
+                  paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10,
+                  backgroundColor: COLORS.card, opacity: results.length === 0 ? 0.3 : 1,
+                }}
+              >
+                <Ionicons name="chevron-forward" size={16} color="#fff" />
               </TouchableOpacity>
             </View>
           )}
@@ -154,4 +195,4 @@ export default function ExploreScreen() {
       )}
     </SafeAreaView>
   );
-}
+                  }
