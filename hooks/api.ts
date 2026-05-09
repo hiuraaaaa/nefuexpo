@@ -9,19 +9,19 @@ const get = async <T>(path: string): Promise<T> => {
 // ─── Mappers ──────────────────────────────────────────────────────────────────
 
 // Untuk /latest dan /movies
-// Response: [{ judul, cover, url, genre[], synopsis, sinopsis, status }]
+// Response: [{ id, url, judul, cover, genre[], sinopsis, studio, score, status, rilis, total_episode }]
 function mapAnime(raw: any): Anime {
   return {
-    id:           (raw.url || raw.judul || raw.anime_name || '').replace(/\/+$/, ''),
+    id:           (raw.url ?? String(raw.id ?? '')).replace(/\/+$/, ''),
     title:        raw.judul ?? raw.anime_name ?? '',
     image_poster: raw.cover ?? '',
     image_cover:  raw.cover ?? '',
-    synopsis:     raw.synopsis ?? raw.sinopsis ?? '',
+    synopsis:     raw.sinopsis ?? raw.synopsis ?? '',
     type:         raw.type ?? '',
     status:       raw.status ?? 'ONGOING',
-    year:         raw.rilis ?? '',
-    aired_start:  raw.rilis ?? '',
-    studio:       raw.author ?? raw.studio ?? '',
+    year:         raw.rilis ?? raw.published?.split(' ').pop() ?? '',
+    aired_start:  raw.published ?? raw.rilis ?? '',
+    studio:       raw.studio ?? raw.author ?? '',
     genre: Array.isArray(raw.genre)
       ? raw.genre.join(', ')
       : raw.genre ?? '',
@@ -52,21 +52,42 @@ function mapScheduleItem(raw: any): Anime {
   };
 }
 
+// Untuk /detail?url=
+// Response: { data: [{ series_id, judul, cover, sinopsis, published, author, rating, type, status, genre[], chapter[] }] }
 function mapAnimeDetail(raw: any): AnimeDetail {
-  const base = mapAnime(raw);
-  const chapters: any[] = [...(raw.chapter ?? [])].reverse();
-  const episode_list = chapters.map((ch: any) => ({
-    id:    `${ch.url}|${raw.series_id}|${ch.ch}`,
-    index: Number(ch.ch),
+  const base: Anime = {
+    id:           (raw.series_id ?? raw.url ?? '').replace(/\/+$/, ''),
+    title:        raw.judul ?? '',
+    image_poster: raw.cover ?? '',
+    image_cover:  raw.cover ?? '',
+    synopsis:     raw.sinopsis ?? '',
+    type:         raw.type ?? '',
+    status:       raw.status ?? '',
+    year:         raw.published?.split(' ').pop() ?? '',
+    aired_start:  raw.published ?? '',
+    studio:       raw.author ?? '',
+    genre: Array.isArray(raw.genre)
+      ? raw.genre.join(', ')
+      : raw.genre ?? '',
+    day:      '',
+    time:     '',
+    key_time: '',
+  };
+
+  // chapter sudah desc (index 0 = episode terbaru), tidak perlu di-reverse
+  const episode_list = (raw.chapter ?? []).map((ch: any) => ({
+    id:    (ch.url ?? '').replace(/\/+$/, ''),
+    index: ch.ch,   // e.g. "12 (End)", "11", "10"
     title: `Episode ${ch.ch}`,
   }));
+
   return { ...base, episode_list };
 }
 
 // ─── Endpoints ────────────────────────────────────────────────────────────────
 
 // GET /latest?page=1
-// Response: array of { judul, cover, url, genre[], synopsis }
+// Response: array of anime objects
 const fetchOngoing = async (page = 0): Promise<ApiResponse<Anime[]>> => {
   const json = await get<any>(`/latest?page=${page + 1}`);
   const list = Array.isArray(json) ? json : (json?.data ?? []);
@@ -74,7 +95,7 @@ const fetchOngoing = async (page = 0): Promise<ApiResponse<Anime[]>> => {
 };
 
 // GET /movies
-// Response: array of { judul, cover, url, genre[], synopsis }
+// Response: array of anime objects
 const fetchPopular = async (_page = 0): Promise<ApiResponse<Anime[]>> => {
   const json = await get<any>('/movies');
   const list = Array.isArray(json) ? json : (json?.data ?? []);
@@ -88,7 +109,7 @@ const fetchSchedule = async (): Promise<ApiResponse<ScheduleDay>> => {
   const raw = json?.data ?? (Array.isArray(json) ? json : []);
   const days: ScheduleDay = {};
   for (const item of raw) {
-    const key = (item.day ?? '').toUpperCase(); // "SENIN", "SELASA", dst
+    const key = (item.day ?? '').toUpperCase();
     days[key] = (item.animeList ?? []).map(mapScheduleItem);
   }
   return { status: true, data: days };
@@ -101,36 +122,40 @@ const fetchSearch = async (q: string, page = 0): Promise<ApiResponse<Anime[]>> =
   return { status: true, data: result.map(mapAnime) };
 };
 
-// GET /series?slug=
+// GET /detail?url=
+// Response: { data: [{ series_id, judul, cover, sinopsis, published, author, chapter[] }] }
 const fetchDetail = async (id: string): Promise<ApiResponse<AnimeDetail>> => {
-  const json = await get<any>(`/series?slug=${encodeURIComponent(id)}`);
-  if (!json?.data) return { status: false, data: null as any };
-  return { status: true, data: mapAnimeDetail(json.data) };
+  const json = await get<any>(`/detail?url=${encodeURIComponent(id)}`);
+  const raw = json?.data?.[0];
+  if (!raw) return { status: false, data: null as any };
+  return { status: true, data: mapAnimeDetail(raw) };
 };
 
-// GET /stream
-const fetchEpisode = async (combinedId: string): Promise<any> => {
-  const [chUrl, slug, episode] = combinedId.split('|');
-  const json = await get<any>(
-    `/stream?post_id=${encodeURIComponent(chUrl)}&slug=${encodeURIComponent(slug)}&episode=${encodeURIComponent(episode)}`
+// GET /episode?url=&reso=720p
+// Response: { data: [{ stream: [{ reso, link, provide, id }] }] }
+// Prioritas: .mp4 dulu (bisa diputar langsung), fallback ke .m3u8
+const fetchEpisode = async (id: string): Promise<any> => {
+  const json = await get<any>(`/episode?url=${encodeURIComponent(id)}&reso=720p`);
+  const streamData: any[] = json?.data?.[0]?.stream ?? [];
+
+  // Pisahkan mp4 dan m3u8
+  const mp4s = streamData.filter((s: any) =>
+    s.link && s.link.split('?')[0].endsWith('.mp4')
   );
-  const data = json?.data ?? {};
-  const server: any[] = [];
-  let i = 0;
-  for (const quality of ['1080p', '720p', '480p', '360p']) {
-    const links: any[] = data[quality] ?? [];
-    for (const item of links) {
-      if (item.link) {
-        server.push({
-          id:      String(i++),
-          quality,
-          link:    item.link,
-          type:    'direct',
-          provide: item.provide,
-        });
-      }
-    }
-  }
+  const m3u8s = streamData.filter((s: any) =>
+    s.link && s.link.includes('.m3u8')
+  );
+
+  // Gabung: mp4 dulu, m3u8 nyusul sebagai fallback
+  const combined = [...mp4s, ...m3u8s];
+
+  const server = combined.map((s: any, i: number) => ({
+    id:      String(i),
+    quality: s.reso ?? 'AUTO',
+    link:    s.link,
+    type:    s.link.includes('.m3u8') ? 'hls' : 'direct',
+  }));
+
   return { status: true, data: { server } };
 };
 
