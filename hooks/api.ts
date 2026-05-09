@@ -140,22 +140,28 @@ const fetchEpisode = async (id: string): Promise<any> => {
   const json = await get<any>(`/episode?url=${encodeURIComponent(id)}&reso=720p`);
   const streamData: any[] = json?.data?.[0]?.stream ?? [];
 
-  const mp4s  = streamData.filter((s: any) => s.link && s.link.split('?')[0].endsWith('.mp4'));
-  const m3u8s = streamData.filter((s: any) => s.link && s.link.includes('.m3u8'));
+  // Prioritas: pixeldrain (paling reliable) → mp4 direct → m3u8
+  const pixeldrain = streamData.filter((s: any) =>
+    s.link && s.link.includes('pixeldrain.com')
+  );
+  const mp4s = streamData.filter((s: any) =>
+    s.link && s.link.split('?')[0].endsWith('.mp4') && !s.link.includes('pixeldrain.com')
+  );
+  const m3u8s = streamData.filter((s: any) =>
+    s.link && s.link.includes('.m3u8')
+  );
 
-  // mp4 prioritas, m3u8 fallback
-  const combined = [...mp4s, ...m3u8s];
+  const combined = [...pixeldrain, ...mp4s, ...m3u8s];
 
   const server = combined.map((s: any, i: number) => ({
     id:      String(i),
     quality: s.reso ?? 'AUTO',
-    link:    s.link,
+    link:    s.link,  // link mentah, tanpa proxy
     type:    s.link.includes('.m3u8') ? 'hls' : 'direct',
   }));
 
   return { status: true, data: { server } };
 };
-
 const fetchGenre = async (): Promise<ApiResponse<Genre[]>> => ({ status: true, data: [] });
 const fetchGenreFilter = async (_ids: string[], _page = 0): Promise<ApiResponse<Anime[]>> => ({ status: true, data: [] });
 
