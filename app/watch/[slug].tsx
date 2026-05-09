@@ -12,6 +12,7 @@ import Slider from '@react-native-community/slider';
 import { COLORS } from '@/constants';
 import { api, getProxyUrl, getAnimeSlug, decodeAnimeId, formatTime } from '@/hooks/api';
 import { historyStorage } from '@/hooks/storage';
+import { xpStorage } from '@/hooks/xp';
 import { AnimeDetail, Episode, Server, Anime } from '@/types';
 import { WatchSkeleton } from '@/components/Skeleton';
 
@@ -206,7 +207,10 @@ export default function WatchScreen() {
   useEffect(() => {
     if (!anime || !currentEpId) return;
     const ep = episodes.find(e => e.id === currentEpId);
-    if (ep) historyStorage.add(anime, ep.index);
+    if (ep) {
+  historyStorage.add(anime, ep.index);
+  xpStorage.add(10);
+    }
   }, [currentEpId, anime]);
 
   const resetControlsTimer = useCallback(() => {
