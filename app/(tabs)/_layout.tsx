@@ -19,7 +19,7 @@ const TABS = [
   { name: 'explore',  label: 'Explore',  iconActive: 'compass',        iconInactive: 'compass-outline' },
   { name: 'ongoing',  label: 'Ongoing',  iconActive: 'play-circle',    iconInactive: 'play-circle-outline' },
   { name: 'schedule', label: 'Schedule', iconActive: 'calendar',       iconInactive: 'calendar-outline' },
-  { name: 'history',  label: 'History',  iconActive: 'time',           iconInactive: 'time-outline' },
+  { name: 'profile', label: 'Profile', iconActive: 'person', iconInactive: 'person-outline' },
 ] as const;
 
 // ─── TabIcon dengan animasi ───────────────────────────────────────────────────
