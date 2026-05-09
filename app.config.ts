@@ -28,7 +28,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-screen-orientation',
     '@react-native-firebase/app',
     '@react-native-firebase/auth',
-    '@react-native-firebase/firestore',
+  //  '@react-native-firebase/firestore',
     '@react-native-google-signin/google-signin',
     [
       'expo-font',
