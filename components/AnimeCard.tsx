@@ -7,6 +7,7 @@ import {
   Animated,
   StyleSheet,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS } from '@/constants';
 import { Anime } from '@/types';
 
@@ -52,13 +53,6 @@ export default function AnimeCard({ anime, onPress, width }: Props) {
     ]).start();
   };
 
-  const statusColor =
-    anime.status === 'ONGOING'
-      ? '#4ade80'
-      : anime.status === 'COMPLETED'
-      ? COLORS.gold
-      : 'rgba(255,255,255,0.3)';
-
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -76,18 +70,11 @@ export default function AnimeCard({ anime, onPress, width }: Props) {
             resizeMode="cover"
           />
 
-          {/* Bottom gradient overlay */}
-          <View style={styles.gradient} />
-
-          {/* Status badge — top right */}
-          {anime.status ? (
-            <View style={[styles.badge, { borderColor: statusColor }]}>
-              <View style={[styles.badgeDot, { backgroundColor: statusColor }]} />
-              <Text style={[styles.badgeText, { color: statusColor }]}>
-                {anime.status === 'ONGOING' ? 'ON' : anime.status === 'COMPLETED' ? 'END' : anime.status}
-              </Text>
-            </View>
-          ) : null}
+          {/* Gradient overlay */}
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.6)']}
+            style={styles.gradient}
+          />
 
           {/* Type badge — top left */}
           {anime.type ? (
@@ -102,7 +89,7 @@ export default function AnimeCard({ anime, onPress, width }: Props) {
           {anime.title}
         </Text>
 
-        {/* Year / studio baris kedua */}
+        {/* Year / studio */}
         {(anime.year || anime.studio) ? (
           <Text style={styles.sub} numberOfLines={1}>
             {[anime.year, anime.studio].filter(Boolean).join(' · ')}
@@ -125,31 +112,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: '35%',
-    backgroundColor: 'rgba(0,0,0,0.45)',
-  },
-  badge: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 4,
-    borderWidth: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-  },
-  badgeDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-  },
-  badgeText: {
-    fontSize: 7,
-    fontWeight: '800',
-    letterSpacing: 0.5,
+    height: '40%',
   },
   typeBadge: {
     position: 'absolute',
