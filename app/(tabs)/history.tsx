@@ -1,84 +1,148 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity,
-  Image, Alert,
+  View, Text, FlatList, Image, TouchableOpacity,
+  StyleSheet, ActivityIndicator, Alert,
 } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants';
-import { historyStorage } from '@/hooks/storage';
-import { getAnimeSlug } from '@/hooks/api';
-import { HistoryItem } from '@/types';
+import { favoritStorage } from '@/hooks/storage';
+import { getCurrentUser } from '@/hooks/auth';
+import { Anime } from '@/types';
 
-export default function HistoryScreen() {
+export default function SavedScreen() {
   const router = useRouter();
-  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [favorites, setFavorites] = useState<Anime[]>([]);
+  const [loading, setLoading] = useState(true);
+  const user = getCurrentUser();
 
-  // Refresh every time tab is focused
   useFocusEffect(useCallback(() => {
-    historyStorage.getAll().then(setHistory);
+    const load = async () => {
+      setLoading(true);
+      const data = await favoritStorage.getAll();
+      setFavorites(data);
+      setLoading(false);
+    };
+    load();
   }, []));
 
-  const clearHistory = () => {
-    Alert.alert('Hapus Riwayat', 'Yakin ingin menghapus semua riwayat?', [
+  const handleRemove = (anime: Anime) => {
+    Alert.alert('Hapus Favorit', `Hapus ${anime.title} dari favorit?`, [
       { text: 'Batal', style: 'cancel' },
       {
         text: 'Hapus', style: 'destructive',
-        onPress: () => { historyStorage.clear(); setHistory([]); },
+        onPress: async () => {
+          await favoritStorage.remove(anime.id);
+          setFavorites(prev => prev.filter(a => a.id !== anime.id));
+        },
       },
     ]);
   };
 
-  if (history.length === 0) {
+  if (!user) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.bg }} edges={['top']}>
-        <View className="flex-1 items-center justify-center gap-4">
-          <Text style={{ fontSize: 48 }}>📺</Text>
-          <Text className="text-white font-black text-lg">Belum ada riwayat</Text>
-          <Text className="text-white/40 text-sm text-center px-8">
-            Anime yang sudah kamu tonton akan muncul di sini
-          </Text>
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Tersimpan</Text>
+        </View>
+        <View style={styles.emptyBox}>
+          <Ionicons name="bookmark-outline" size={56} color="rgba(255,255,255,0.1)" />
+          <Text style={styles.emptyTitle}>Belum Login</Text>
+          <Text style={styles.emptySub}>Login untuk menyimpan anime favorit kamu</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Tersimpan</Text>
+        </View>
+        <View style={styles.emptyBox}>
+          <ActivityIndicator color={COLORS.gold} size="large" />
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.bg }} edges={['top']}>
-      <View className="flex-row items-center justify-between px-4 py-4">
-        <Text className="text-white font-black text-lg uppercase tracking-tight">Riwayat</Text>
-        <TouchableOpacity onPress={clearHistory}
-          className="px-3 py-1.5 rounded-xl border border-white/10">
-          <Text className="text-white/50 text-xs font-bold">Hapus Semua</Text>
-        </TouchableOpacity>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Tersimpan</Text>
+        <Text style={styles.headerCount}>{favorites.length} anime</Text>
       </View>
 
-      <FlatList
-        data={history}
-        keyExtractor={(_, i) => String(i)}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            onPress={() => router.push(`/watch/${getAnimeSlug(item.anime)}?ep=${item.episodeIndex}`)}
-            className="flex-row items-center gap-3 mb-3 p-3 rounded-2xl"
-            style={{ backgroundColor: COLORS.card, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' }}
-            activeOpacity={0.8}
-          >
-            <Image source={{ uri: item.anime.image_poster }} className="w-14 rounded-lg"
-              style={{ aspectRatio: 3 / 4 }} resizeMode="cover" />
-            <View className="flex-1">
-              <Text className="text-white font-bold text-sm mb-1" numberOfLines={1}>{item.anime.title}</Text>
-              <Text style={{ color: COLORS.gold, fontSize: 11, fontWeight: '700' }}>
-                Episode {item.episodeIndex}
-              </Text>
-              <Text className="text-white/30 text-xs mt-1">
-                {new Date(item.timestamp).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
-              </Text>
-            </View>
-            <Text className="text-white/20 text-xl">›</Text>
-          </TouchableOpacity>
-        )}
-      />
+      {favorites.length === 0 ? (
+        <View style={styles.emptyBox}>
+          <Ionicons name="bookmark-outline" size={56} color="rgba(255,255,255,0.1)" />
+          <Text style={styles.emptyTitle}>Belum Ada Favorit</Text>
+          <Text style={styles.emptySub}>Tap ikon bookmark saat nonton untuk menyimpan anime</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={favorites}
+          keyExtractor={item => item.id}
+          contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+          ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              onPress={() => router.push(`/watch/${item.id}`)}
+              style={styles.card}
+              activeOpacity={0.8}
+            >
+              <Image
+                source={{ uri: item.image_poster }}
+                style={styles.poster}
+                resizeMode="cover"
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
+                <Text style={styles.meta}>{item.type} • {item.status}</Text>
+                {item.genre ? (
+                  <Text style={styles.genre} numberOfLines={1}>
+                    {item.genre.replace(/,/g, ', ')}
+                  </Text>
+                ) : null}
+              </View>
+              <TouchableOpacity
+                onPress={() => handleRemove(item)}
+                style={styles.removeBtn}
+              >
+                <Ionicons name="bookmark" size={22} color={COLORS.gold} />
+              </TouchableOpacity>
+            </TouchableOpacity>
+          )}
+        />
+      )}
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: COLORS.bg },
+  header: {
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16,
+  },
+  headerTitle: { color: '#fff', fontSize: 28, fontWeight: '900', letterSpacing: -0.5 },
+  headerCount: { color: 'rgba(255,255,255,0.3)', fontSize: 13, fontWeight: '700' },
+  emptyBox: {
+    flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 40,
+  },
+  emptyTitle: { color: '#fff', fontSize: 18, fontWeight: '800', marginTop: 8 },
+  emptySub: { color: 'rgba(255,255,255,0.35)', fontSize: 12, textAlign: 'center' },
+  card: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: COLORS.card, borderRadius: 14, padding: 12,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+  },
+  poster: { width: 56, height: 80, borderRadius: 8 },
+  title: { color: '#fff', fontSize: 13, fontWeight: '700', marginBottom: 4 },
+  meta: { color: 'rgba(255,255,255,0.4)', fontSize: 10, marginBottom: 4 },
+  genre: { color: COLORS.gold, fontSize: 10, fontWeight: '600' },
+  removeBtn: { padding: 8 },
+});
