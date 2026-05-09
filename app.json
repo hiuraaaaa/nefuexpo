@@ -2,7 +2,7 @@
   "expo": {
     "name": "NefuSoft",
     "slug": "nefusoft",
-    "version": "1.0.1",
+    "version": "1.0.0",
     "orientation": "default",
     "userInterfaceStyle": "dark",
     "icon": "./assets/icon.png",
