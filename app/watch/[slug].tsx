@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, Image,
-  ActivityIndicator, FlatList, Share, Alert,
+  ActivityIndicator, FlatList, Share,
   Dimensions, StatusBar, Modal,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Video, ResizeMode, AVPlaybackStatus, Audio } from 'expo-av';
 import * as ScreenOrientation from 'expo-screen-orientation';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Slider from '@react-native-community/slider';
 import { COLORS } from '@/constants';
 import { api, getProxyUrl, getAnimeSlug, decodeAnimeId, formatTime } from '@/hooks/api';
@@ -17,8 +17,89 @@ import { WatchSkeleton } from '@/components/Skeleton';
 
 const { width } = Dimensions.get('window');
 
-// Kelompokkan server per resolusi: { '720p': [s1, s2], '480p': [...] }
 type ServerGroup = { [quality: string]: Server[] };
+
+// ── Ikon SVG-style pakai View (tanpa library) ──────────────────────────────
+
+// Tombol skip prev (|◄◄)
+const IconPrev = ({ color = '#fff', size = 28 }: { color?: string; size?: number }) => (
+  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+    <View style={{ width: 3, height: size * 0.75, backgroundColor: color, borderRadius: 2 }} />
+    <View style={{ flexDirection: 'row' }}>
+      <View style={{ width: 0, height: 0,
+        borderTopWidth: size * 0.4, borderBottomWidth: size * 0.4, borderRightWidth: size * 0.5,
+        borderTopColor: 'transparent', borderBottomColor: 'transparent', borderRightColor: color }} />
+      <View style={{ width: 0, height: 0,
+        borderTopWidth: size * 0.4, borderBottomWidth: size * 0.4, borderRightWidth: size * 0.5,
+        borderTopColor: 'transparent', borderBottomColor: 'transparent', borderRightColor: color,
+        marginLeft: -size * 0.2 }} />
+    </View>
+  </View>
+);
+
+// Tombol skip next (►►|)
+const IconNext = ({ color = '#fff', size = 28 }: { color?: string; size?: number }) => (
+  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+    <View style={{ flexDirection: 'row' }}>
+      <View style={{ width: 0, height: 0,
+        borderTopWidth: size * 0.4, borderBottomWidth: size * 0.4, borderLeftWidth: size * 0.5,
+        borderTopColor: 'transparent', borderBottomColor: 'transparent', borderLeftColor: color }} />
+      <View style={{ width: 0, height: 0,
+        borderTopWidth: size * 0.4, borderBottomWidth: size * 0.4, borderLeftWidth: size * 0.5,
+        borderTopColor: 'transparent', borderBottomColor: 'transparent', borderLeftColor: color,
+        marginLeft: -size * 0.2 }} />
+    </View>
+    <View style={{ width: 3, height: size * 0.75, backgroundColor: color, borderRadius: 2 }} />
+  </View>
+);
+
+// Tombol play (▶)
+const IconPlay = ({ size = 28 }: { size?: number }) => (
+  <View style={{ width: 0, height: 0,
+    borderTopWidth: size * 0.55, borderBottomWidth: size * 0.55, borderLeftWidth: size * 0.9,
+    borderTopColor: 'transparent', borderBottomColor: 'transparent', borderLeftColor: '#fff',
+    marginLeft: size * 0.2 }} />
+);
+
+// Tombol pause (⏸)
+const IconPause = ({ size = 28 }: { size?: number }) => (
+  <View style={{ flexDirection: 'row', gap: size * 0.25 }}>
+    <View style={{ width: size * 0.22, height: size * 0.9, backgroundColor: '#fff', borderRadius: 3 }} />
+    <View style={{ width: size * 0.22, height: size * 0.9, backgroundColor: '#fff', borderRadius: 3 }} />
+  </View>
+);
+
+// Ikon fullscreen
+const IconFullscreen = ({ exit = false }: { exit?: boolean }) => {
+  const c = '#fff';
+  const s = 7; const t = 2;
+  if (exit) return (
+    <View style={{ width: 18, height: 18 }}>
+      <View style={{ position: 'absolute', top: s-t, left: 0, width: s, height: t, backgroundColor: c }} />
+      <View style={{ position: 'absolute', top: 0, left: s-t, width: t, height: s, backgroundColor: c }} />
+      <View style={{ position: 'absolute', top: s-t, right: 0, width: s, height: t, backgroundColor: c }} />
+      <View style={{ position: 'absolute', top: 0, right: s-t, width: t, height: s, backgroundColor: c }} />
+      <View style={{ position: 'absolute', bottom: s-t, left: 0, width: s, height: t, backgroundColor: c }} />
+      <View style={{ position: 'absolute', bottom: 0, left: s-t, width: t, height: s, backgroundColor: c }} />
+      <View style={{ position: 'absolute', bottom: s-t, right: 0, width: s, height: t, backgroundColor: c }} />
+      <View style={{ position: 'absolute', bottom: 0, right: s-t, width: t, height: s, backgroundColor: c }} />
+    </View>
+  );
+  return (
+    <View style={{ width: 18, height: 18 }}>
+      <View style={{ position: 'absolute', top: 0, left: 0, width: s, height: t, backgroundColor: c }} />
+      <View style={{ position: 'absolute', top: 0, left: 0, width: t, height: s, backgroundColor: c }} />
+      <View style={{ position: 'absolute', top: 0, right: 0, width: s, height: t, backgroundColor: c }} />
+      <View style={{ position: 'absolute', top: 0, right: 0, width: t, height: s, backgroundColor: c }} />
+      <View style={{ position: 'absolute', bottom: 0, left: 0, width: s, height: t, backgroundColor: c }} />
+      <View style={{ position: 'absolute', bottom: 0, left: 0, width: t, height: s, backgroundColor: c }} />
+      <View style={{ position: 'absolute', bottom: 0, right: 0, width: s, height: t, backgroundColor: c }} />
+      <View style={{ position: 'absolute', bottom: 0, right: 0, width: t, height: s, backgroundColor: c }} />
+    </View>
+  );
+};
+
+// ── Main Component ─────────────────────────────────────────────────────────────
 
 export default function WatchScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
@@ -27,32 +108,29 @@ export default function WatchScreen() {
   const insets = useSafeAreaInsets();
   const videoRef = useRef<Video>(null);
 
-  // slug format: "{id}--{title-kebab}" — split("--")[0] untuk ambil id asli
-  // slug format: "{base64(id)}--{title-kebab}" — decode base64 untuk ambil id asli
   const animeId = decodeAnimeId(slug ?? '');
 
-  const [anime, setAnime] = useState<AnimeDetail | null>(null);
-  const [episodes, setEpisodes] = useState<Episode[]>([]);
-  const [currentEpId, setCurrentEpId] = useState<string | null>(null);
-  const [serverGroup, setServerGroup] = useState<ServerGroup>({});
+  const [anime, setAnime]                   = useState<AnimeDetail | null>(null);
+  const [episodes, setEpisodes]             = useState<Episode[]>([]);
+  const [currentEpId, setCurrentEpId]       = useState<string | null>(null);
+  const [serverGroup, setServerGroup]       = useState<ServerGroup>({});
   const [selectedQuality, setSelectedQuality] = useState<string>('');
   const [selectedServer, setSelectedServer] = useState<Server | null>(null);
   const [recommendations, setRecommendations] = useState<Anime[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isEpLoading, setIsEpLoading] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [autoNext, setAutoNext] = useState(false);
-  const [showControls, setShowControls] = useState(true);
+  const [isLoading, setIsLoading]           = useState(true);
+  const [isEpLoading, setIsEpLoading]       = useState(false);
+  const [isFullscreen, setIsFullscreen]     = useState(false);
+  const [autoNext, setAutoNext]             = useState(false);
+  const [showControls, setShowControls]     = useState(true);
   const [showServerModal, setShowServerModal] = useState(false);
 
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [position, setPosition] = useState(0);
-  const [duration, setDuration] = useState(0);
+  const [isPlaying, setIsPlaying]   = useState(false);
+  const [position, setPosition]     = useState(0);
+  const [duration, setDuration]     = useState(0);
   const [isBuffering, setIsBuffering] = useState(false);
 
   const controlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Disable Android media session notification
   useEffect(() => {
     Audio.setAudioModeAsync({
       staysActiveInBackground: false,
@@ -103,7 +181,6 @@ export default function WatchScreen() {
       try {
         const res = await api.episode(currentEpId);
         if (res.status && res.data) {
-          // Kelompokkan per resolusi — pakai SEMUA server, tidak filter ekstensi
           const allServers: Server[] = res.data.server || [];
           const group: ServerGroup = {};
           allServers.forEach((s: Server, i: number) => {
@@ -112,8 +189,6 @@ export default function WatchScreen() {
             group[q].push({ ...s, id: String(i) });
           });
           setServerGroup(group);
-
-          // Pilih kualitas terbaik secara default
           const qualities = ['1080p', '720p', '480p', '360p'];
           const bestQ = qualities.find(q => group[q]?.length > 0) || Object.keys(group)[0];
           if (bestQ && group[bestQ]?.length > 0) {
@@ -136,16 +211,16 @@ export default function WatchScreen() {
   const resetControlsTimer = useCallback(() => {
     setShowControls(true);
     if (controlsTimer.current) clearTimeout(controlsTimer.current);
-    controlsTimer.current = setTimeout(() => setShowControls(false), 3000);
+    controlsTimer.current = setTimeout(() => setShowControls(false), 3500);
   }, []);
 
-  const epIndex = episodes.findIndex(e => e.id === currentEpId);
-  const currentEpNum = episodes.find(e => e.id === currentEpId)?.index || 0;
+  const epIndex       = episodes.findIndex(e => e.id === currentEpId);
+  const currentEpNum  = episodes.find(e => e.id === currentEpId)?.index || 0;
   const availableQualities = Object.keys(serverGroup).filter(q => serverGroup[q]?.length > 0);
 
   const changeEpisode = (ep: Episode) => setCurrentEpId(ep.id);
-  const handlePrev = () => { if (epIndex < episodes.length - 1) changeEpisode(episodes[epIndex + 1]); };
-  const handleNext = () => { if (epIndex > 0) changeEpisode(episodes[epIndex - 1]); };
+  const handlePrev    = () => { if (epIndex < episodes.length - 1) changeEpisode(episodes[epIndex + 1]); };
+  const handleNext    = () => { if (epIndex > 0) changeEpisode(episodes[epIndex - 1]); };
 
   const selectQualityAndServer = (quality: string, server: Server) => {
     const cur = position;
@@ -153,6 +228,12 @@ export default function WatchScreen() {
     setSelectedServer(server);
     setShowServerModal(false);
     setTimeout(() => videoRef.current?.setPositionAsync(cur * 1000), 300);
+  };
+
+  const togglePlayPause = () => {
+    if (isPlaying) videoRef.current?.pauseAsync();
+    else videoRef.current?.playAsync();
+    resetControlsTimer();
   };
 
   const toggleFullscreen = async () => {
@@ -199,29 +280,30 @@ export default function WatchScreen() {
     <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
       <StatusBar hidden={isFullscreen} barStyle="light-content" />
 
-      {/* Server/Quality Picker Modal */}
+      {/* ── Server/Quality Modal ── */}
       <Modal visible={showServerModal} transparent animationType="slide" onRequestClose={() => setShowServerModal(false)}>
-        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' }} activeOpacity={1} onPress={() => setShowServerModal(false)}>
-          <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: COLORS.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 40 }}>
-            <Text style={{ color: '#fff', fontWeight: '900', fontSize: 14, marginBottom: 16, textTransform: 'uppercase', letterSpacing: 1 }}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' }}
+          activeOpacity={1} onPress={() => setShowServerModal(false)}>
+          <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0,
+            backgroundColor: COLORS.card, borderTopLeftRadius: 20, borderTopRightRadius: 20,
+            padding: 20, paddingBottom: 40 }}>
+            <Text style={{ color: '#fff', fontWeight: '900', fontSize: 14, marginBottom: 16,
+              textTransform: 'uppercase', letterSpacing: 1 }}>
               Pilih Kualitas & Server
             </Text>
             {availableQualities.map(quality => (
               <View key={quality} style={{ marginBottom: 16 }}>
-                <Text style={{ color: COLORS.gold, fontWeight: '900', fontSize: 12, marginBottom: 8 }}>{quality}</Text>
+                <Text style={{ color: COLORS.gold, fontWeight: '900', fontSize: 12, marginBottom: 8 }}>
+                  {quality}
+                </Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                   {serverGroup[quality].map((s, idx) => {
                     const isActive = selectedServer?.id === s.id;
                     return (
-                      <TouchableOpacity
-                        key={s.id}
-                        onPress={() => selectQualityAndServer(quality, s)}
-                        style={{
-                          paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8,
+                      <TouchableOpacity key={s.id} onPress={() => selectQualityAndServer(quality, s)}
+                        style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8,
                           backgroundColor: isActive ? COLORS.gold : COLORS.bg,
-                          borderWidth: 1,
-                          borderColor: isActive ? COLORS.gold : 'rgba(255,255,255,0.1)',
-                        }}>
+                          borderWidth: 1, borderColor: isActive ? COLORS.gold : 'rgba(255,255,255,0.1)' }}>
                         <Text style={{ color: isActive ? '#000' : '#fff', fontWeight: '900', fontSize: 12 }}>
                           Server {idx + 1}
                         </Text>
@@ -235,12 +317,10 @@ export default function WatchScreen() {
         </TouchableOpacity>
       </Modal>
 
-      {/* Video Player */}
-      <TouchableOpacity
-        activeOpacity={1}
-        onPress={resetControlsTimer}
-        style={{ width: '100%', height: videoHeight, backgroundColor: '#000', position: 'relative' }}
-      >
+      {/* ── Video Player Container ── */}
+      <View style={{ width: '100%', height: videoHeight, backgroundColor: '#000' }}>
+
+        {/* Video */}
         {selectedServer && !isEpLoading ? (
           <Video
             ref={videoRef}
@@ -253,113 +333,145 @@ export default function WatchScreen() {
           />
         ) : (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-            <ActivityIndicator color={COLORS.gold} />
-            <Text style={{ color: COLORS.gold, fontSize: 12, marginTop: 8, fontWeight: '700' }}>
+            <ActivityIndicator color={COLORS.gold} size="large" />
+            <Text style={{ color: COLORS.gold, fontSize: 12, marginTop: 10, fontWeight: '700' }}>
               {isEpLoading ? 'Memuat episode...' : 'Video tidak tersedia'}
             </Text>
           </View>
         )}
 
-        {/* Controls overlay */}
-        {showControls && selectedServer && !isEpLoading && (
-          <View style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)' }}>
-            <TouchableOpacity
-              onPress={() => { if (isFullscreen) toggleFullscreen(); else router.back(); }}
-              style={{ position: 'absolute', top: 16, left: 16, width: 36, height: 36,
-                backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 18,
-                alignItems: 'center', justifyContent: 'center' }}>
-              <View style={{ width: 0, height: 0, borderTopWidth: 7, borderBottomWidth: 7, borderRightWidth: 11,
-                borderTopColor: 'transparent', borderBottomColor: 'transparent', borderRightColor: '#fff', marginRight: 2 }} />
-            </TouchableOpacity>
+        {/* Buffering spinner — di atas video, di bawah controls */}
+        {isBuffering && !isEpLoading && (
+          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+            alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+            <ActivityIndicator color={COLORS.gold} size="large" />
+          </View>
+        )}
 
-            <View style={{ position: 'absolute', top: 16, left: 60, right: 60 }}>
-              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13 }} numberOfLines={1}>
-                {anime?.title} — Eps {currentEpNum}
+        {/* Touch area untuk toggle controls */}
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={resetControlsTimer}
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+        />
+
+        {/* ── Controls Overlay ── */}
+        {showControls && selectedServer && !isEpLoading && (
+          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+            pointerEvents="box-none">
+
+            {/* Gradient gelap atas & bawah */}
+            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 80,
+              backgroundColor: 'rgba(0,0,0,0.55)' }} pointerEvents="none" />
+            <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 90,
+              backgroundColor: 'rgba(0,0,0,0.65)' }} pointerEvents="none" />
+
+            {/* ── Top bar: back + judul ── */}
+            <View style={{ position: 'absolute', top: 0, left: 0, right: 0,
+              flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 12, gap: 10 }}>
+              <TouchableOpacity
+                onPress={() => { if (isFullscreen) toggleFullscreen(); else router.back(); }}
+                style={{ width: 36, height: 36, borderRadius: 18,
+                  backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' }}>
+                {/* Chevron kiri */}
+                <View style={{ width: 0, height: 0,
+                  borderTopWidth: 7, borderBottomWidth: 7, borderRightWidth: 10,
+                  borderTopColor: 'transparent', borderBottomColor: 'transparent',
+                  borderRightColor: '#fff', marginRight: 2 }} />
+              </TouchableOpacity>
+              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13, flex: 1 }} numberOfLines={1}>
+                {anime?.title}{'  '}
+                <Text style={{ color: COLORS.gold, fontWeight: '900' }}>Eps {currentEpNum}</Text>
               </Text>
             </View>
 
-            <View style={{ position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 32 }}>
-              <TouchableOpacity onPress={handlePrev} disabled={epIndex >= episodes.length - 1}
-                style={{ opacity: epIndex >= episodes.length - 1 ? 0.3 : 1, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <View style={{ width: 4, height: 22, backgroundColor: COLORS.gold, borderRadius: 2, marginRight: 4 }} />
-                  <View style={{ width: 0, height: 0, borderTopWidth: 11, borderBottomWidth: 11, borderRightWidth: 14, borderTopColor: 'transparent', borderBottomColor: 'transparent', borderRightColor: COLORS.gold }} />
-                  <View style={{ width: 0, height: 0, borderTopWidth: 11, borderBottomWidth: 11, borderRightWidth: 14, borderTopColor: 'transparent', borderBottomColor: 'transparent', borderRightColor: COLORS.gold, marginLeft: -5 }} />
-                </View>
+            {/* ── Center controls: Prev / Play-Pause / Next ── */}
+            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+              alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 36 }}
+              pointerEvents="box-none">
+
+              {/* Prev */}
+              <TouchableOpacity
+                onPress={() => { handlePrev(); resetControlsTimer(); }}
+                disabled={epIndex >= episodes.length - 1}
+                style={{ opacity: epIndex >= episodes.length - 1 ? 0.25 : 1,
+                  width: 52, height: 52, alignItems: 'center', justifyContent: 'center' }}>
+                <IconPrev color={COLORS.gold} size={26} />
               </TouchableOpacity>
 
-              <TouchableOpacity onPress={() => { if (isPlaying) videoRef.current?.pauseAsync(); else videoRef.current?.playAsync(); }}
-                style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.8)' }}>
-                {isPlaying ? (
-                  <View style={{ flexDirection: 'row', gap: 8 }}>
-                    <View style={{ width: 6, height: 26, backgroundColor: '#fff', borderRadius: 3 }} />
-                    <View style={{ width: 6, height: 26, backgroundColor: '#fff', borderRadius: 3 }} />
-                  </View>
-                ) : (
-                  <View style={{ width: 0, height: 0, borderTopWidth: 15, borderBottomWidth: 15, borderLeftWidth: 24, borderTopColor: 'transparent', borderBottomColor: 'transparent', borderLeftColor: '#fff', marginLeft: 5 }} />
-                )}
+              {/* Play / Pause — lingkaran besar tengah */}
+              <TouchableOpacity
+                onPress={togglePlayPause}
+                style={{ width: 72, height: 72, borderRadius: 36,
+                  backgroundColor: 'rgba(255,255,255,0.15)',
+                  borderWidth: 2, borderColor: 'rgba(255,255,255,0.7)',
+                  alignItems: 'center', justifyContent: 'center' }}>
+                {isPlaying
+                  ? <IconPause size={26} />
+                  : <IconPlay size={26} />
+                }
               </TouchableOpacity>
 
-              <TouchableOpacity onPress={handleNext} disabled={epIndex <= 0}
-                style={{ opacity: epIndex <= 0 ? 0.3 : 1, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <View style={{ width: 0, height: 0, borderTopWidth: 11, borderBottomWidth: 11, borderLeftWidth: 14, borderTopColor: 'transparent', borderBottomColor: 'transparent', borderLeftColor: COLORS.gold }} />
-                  <View style={{ width: 0, height: 0, borderTopWidth: 11, borderBottomWidth: 11, borderLeftWidth: 14, borderTopColor: 'transparent', borderBottomColor: 'transparent', borderLeftColor: COLORS.gold, marginLeft: -5 }} />
-                  <View style={{ width: 4, height: 22, backgroundColor: COLORS.gold, borderRadius: 2, marginLeft: 4 }} />
-                </View>
+              {/* Next */}
+              <TouchableOpacity
+                onPress={() => { handleNext(); resetControlsTimer(); }}
+                disabled={epIndex <= 0}
+                style={{ opacity: epIndex <= 0 ? 0.25 : 1,
+                  width: 52, height: 52, alignItems: 'center', justifyContent: 'center' }}>
+                <IconNext color={COLORS.gold} size={26} />
               </TouchableOpacity>
             </View>
 
-            {isBuffering && (
-              <View style={{ position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center' }}>
-                <ActivityIndicator color={COLORS.gold} size="large" />
-              </View>
-            )}
-
-            <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: 12 }}>
+            {/* ── Bottom bar: progress + waktu + kualitas + fullscreen ── */}
+            <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 12, paddingBottom: 10 }}>
               <Slider
                 style={{ width: '100%', height: 20 }}
                 minimumValue={0}
                 maximumValue={duration || 1}
                 value={position}
                 minimumTrackTintColor={COLORS.gold}
-                maximumTrackTintColor="rgba(255,255,255,0.3)"
+                maximumTrackTintColor="rgba(255,255,255,0.25)"
                 thumbTintColor={COLORS.gold}
-                onSlidingComplete={val => videoRef.current?.setPositionAsync(val * 1000)}
+                onSlidingComplete={val => {
+                  videoRef.current?.setPositionAsync(val * 1000);
+                  resetControlsTimer();
+                }}
               />
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>
-                  {formatTime(position)} / {formatTime(duration)}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 }}>
+                {/* Waktu */}
+                <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 }}>
+                  {formatTime(position)}
+                  <Text style={{ color: 'rgba(255,255,255,0.4)' }}> / </Text>
+                  {formatTime(duration)}
                 </Text>
-                <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
-                  {/* Tombol kualitas — buka modal pilih resolusi & server */}
-                  <TouchableOpacity onPress={() => setShowServerModal(true)}
-                    style={{ backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: `${COLORS.gold}80` }}>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                  {/* Pilih kualitas */}
+                  <TouchableOpacity onPress={() => { setShowServerModal(true); resetControlsTimer(); }}
+                    style={{ backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 10, paddingVertical: 4,
+                      borderRadius: 6, borderWidth: 1, borderColor: `${COLORS.gold}90` }}>
                     <Text style={{ color: COLORS.gold, fontSize: 11, fontWeight: '900' }}>
                       {selectedQuality || 'AUTO'}
                     </Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={toggleFullscreen} style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
-                    <View style={{ width: 18, height: 18, position: 'relative' }}>
-                      <View style={{ position: 'absolute', top: 0, left: 0, width: 7, height: 2, backgroundColor: '#fff' }} />
-                      <View style={{ position: 'absolute', top: 0, left: 0, width: 2, height: 7, backgroundColor: '#fff' }} />
-                      <View style={{ position: 'absolute', top: 0, right: 0, width: 7, height: 2, backgroundColor: '#fff' }} />
-                      <View style={{ position: 'absolute', top: 0, right: 0, width: 2, height: 7, backgroundColor: '#fff' }} />
-                      <View style={{ position: 'absolute', bottom: 0, left: 0, width: 7, height: 2, backgroundColor: '#fff' }} />
-                      <View style={{ position: 'absolute', bottom: 0, left: 0, width: 2, height: 7, backgroundColor: '#fff' }} />
-                      <View style={{ position: 'absolute', bottom: 0, right: 0, width: 7, height: 2, backgroundColor: '#fff' }} />
-                      <View style={{ position: 'absolute', bottom: 0, right: 0, width: 2, height: 7, backgroundColor: '#fff' }} />
-                    </View>
+
+                  {/* Fullscreen */}
+                  <TouchableOpacity onPress={toggleFullscreen}
+                    style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
+                    <IconFullscreen exit={isFullscreen} />
                   </TouchableOpacity>
                 </View>
               </View>
             </View>
+
           </View>
         )}
-      </TouchableOpacity>
+      </View>
 
+      {/* ── Konten bawah (non-fullscreen) ── */}
       {!isFullscreen && (
         <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
+
           {/* Episode nav */}
           <View style={{ flexDirection: 'row', gap: 12, padding: 16 }}>
             <TouchableOpacity onPress={handlePrev} disabled={epIndex >= episodes.length - 1}
@@ -374,10 +486,11 @@ export default function WatchScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* AutoNext toggle */}
+          {/* AutoNext */}
           <TouchableOpacity onPress={() => setAutoNext(p => !p)}
             style={{ marginHorizontal: 16, marginBottom: 16, paddingVertical: 14, borderRadius: 12,
-              borderWidth: 1, borderColor: autoNext ? `${COLORS.gold}60` : 'rgba(255,255,255,0.1)', alignItems: 'center' }}>
+              borderWidth: 1, borderColor: autoNext ? `${COLORS.gold}60` : 'rgba(255,255,255,0.1)',
+              alignItems: 'center' }}>
             <Text style={{ color: autoNext ? COLORS.gold : 'rgba(255,255,255,0.4)', fontWeight: '900', fontSize: 13 }}>
               AutoNext {autoNext ? 'ON' : 'OFF'}
             </Text>
@@ -386,13 +499,12 @@ export default function WatchScreen() {
             </Text>
           </TouchableOpacity>
 
-          {/* Server selector (below video, non-fullscreen) */}
+          {/* Pilih Server */}
           {availableQualities.length > 0 && (
             <View style={{ marginHorizontal: 16, backgroundColor: COLORS.card, borderRadius: 12,
               borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', padding: 16, marginBottom: 16 }}>
-              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 }}>
-                Pilih Server
-              </Text>
+              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13, marginBottom: 12,
+                textTransform: 'uppercase', letterSpacing: 1 }}>Pilih Server</Text>
               {availableQualities.map(quality => (
                 <View key={quality} style={{ marginBottom: 12 }}>
                   <Text style={{ color: COLORS.gold, fontWeight: '900', fontSize: 11, marginBottom: 6 }}>{quality}</Text>
@@ -400,8 +512,7 @@ export default function WatchScreen() {
                     {serverGroup[quality].map((s, idx) => {
                       const isActive = selectedServer?.id === s.id;
                       return (
-                        <TouchableOpacity key={s.id}
-                          onPress={() => selectQualityAndServer(quality, s)}
+                        <TouchableOpacity key={s.id} onPress={() => selectQualityAndServer(quality, s)}
                           style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8,
                             backgroundColor: isActive ? COLORS.gold : COLORS.bg,
                             borderWidth: 1, borderColor: isActive ? COLORS.gold : 'rgba(255,255,255,0.1)' }}>
@@ -417,14 +528,13 @@ export default function WatchScreen() {
             </View>
           )}
 
-          {/* Episode list */}
+          {/* Daftar Episode */}
           <View style={{ marginHorizontal: 16, backgroundColor: COLORS.card, borderRadius: 12,
             borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', padding: 16, marginBottom: 16 }}>
-            <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 }}>
-              Daftar Episode
-            </Text>
+            <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13, marginBottom: 12,
+              textTransform: 'uppercase', letterSpacing: 1 }}>Daftar Episode</Text>
             <FlatList
-              data={[...episodes].reverse()}
+              data={episodes}
               keyExtractor={e => e.id}
               numColumns={6}
               scrollEnabled={false}
@@ -434,7 +544,8 @@ export default function WatchScreen() {
                   style={{ flex: 1, aspectRatio: 1, borderRadius: 6, alignItems: 'center', justifyContent: 'center',
                     backgroundColor: currentEpId === item.id ? COLORS.gold : COLORS.bg,
                     borderWidth: 1, borderColor: currentEpId === item.id ? COLORS.gold : 'rgba(255,255,255,0.05)' }}>
-                  <Text style={{ fontSize: 11, fontWeight: '900', color: currentEpId === item.id ? '#000' : 'rgba(255,255,255,0.5)' }}>
+                  <Text style={{ fontSize: 11, fontWeight: '900',
+                    color: currentEpId === item.id ? '#000' : 'rgba(255,255,255,0.5)' }}>
                     {item.index}
                   </Text>
                 </TouchableOpacity>
@@ -442,7 +553,7 @@ export default function WatchScreen() {
             />
           </View>
 
-          {/* Anime info */}
+          {/* Info Anime */}
           {anime && (
             <View style={{ marginHorizontal: 16, backgroundColor: COLORS.card, borderRadius: 12,
               borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', padding: 16, marginBottom: 16 }}>
@@ -466,24 +577,24 @@ export default function WatchScreen() {
                   </Text>
                 </View>
               </View>
-              {anime.genre && (
+              {anime.genre ? (
                 <Text style={{ color: COLORS.gold, fontSize: 11, fontWeight: '700', marginTop: 12 }}>
                   {anime.genre.replace(/,/g, ', ')}
                 </Text>
-              )}
+              ) : null}
             </View>
           )}
 
           {/* Share */}
           <TouchableOpacity onPress={handleShare}
             style={{ marginHorizontal: 16, marginBottom: 16, paddingVertical: 14, borderRadius: 12,
-              borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', alignItems: 'center', flexDirection: 'row',
-              justifyContent: 'center', gap: 8 }}>
+              borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', alignItems: 'center',
+              flexDirection: 'row', justifyContent: 'center', gap: 8 }}>
             <Text style={{ fontSize: 16 }}>↗</Text>
             <Text style={{ color: 'rgba(255,255,255,0.6)', fontWeight: '900', fontSize: 13 }}>Bagikan Anime Ini</Text>
           </TouchableOpacity>
 
-          {/* Recommendations */}
+          {/* Rekomendasi */}
           {recommendations.length > 0 && (
             <View style={{ marginHorizontal: 16 }}>
               <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13, marginBottom: 12,
@@ -507,6 +618,7 @@ export default function WatchScreen() {
               ))}
             </View>
           )}
+
         </ScrollView>
       )}
     </View>
