@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { useRef, useEffect } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants';
 
 const ACTIVE = COLORS.gold;
@@ -11,69 +12,24 @@ const LABEL_COLOR = COLORS.gold;
 const TAB_HEIGHT = 64;
 const BUBBLE_SIZE = 58;
 
-// ─── Icons ────────────────────────────────────────────────────────────────────
+// ─── Tab config ───────────────────────────────────────────────────────────────
 
-function HomeIcon({ color }: { color: string }) {
-  return (
-    <View style={{ alignItems: 'center', justifyContent: 'center', width: 26, height: 26 }}>
-      <View style={{ width: 0, height: 0, borderLeftWidth: 13, borderRightWidth: 13, borderBottomWidth: 11, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: color }} />
-      <View style={{ width: 18, height: 13, backgroundColor: color, borderBottomLeftRadius: 2, borderBottomRightRadius: 2, alignItems: 'center', justifyContent: 'flex-end' }}>
-        <View style={{ width: 6, height: 8, backgroundColor: BAR_BG, borderTopLeftRadius: 3, borderTopRightRadius: 3 }} />
-      </View>
-    </View>
-  );
-}
-
-function SearchIcon({ color }: { color: string }) {
-  return (
-    <View style={{ width: 26, height: 26, alignItems: 'center', justifyContent: 'center' }}>
-      <View style={{ width: 14, height: 14, borderRadius: 7, borderWidth: 2.5, borderColor: color }} />
-      <View style={{ position: 'absolute', bottom: 3, right: 3, width: 7, height: 2.5, backgroundColor: color, borderRadius: 2, transform: [{ rotate: '45deg' }] }} />
-    </View>
-  );
-}
-
-function PlayIcon({ color }: { color: string }) {
-  return (
-    <View style={{ width: 26, height: 26, alignItems: 'center', justifyContent: 'center' }}>
-      <View style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: color, alignItems: 'center', justifyContent: 'center' }}>
-        <View style={{ width: 0, height: 0, borderTopWidth: 5, borderBottomWidth: 5, borderLeftWidth: 8, borderTopColor: 'transparent', borderBottomColor: 'transparent', borderLeftColor: color, marginLeft: 2 }} />
-      </View>
-    </View>
-  );
-}
-
-function CalendarIcon({ color }: { color: string }) {
-  return (
-    <View style={{ width: 26, height: 26, alignItems: 'center', justifyContent: 'center' }}>
-      <View style={{ width: 20, height: 18, borderWidth: 2, borderColor: color, borderRadius: 3, overflow: 'hidden' }}>
-        <View style={{ height: 6, backgroundColor: color }} />
-        <View style={{ flexDirection: 'row', justifyContent: 'space-around', paddingTop: 2 }}>
-          <View style={{ width: 2.5, height: 2.5, borderRadius: 1, backgroundColor: color }} />
-          <View style={{ width: 2.5, height: 2.5, borderRadius: 1, backgroundColor: color }} />
-          <View style={{ width: 2.5, height: 2.5, borderRadius: 1, backgroundColor: color }} />
-        </View>
-      </View>
-      <View style={{ position: 'absolute', top: 0, left: 5, width: 2, height: 5, backgroundColor: color, borderRadius: 1 }} />
-      <View style={{ position: 'absolute', top: 0, right: 5, width: 2, height: 5, backgroundColor: color, borderRadius: 1 }} />
-    </View>
-  );
-}
-
-function HistoryIcon({ color }: { color: string }) {
-  return (
-    <View style={{ width: 26, height: 26, alignItems: 'center', justifyContent: 'center' }}>
-      <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: color, alignItems: 'center', justifyContent: 'center' }}>
-        <View style={{ position: 'absolute', width: 2, height: 5, backgroundColor: color, borderRadius: 1, bottom: '50%', left: '50%', marginLeft: -1, transform: [{ rotate: '0deg' }] }} />
-        <View style={{ position: 'absolute', width: 2, height: 4, backgroundColor: color, borderRadius: 1, bottom: '50%', left: '50%', marginLeft: -1, transform: [{ rotate: '90deg' }, { translateY: -2 }] }} />
-      </View>
-    </View>
-  );
-}
+const TABS = [
+  { name: 'index',    label: 'Home',     iconActive: 'home',           iconInactive: 'home-outline' },
+  { name: 'explore',  label: 'Explore',  iconActive: 'compass',        iconInactive: 'compass-outline' },
+  { name: 'ongoing',  label: 'Ongoing',  iconActive: 'play-circle',    iconInactive: 'play-circle-outline' },
+  { name: 'schedule', label: 'Schedule', iconActive: 'calendar',       iconInactive: 'calendar-outline' },
+  { name: 'history',  label: 'History',  iconActive: 'time',           iconInactive: 'time-outline' },
+] as const;
 
 // ─── TabIcon dengan animasi ───────────────────────────────────────────────────
 
-function TabIcon({ focused, label }: { focused: boolean; label: string }) {
+function TabIcon({ focused, label, iconActive, iconInactive }: {
+  focused: boolean;
+  label: string;
+  iconActive: string;
+  iconInactive: string;
+}) {
   const scale = useRef(new Animated.Value(focused ? 1 : 0.85)).current;
   const translateY = useRef(new Animated.Value(focused ? 0 : 4)).current;
   const opacity = useRef(new Animated.Value(focused ? 1 : 0.6)).current;
@@ -100,19 +56,6 @@ function TabIcon({ focused, label }: { focused: boolean; label: string }) {
     ]).start();
   }, [focused]);
 
-  const iconColor = focused ? BAR_BG : INACTIVE;
-
-  const Icon = () => {
-    switch (label) {
-      case 'Home':     return <HomeIcon color={iconColor} />;
-      case 'Explore':  return <SearchIcon color={iconColor} />;
-      case 'Ongoing':  return <PlayIcon color={iconColor} />;
-      case 'Schedule': return <CalendarIcon color={iconColor} />;
-      case 'History':  return <HistoryIcon color={iconColor} />;
-      default:         return null;
-    }
-  };
-
   if (focused) {
     return (
       <Animated.View style={[
@@ -120,7 +63,7 @@ function TabIcon({ focused, label }: { focused: boolean; label: string }) {
         { transform: [{ scale }, { translateY }] },
       ]}>
         <View style={styles.activeBubble}>
-          <Icon />
+          <Ionicons name={iconActive as any} size={26} color={BAR_BG} />
         </View>
         <Animated.Text style={[styles.activeLabel, { opacity }]}>
           {label.toUpperCase()}
@@ -134,7 +77,7 @@ function TabIcon({ focused, label }: { focused: boolean; label: string }) {
       styles.inactiveWrapper,
       { opacity, transform: [{ scale }, { translateY }] },
     ]}>
-      <Icon />
+      <Ionicons name={iconInactive as any} size={24} color={INACTIVE} />
     </Animated.View>
   );
 }
@@ -148,6 +91,8 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
+        sceneStyle: { backgroundColor: COLORS.bg },
+        animation: 'fade',
         tabBarStyle: {
           backgroundColor: BAR_BG,
           borderTopWidth: 1,
@@ -161,11 +106,22 @@ export default function TabLayout() {
         tabBarInactiveTintColor: INACTIVE,
       }}
     >
-      <Tabs.Screen name="index"    options={{ tabBarIcon: ({ focused }) => <TabIcon focused={focused} label="Home" /> }} />
-      <Tabs.Screen name="explore"  options={{ tabBarIcon: ({ focused }) => <TabIcon focused={focused} label="Explore" /> }} />
-      <Tabs.Screen name="ongoing"  options={{ tabBarIcon: ({ focused }) => <TabIcon focused={focused} label="Ongoing" /> }} />
-      <Tabs.Screen name="schedule" options={{ tabBarIcon: ({ focused }) => <TabIcon focused={focused} label="Schedule" /> }} />
-      <Tabs.Screen name="history"  options={{ tabBarIcon: ({ focused }) => <TabIcon focused={focused} label="History" /> }} />
+      {TABS.map(tab => (
+        <Tabs.Screen
+          key={tab.name}
+          name={tab.name}
+          options={{
+            tabBarIcon: ({ focused }) => (
+              <TabIcon
+                focused={focused}
+                label={tab.label}
+                iconActive={tab.iconActive}
+                iconInactive={tab.iconInactive}
+              />
+            ),
+          }}
+        />
+      ))}
     </Tabs>
   );
 }
