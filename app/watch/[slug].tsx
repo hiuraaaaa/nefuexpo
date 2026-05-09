@@ -331,7 +331,7 @@ export default function WatchScreen() {
         {selectedServer && !isEpLoading ? (
           <Video
             ref={videoRef}
-            source={{ uri: getProxyUrl(selectedServer.link) }}
+            source={{ uri: selectedServer.link }}
             style={{ width: '100%', height: '100%' }}
             resizeMode={ResizeMode.CONTAIN}
             useNativeControls={false}
