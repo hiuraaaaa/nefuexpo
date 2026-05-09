@@ -12,17 +12,13 @@ const LABEL_COLOR = COLORS.gold;
 const TAB_HEIGHT = 64;
 const BUBBLE_SIZE = 58;
 
-// ─── Tab config ───────────────────────────────────────────────────────────────
-
 const TABS = [
   { name: 'index',    label: 'Home',     iconActive: 'home',           iconInactive: 'home-outline' },
   { name: 'explore',  label: 'Explore',  iconActive: 'compass',        iconInactive: 'compass-outline' },
   { name: 'ongoing',  label: 'Ongoing',  iconActive: 'play-circle',    iconInactive: 'play-circle-outline' },
   { name: 'schedule', label: 'Schedule', iconActive: 'calendar',       iconInactive: 'calendar-outline' },
-  { name: 'profile', label: 'Profile', iconActive: 'person', iconInactive: 'person-outline' },
+  { name: 'profile',  label: 'Profile',  iconActive: 'person',         iconInactive: 'person-outline' },
 ] as const;
-
-// ─── TabIcon dengan animasi ───────────────────────────────────────────────────
 
 function TabIcon({ focused, label, iconActive, iconInactive }: {
   focused: boolean;
@@ -82,8 +78,6 @@ function TabIcon({ focused, label, iconActive, iconInactive }: {
   );
 }
 
-// ─── Layout ───────────────────────────────────────────────────────────────────
-
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
 
@@ -122,11 +116,12 @@ export default function TabLayout() {
           }}
         />
       ))}
+
+      {/* Hidden tabs */}
+      <Tabs.Screen name="history" options={{ href: null }} />
     </Tabs>
   );
 }
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   activeBubbleWrapper: {
