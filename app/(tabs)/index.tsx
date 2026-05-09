@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, DAY_KEYS, DAY_NAMES, LOGO_URL } from '@/constants';
 import { api, shuffleArray, getAnimeSlug } from '@/hooks/api';
 import { Anime, ScheduleDay } from '@/types';
@@ -29,7 +30,6 @@ export default function HomeScreen() {
   const ongoingRef = useRef<ScrollView>(null);
   const terbaruRef = useRef<ScrollView>(null);
 
-  // Hero pakai ongoing (sama kayak web)
   const carouselItems = ongoing.slice(0, 8);
 
   const fetchData = useCallback(async () => {
@@ -45,7 +45,6 @@ export default function HomeScreen() {
 
   useEffect(() => { fetchData(); }, []);
 
-  // Auto-advance hero
   useEffect(() => {
     if (carouselItems.length === 0) return;
     const itv = setInterval(() => {
@@ -95,7 +94,6 @@ export default function HomeScreen() {
         </View>
       )}
 
-
       <ScrollView
         style={{ flex: 1 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.gold} />}
@@ -116,6 +114,7 @@ export default function HomeScreen() {
                 borderColor: 'rgba(255,255,255,0.8)' }} />
             </TouchableOpacity>
           </View>
+
           {isLoading ? <HeroSkeleton /> : (
             <>
               <ScrollView
@@ -131,13 +130,14 @@ export default function HomeScreen() {
                     style={{ width, height: width * 0.7, position: 'relative' }}>
                     <Image source={{ uri: a.image_cover || a.image_poster }}
                       style={{ width: '100%', height: '100%', opacity: 0.6 }} resizeMode="cover" />
-                    {/* Gradient overlay — 3 layer supaya smooth tanpa garis */}
-                    <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '30%',
-                      backgroundColor: 'rgba(10,10,12,0.3)' }} />
-                    <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '50%',
-                      backgroundColor: 'rgba(10,10,12,0.5)' }} />
-                    <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '65%',
-                      backgroundColor: 'rgba(10,10,12,0.65)' }} />
+
+                    {/* ✅ LinearGradient — smooth tanpa stepping */}
+                    <LinearGradient
+                      colors={['transparent', 'rgba(10,10,12,0.4)', 'rgba(10,10,12,0.95)']}
+                      locations={[0.2, 0.55, 1]}
+                      style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '80%' }}
+                    />
+
                     {/* Content */}
                     <View style={{ position: 'absolute', bottom: 24, left: 24, right: 24,
                       flexDirection: 'row', alignItems: 'flex-end', gap: 16 }}>
@@ -185,14 +185,22 @@ export default function HomeScreen() {
           )}
         </View>
 
-        {/* ── Share Banner — pill modern style ── */}
+        {/* ── Share Banner ── */}
         <View style={{ marginHorizontal: 16, marginTop: 20, borderRadius: 24,
           overflow: 'hidden', backgroundColor: 'rgba(22,22,26,0.6)',
-          borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-          backdropFilter: 'blur(20px)' }}>
+          borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }}>
           <Image source={{ uri: 'https://raw.githubusercontent.com/alip-jmbd/alipp/main/bc.jpg' }}
             style={{ position: 'absolute', width: '100%', height: '100%', opacity: 0.15 }}
             resizeMode="cover" />
+
+          {/* ✅ LinearGradient overlay biar lebih premium */}
+          <LinearGradient
+            colors={['rgba(246,207,128,0.08)', 'rgba(22,22,26,0.0)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+          />
+
           <View style={{ padding: 18 }}>
             <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13,
               textTransform: 'uppercase', letterSpacing: 1, marginBottom: 3 }}>
@@ -265,7 +273,7 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* ── Terbaru Section (ongoing.slice 0-8, sama kayak web) ── */}
+        {/* ── Terbaru Section ── */}
         <View style={{ marginTop: 24 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
             paddingHorizontal: 16, marginBottom: 14 }}>
@@ -326,17 +334,24 @@ export default function HomeScreen() {
                   flexDirection: 'row', alignItems: 'center', height: 88, paddingHorizontal: 16,
                   backgroundColor: COLORS.card,
                   borderWidth: 1,
-                  borderColor: index < 3 ? 'rgba(246,207,128,0.2)' : 'rgba(255,255,255,0.05)',
-                  ...(index < 3 ? {} : {}) }}>
+                  borderColor: index < 3 ? 'rgba(246,207,128,0.2)' : 'rgba(255,255,255,0.05)' }}>
+
                 {/* BG image right */}
                 <Image source={{ uri: anime.image_cover || anime.image_poster }}
-                  style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '45%', opacity: 0.5 }}
+                  style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '55%', opacity: 0.6 }}
                   resizeMode="cover" />
-                <View style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '45%',
-                  backgroundColor: 'rgba(22,22,26,0.85)' }} />
+
+                {/* ✅ LinearGradient fade left — lebih natural dari flat overlay */}
+                <LinearGradient
+                  colors={[COLORS.card, COLORS.card, 'transparent']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '75%' }}
+                />
+
                 {/* Rank */}
                 <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center',
-                  justifyContent: 'center', marginRight: 16,
+                  justifyContent: 'center', marginRight: 16, zIndex: 1,
                   backgroundColor: index < 3 ? COLORS.gold : 'rgba(255,255,255,0.05)',
                   borderWidth: index < 3 ? 0 : 1,
                   borderColor: 'rgba(255,255,255,0.1)' }}>
@@ -345,7 +360,7 @@ export default function HomeScreen() {
                     {index + 1}
                   </Text>
                 </View>
-                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13, flex: 1 }}
+                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13, flex: 1, zIndex: 1 }}
                   numberOfLines={1}>{anime.title}</Text>
               </TouchableOpacity>
             ))
