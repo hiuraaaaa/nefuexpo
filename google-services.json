@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "206619940359-j0h5gfqcnqnoasds5cpi3ifooc6nbko6.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.nefusoft.anime",
+            "certificate_hash": "bb34982c7646817bd88012dfda767c22e9b67f0f"
+          }
+        },
+        {
           "client_id": "206619940359-r4c4arj7mkq2pip24cn8i365er8p57i0.apps.googleusercontent.com",
           "client_type": 3
         }
