@@ -15,7 +15,7 @@ import * as Haptics from 'expo-haptics';
 import FastImage from 'react-native-fast-image';
 
 const { width } = Dimensions.get('window');
-const NUM_COLUMNS = 3;
+const NUM_COLUMNS = 4;
 const H_PAD = 12;
 const GAP = 8;
 const CARD_WIDTH = (width - H_PAD * 2 - GAP * (NUM_COLUMNS - 1)) / NUM_COLUMNS;
@@ -59,11 +59,9 @@ export default function ExploreScreen() {
     setSelectedGenres(p => p.includes(id) ? p.filter(g => g !== id) : [...p, id]);
   };
 
-  // Pad results to always fill rows of 3
+  // Pad results to fill rows
   const paddedResults = [...results];
-  while (paddedResults.length % NUM_COLUMNS !== 0) {
-    paddedResults.push(null as any);
-  }
+  while (paddedResults.length % NUM_COLUMNS !== 0) paddedResults.push(null as any);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }} edges={['top']}>
@@ -80,12 +78,10 @@ export default function ExploreScreen() {
 
       {/* Search bar */}
       <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 }}>
-        <View style={{
-          flexDirection: 'row', alignItems: 'center',
+        <View style={{ flexDirection: 'row', alignItems: 'center',
           backgroundColor: theme.card, borderRadius: 14,
           paddingHorizontal: 14, paddingVertical: 11,
-          borderWidth: 1, borderColor: theme.border, gap: 10,
-        }}>
+          borderWidth: 1, borderColor: theme.border, gap: 10 }}>
           <Ionicons name="search-outline" size={18} color={theme.accent} />
           <TextInput
             style={{ flex: 1, color: theme.text, fontWeight: '600',
@@ -108,28 +104,19 @@ export default function ExploreScreen() {
       {/* Genre chips */}
       {!query && genres.length > 0 && (
         <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
+          horizontal showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingBottom: 4 }}
           style={{ maxHeight: 44, marginBottom: 8 }}
         >
           {genres.map(g => {
             const active = selectedGenres.includes(g.id);
             return (
-              <TouchableOpacity
-                key={g.id}
-                onPress={() => toggleGenre(g.id)}
-                style={{
-                  paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10,
+              <TouchableOpacity key={g.id} onPress={() => toggleGenre(g.id)}
+                style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10,
                   backgroundColor: active ? theme.accent : theme.card,
-                  borderWidth: 1,
-                  borderColor: active ? theme.accent : theme.border,
-                }}
-              >
-                <Text style={{
-                  color: active ? '#000' : theme.subtext,
-                  fontSize: 10, fontWeight: '700',
-                }}>{g.name}</Text>
+                  borderWidth: 1, borderColor: active ? theme.accent : theme.border }}>
+                <Text style={{ color: active ? '#000' : theme.subtext,
+                  fontSize: 10, fontWeight: '700' }}>{g.name}</Text>
               </TouchableOpacity>
             );
           })}
@@ -140,13 +127,9 @@ export default function ExploreScreen() {
       {query.length > 0 && (
         <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
           <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '700',
-            letterSpacing: 1, textTransform: 'uppercase' }}>
-            Hasil untuk
-          </Text>
+            letterSpacing: 1, textTransform: 'uppercase' }}>Hasil untuk</Text>
           <Text style={{ color: theme.accent, fontSize: 20, fontWeight: '900',
-            letterSpacing: -0.5 }} numberOfLines={1}>
-            "{query}"
-          </Text>
+            letterSpacing: -0.5 }} numberOfLines={1}>"{query}"</Text>
         </View>
       )}
 
@@ -158,20 +141,14 @@ export default function ExploreScreen() {
           numColumns={NUM_COLUMNS}
           contentContainerStyle={{ paddingHorizontal: H_PAD, paddingBottom: 100 }}
           columnWrapperStyle={{ gap: GAP, marginBottom: GAP }}
-          renderItem={() => (
-            <View style={{ width: CARD_WIDTH }}>
-              <CardSkeleton />
-            </View>
-          )}
+          renderItem={() => <View style={{ width: CARD_WIDTH }}><CardSkeleton /></View>}
           scrollEnabled={false}
         />
       ) : results.length === 0 ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
           <Ionicons name="search-outline" size={56} color={theme.subtext} />
           <Text style={{ color: theme.subtext, fontWeight: '700', fontSize: 13,
-            textTransform: 'uppercase', letterSpacing: 2 }}>
-            Tidak ditemukan
-          </Text>
+            textTransform: 'uppercase', letterSpacing: 2 }}>Tidak ditemukan</Text>
         </View>
       ) : (
         <FlatList
@@ -193,28 +170,28 @@ export default function ExploreScreen() {
                     router.push(`/watch/${getAnimeSlug(item)}`);
                   }}
                   activeOpacity={0.85}
-                  style={{ borderRadius: 12, overflow: 'hidden',
+                  style={{ borderRadius: 10, overflow: 'hidden',
                     backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border }}
                 >
                   <FastImage
                     source={{ uri: item.image_poster, priority: FastImage.priority.normal }}
-                    style={{ width: '100%', aspectRatio: 3/4.2 }}
+                    style={{ width: '100%', aspectRatio: 3 / 4.2 }}
                     resizeMode={FastImage.resizeMode.cover}
                   />
-                  <View style={{ padding: 6 }}>
-                    <Text style={{ color: theme.text, fontSize: 10, fontWeight: '700' }}
-                      numberOfLines={2}>
+                  <View style={{ padding: 5 }}>
+                    <Text style={{ color: theme.text, fontSize: 9, fontWeight: '700',
+                      lineHeight: 13 }} numberOfLines={2}>
                       {item.title}
                     </Text>
-                    {item.type && (
-                      <View style={{ marginTop: 4, alignSelf: 'flex-start',
-                        backgroundColor: theme.accentDim, paddingHorizontal: 6,
-                        paddingVertical: 2, borderRadius: 4 }}>
-                        <Text style={{ color: theme.accent, fontSize: 8, fontWeight: '900' }}>
+                    {item.type ? (
+                      <View style={{ marginTop: 3, alignSelf: 'flex-start',
+                        backgroundColor: theme.accentDim, paddingHorizontal: 5,
+                        paddingVertical: 2, borderRadius: 3 }}>
+                        <Text style={{ color: theme.accent, fontSize: 7, fontWeight: '900' }}>
                           {item.type}
                         </Text>
                       </View>
-                    )}
+                    ) : null}
                   </View>
                 </TouchableOpacity>
               </Animated.View>
@@ -228,8 +205,7 @@ export default function ExploreScreen() {
                 disabled={page === 0}
                 style={{ width: 44, height: 44, borderRadius: 12, alignItems: 'center',
                   justifyContent: 'center', backgroundColor: theme.card,
-                  borderWidth: 1, borderColor: theme.border, opacity: page === 0 ? 0.3 : 1 }}
-              >
+                  borderWidth: 1, borderColor: theme.border, opacity: page === 0 ? 0.3 : 1 }}>
                 <Ionicons name="chevron-back" size={18} color={theme.text} />
               </TouchableOpacity>
 
@@ -245,8 +221,7 @@ export default function ExploreScreen() {
                 style={{ width: 44, height: 44, borderRadius: 12, alignItems: 'center',
                   justifyContent: 'center', backgroundColor: theme.card,
                   borderWidth: 1, borderColor: theme.border,
-                  opacity: results.length === 0 ? 0.3 : 1 }}
-              >
+                  opacity: results.length === 0 ? 0.3 : 1 }}>
                 <Ionicons name="chevron-forward" size={18} color={theme.text} />
               </TouchableOpacity>
             </View>
@@ -255,4 +230,4 @@ export default function ExploreScreen() {
       )}
     </SafeAreaView>
   );
-                      }
+}
