@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { DAY_KEYS, DAY_NAMES } from '@/constants';
@@ -11,27 +11,35 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import FastImage from 'react-native-fast-image';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+
+const { width } = Dimensions.get('window');
 
 export default function ScheduleScreen() {
-  const router = useRouter();
-  const theme = useTheme();
-  const [schedule, setSchedule] = useState<ScheduleDay>({});
-  const [isLoading, setIsLoading] = useState(true);
-  const today = new Date();
-  const currentDayIndex = today.getDay();
-  const [selectedDay, setSelectedDay] = useState(DAY_KEYS[currentDayIndex]);
+  const router   = useRouter();
+  const theme    = useTheme();
   const scrollRef = useRef<ScrollView>(null);
 
+  const [schedule, setSchedule]     = useState<ScheduleDay>({});
+  const [isLoading, setIsLoading]   = useState(true);
+
+  const today          = new Date();
+  const currentDayIdx  = today.getDay();
+  const [selectedDay, setSelectedDay] = useState(DAY_KEYS[currentDayIdx]);
+
   useEffect(() => {
-    api.schedule().then(r => setSchedule(r.data || {})).catch(() => {}).finally(() => setIsLoading(false));
+    api.schedule()
+      .then(r => setSchedule(r.data || {}))
+      .catch(() => {})
+      .finally(() => setIsLoading(false));
   }, []);
 
   const animeList: Anime[] = schedule[selectedDay] || [];
 
   const weekDates = DAY_NAMES.map((name, i) => {
     const d = new Date(today);
-    d.setDate(today.getDate() - currentDayIndex + i);
-    return { name, date: d.getDate(), key: DAY_KEYS[i], isToday: i === currentDayIndex };
+    d.setDate(today.getDate() - currentDayIdx + i);
+    return { name, date: d.getDate(), key: DAY_KEYS[i], isToday: i === currentDayIdx };
   });
 
   const handleDayPress = (key: string) => {
@@ -40,11 +48,14 @@ export default function ScheduleScreen() {
     scrollRef.current?.scrollTo({ y: 0, animated: true });
   };
 
+  // Day item width — 7 hari pas muat di layar
+  const DAY_ITEM_W = (width - 32) / 7; // 32 = padding kiri kanan, 6 gap antar 7 item
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }} edges={['top']}>
 
       {/* Header */}
-      <View style={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 }}>
+      <View style={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16 }}>
         <Text style={{ color: theme.text, fontWeight: '900', fontSize: 28,
           letterSpacing: -0.5 }}>Jadwal</Text>
         <Text style={{ color: theme.subtext, fontSize: 11, fontWeight: '700',
@@ -53,52 +64,42 @@ export default function ScheduleScreen() {
         </Text>
       </View>
 
-      {/* Day picker */}
-      <View style={{ paddingHorizontal: 16, paddingVertical: 16 }}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 8 }}>
-          {weekDates.map(w => {
-            const isSelected = selectedDay === w.key;
-            return (
-              <TouchableOpacity
-                key={w.key}
-                onPress={() => handleDayPress(w.key)}
-                activeOpacity={0.8}
-                style={{
-                  alignItems: 'center', gap: 4, paddingHorizontal: 14,
-                  paddingVertical: 10, borderRadius: 16,
-                  backgroundColor: isSelected ? theme.accent : theme.card,
-                  borderWidth: 1,
-                  borderColor: isSelected ? theme.accent : theme.border,
-                  minWidth: 52,
-                }}
-              >
-                <Text style={{
-                  fontSize: 10, fontWeight: '700',
-                  color: isSelected ? '#000' : theme.subtext,
-                }}>
-                  {w.name}
-                </Text>
-                <Text style={{
-                  fontSize: 16, fontWeight: '900',
-                  color: isSelected ? '#000' : theme.text,
-                }}>
-                  {w.date}
-                </Text>
-                {w.isToday && (
-                  <View style={{
-                    width: 4, height: 4, borderRadius: 2,
-                    backgroundColor: isSelected ? '#000' : theme.accent,
-                  }} />
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+      {/* Day picker — underline style */}
+      <View style={{ flexDirection: 'row', paddingHorizontal: 16, marginBottom: 4 }}>
+        {weekDates.map(w => {
+          const isSelected = selectedDay === w.key;
+          return (
+            <TouchableOpacity
+              key={w.key}
+              onPress={() => handleDayPress(w.key)}
+              activeOpacity={0.7}
+              style={{ width: DAY_ITEM_W, alignItems: 'center', paddingVertical: 8 }}
+            >
+              <Text style={{ fontSize: 9, fontWeight: '700', textTransform: 'uppercase',
+                letterSpacing: 0.5,
+                color: isSelected ? theme.accent : theme.subtext }}>
+                {w.name}
+              </Text>
+              <Text style={{ fontSize: 16, fontWeight: '900', marginTop: 2,
+                color: isSelected ? theme.accent : theme.text }}>
+                {w.date}
+              </Text>
+              {/* Dot hari ini */}
+              {w.isToday && (
+                <View style={{ width: 3, height: 3, borderRadius: 2, marginTop: 3,
+                  backgroundColor: isSelected ? theme.accent : theme.subtext }} />
+              )}
+              {/* Underline aktif */}
+              <View style={{ height: 2, borderRadius: 1, marginTop: 6,
+                width: isSelected ? DAY_ITEM_W * 0.6 : 0,
+                backgroundColor: theme.accent }} />
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       {/* Divider */}
-      <View style={{ height: 1, backgroundColor: theme.border, marginHorizontal: 16, marginBottom: 8 }} />
+      <View style={{ height: 1, backgroundColor: theme.border, marginHorizontal: 16, marginBottom: 12 }} />
 
       {/* Content */}
       {isLoading ? (
@@ -120,29 +121,30 @@ export default function ScheduleScreen() {
           showsVerticalScrollIndicator={false}
         >
           {animeList.map((a, index) => {
-            const timeText = a.key_time ? a.key_time.split(' ')[1]?.substring(0, 5) : '--:--';
+            const timeText = a.key_time
+              ? a.key_time.split(' ')[1]?.substring(0, 5)
+              : '--:--';
+
             return (
               <Animated.View
                 key={`${a.id}-${index}`}
                 entering={FadeInDown.delay(index * 40).springify()}
-                style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}
+                style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}
               >
-                {/* Time */}
-                <View style={{ alignItems: 'center', width: 44 }}>
-                  <Text style={{ color: theme.accent, fontSize: 11, fontWeight: '900',
-                    paddingTop: 18, textAlign: 'center' }}>
+                {/* Timeline kiri */}
+                <View style={{ width: 40, alignItems: 'center', paddingTop: 14 }}>
+                  <Text style={{ color: theme.accent, fontSize: 10, fontWeight: '900',
+                    textAlign: 'center', lineHeight: 13 }}>
                     {timeText}
                   </Text>
-                  <View style={{ width: 2, flex: 1, marginTop: 6,
+                  <View style={{ width: 1.5, flex: 1, marginTop: 6,
                     backgroundColor: theme.border, borderRadius: 1 }} />
                 </View>
 
                 {/* Dot */}
-                <View style={{ alignItems: 'center', paddingTop: 20, width: 12 }}>
-                  <View style={{ width: 10, height: 10, borderRadius: 5,
-                    backgroundColor: theme.accent,
-                    shadowColor: theme.accent, shadowOpacity: 0.6,
-                    shadowRadius: 6, elevation: 4 }} />
+                <View style={{ width: 10, alignItems: 'center', paddingTop: 16 }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 4,
+                    backgroundColor: theme.accent }} />
                 </View>
 
                 {/* Card */}
@@ -152,39 +154,42 @@ export default function ScheduleScreen() {
                     router.push(`/watch/${getAnimeSlug(a)}`);
                   }}
                   activeOpacity={0.85}
-                  style={{ flex: 1, borderRadius: 16, overflow: 'hidden',
-                    backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border }}
+                  style={{ flex: 1, borderRadius: 14, overflow: 'hidden',
+                    backgroundColor: theme.card,
+                    borderWidth: 1, borderColor: theme.border }}
                 >
-                  <View style={{ flexDirection: 'row', padding: 12, gap: 12 }}>
+                  <View style={{ flexDirection: 'row', gap: 0 }}>
+                    {/* Poster */}
                     <FastImage
                       source={{ uri: a.image_poster, priority: FastImage.priority.normal }}
-                      style={{ width: 60, aspectRatio: 3/4, borderRadius: 10 }}
+                      style={{ width: 64, aspectRatio: 3/4 }}
                       resizeMode={FastImage.resizeMode.cover}
                     />
-                    <View style={{ flex: 1, justifyContent: 'center' }}>
-                      <Text style={{ color: theme.text, fontWeight: '800', fontSize: 13,
-                        marginBottom: 6 }} numberOfLines={2}>
+
+                    {/* Gradient fade dari poster ke card */}
+                    <LinearGradient
+                      colors={[theme.card + '00', theme.card]}
+                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                      style={{ width: 24, position: 'absolute', left: 52, top: 0, bottom: 0 }}
+                    />
+
+                    {/* Info */}
+                    <View style={{ flex: 1, padding: 12, justifyContent: 'center', gap: 4 }}>
+                      <Text style={{ color: theme.text, fontWeight: '800', fontSize: 12,
+                        lineHeight: 16 }} numberOfLines={2}>
                         {a.title}
                       </Text>
-                      {a.genre && (
-                        <Text style={{ color: theme.subtext, fontSize: 10, marginBottom: 6 }}
+                      {a.genre ? (
+                        <Text style={{ color: theme.subtext, fontSize: 9, fontWeight: '600' }}
                           numberOfLines={1}>
-                          {a.genre.replace(/,/g, ', ')}
+                          {a.genre.replace(/,/g, ' · ')}
                         </Text>
-                      )}
-                      {a.time && (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                          <Ionicons name="time-outline" size={11} color={theme.accent} />
-                          <Text style={{ color: theme.accent, fontSize: 10, fontWeight: '700' }}>
-                            {a.time}
-                          </Text>
-                        </View>
-                      )}
+                      ) : null}
                     </View>
 
                     {/* Arrow */}
-                    <View style={{ justifyContent: 'center' }}>
-                      <Ionicons name="chevron-forward" size={16} color={theme.subtext} />
+                    <View style={{ justifyContent: 'center', paddingRight: 12 }}>
+                      <Ionicons name="chevron-forward" size={14} color={theme.subtext} />
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -195,4 +200,4 @@ export default function ScheduleScreen() {
       )}
     </SafeAreaView>
   );
-                              }
+}
