@@ -114,13 +114,12 @@ export default function WelcomeScreen() {
     opacity: overlayOpacity.value,
   }));
 
+  const goMain    = () => router.replace('/(tabs)/');
+  const goExplore = () => router.push('/(tabs)/explore');
+
   const navigateTo = (target: 'main' | 'explore') => {
-    // Fade ke hitam dulu baru navigate
     overlayOpacity.value = withTiming(1, { duration: 300 }, (done) => {
-      if (done) runOnJS(target === 'main'
-        ? () => router.replace('/(tabs)/')
-        : () => router.push('/(tabs)/explore')
-      )();
+      if (done) runOnJS(target === 'main' ? goMain : goExplore)();
     });
   };
 
