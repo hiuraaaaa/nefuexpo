@@ -1,13 +1,13 @@
-import React, { useRef } from 'react';
-import {
-  View,
-  Text,
-  Image,
-  TouchableOpacity,
-  Animated,
-  StyleSheet,
-} from 'react-native';
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import FastImage from 'react-native-fast-image';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import { COLORS } from '@/constants';
 import { Anime } from '@/types';
 
@@ -17,86 +17,71 @@ interface Props {
   width?: number;
 }
 
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+
 export default function AnimeCard({ anime, onPress, width }: Props) {
-  const scale = useRef(new Animated.Value(1)).current;
-  const brightness = useRef(new Animated.Value(1)).current;
+  const scale   = useSharedValue(1);
+  const opacity = useSharedValue(1);
+
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+    opacity: opacity.value,
+  }));
 
   const handlePressIn = () => {
-    Animated.parallel([
-      Animated.spring(scale, {
-        toValue: 0.93,
-        useNativeDriver: true,
-        speed: 50,
-        bounciness: 4,
-      }),
-      Animated.timing(brightness, {
-        toValue: 0.7,
-        duration: 80,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    scale.value   = withSpring(0.93, { damping: 15, stiffness: 300 });
+    opacity.value = withTiming(0.7, { duration: 80 });
   };
 
   const handlePressOut = () => {
-    Animated.parallel([
-      Animated.spring(scale, {
-        toValue: 1,
-        useNativeDriver: true,
-        speed: 20,
-        bounciness: 8,
-      }),
-      Animated.timing(brightness, {
-        toValue: 1,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    scale.value   = withSpring(1, { damping: 12, stiffness: 200 });
+    opacity.value = withTiming(1, { duration: 150 });
   };
 
   return (
-    <TouchableOpacity
+    <AnimatedTouchable
       onPress={onPress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       activeOpacity={1}
-      style={width ? { width } : { flex: 1 }}
+      style={[animStyle, width ? { width } : { flex: 1 }]}
     >
-      <Animated.View style={{ transform: [{ scale }], opacity: brightness }}>
-        {/* Poster */}
-        <View style={styles.posterWrapper}>
-          <Image
-            source={{ uri: anime.image_poster }}
-            style={StyleSheet.absoluteFillObject}
-            resizeMode="cover"
-          />
+      {/* Poster */}
+      <View style={styles.posterWrapper}>
+        <FastImage
+          source={{
+            uri: anime.image_poster,
+            priority: FastImage.priority.normal,
+            cache: FastImage.cacheControl.immutable,
+          }}
+          style={StyleSheet.absoluteFillObject}
+          resizeMode={FastImage.resizeMode.cover}
+        />
 
-          {/* Gradient overlay */}
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.6)']}
-            style={styles.gradient}
-          />
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.6)']}
+          style={styles.gradient}
+        />
 
-          {/* Type badge — top left */}
-          {anime.type ? (
-            <View style={styles.typeBadge}>
-              <Text style={styles.typeBadgeText}>{anime.type}</Text>
-            </View>
-          ) : null}
-        </View>
-
-        {/* Title */}
-        <Text style={styles.title} numberOfLines={2}>
-          {anime.title}
-        </Text>
-
-        {/* Year / studio */}
-        {(anime.year || anime.studio) ? (
-          <Text style={styles.sub} numberOfLines={1}>
-            {[anime.year, anime.studio].filter(Boolean).join(' · ')}
-          </Text>
+        {anime.type ? (
+          <View style={styles.typeBadge}>
+            <Text style={styles.typeBadgeText}>{anime.type}</Text>
+          </View>
         ) : null}
-      </Animated.View>
-    </TouchableOpacity>
+      </View>
+
+      {/* Title */}
+      <Text style={styles.title} numberOfLines={2}>
+        {anime.title}
+      </Text>
+
+      {/* Year / studio */}
+      {(anime.year || anime.studio) ? (
+        <Text style={styles.sub} numberOfLines={1}>
+          {[anime.year, anime.studio].filter(Boolean).join(' · ')}
+        </Text>
+      ) : null}
+    </AnimatedTouchable>
   );
 }
 
