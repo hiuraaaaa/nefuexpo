@@ -13,11 +13,13 @@ import { Anime, ScheduleDay } from '@/types';
 import AnimeCard from '@/components/AnimeCard';
 import SearchModal from '@/components/SearchModal';
 import { HeroSkeleton, HorizontalCardSkeleton, RankSkeleton } from '@/components/Skeleton';
+import { useTheme } from '@/hooks/theme';
 
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen() {
   const router = useRouter();
+  const theme = useTheme();
   const [ongoing, setOngoing] = useState<Anime[]>([]);
   const [popular, setPopular] = useState<Anime[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -83,26 +85,25 @@ export default function HomeScreen() {
   const onRefresh = () => { setRefreshing(true); fetchData(); };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.bg }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }} edges={['top']}>
       {/* Copy toast */}
       {copyToast && (
         <View style={{ position: 'absolute', top: 80, left: width / 2 - 120, zIndex: 999,
-          backgroundColor: COLORS.gold, paddingHorizontal: 24, paddingVertical: 12,
+          backgroundColor: theme.accent, paddingHorizontal: 24, paddingVertical: 12,
           borderRadius: 999, width: 240, alignItems: 'center',
-          shadowColor: COLORS.gold, shadowOpacity: 0.4, shadowRadius: 20 }}>
+          shadowColor: theme.accent, shadowOpacity: 0.4, shadowRadius: 20 }}>
           <Text style={{ color: '#000', fontWeight: '900', fontSize: 12 }}>Tautan berhasil disalin!</Text>
         </View>
       )}
 
       <ScrollView
         style={{ flex: 1 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.gold} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.accent} />}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
       >
-        {/* ── Hero Carousel ── */}
-        <View style={{ width, height: width * 0.7, backgroundColor: '#0f0f12' }}>
-          {/* Navbar overlay di dalam hero */}
+        {/* Hero Carousel */}
+        <View style={{ width, height: width * 0.7, backgroundColor: theme.card }}>
           <View style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 30,
             flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
             paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10 }}>
@@ -130,32 +131,28 @@ export default function HomeScreen() {
                     style={{ width, height: width * 0.7, position: 'relative' }}>
                     <Image source={{ uri: a.image_cover || a.image_poster }}
                       style={{ width: '100%', height: '100%', opacity: 0.6 }} resizeMode="cover" />
-
-                    {/* ✅ LinearGradient — smooth tanpa stepping */}
                     <LinearGradient
-                      colors={['transparent', 'rgba(10,10,12,0.4)', 'rgba(10,10,12,0.95)']}
+                      colors={['transparent', `${theme.bg}66`, `${theme.bg}f2`]}
                       locations={[0.2, 0.55, 1]}
                       style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '80%' }}
                     />
-
-                    {/* Content */}
                     <View style={{ position: 'absolute', bottom: 24, left: 24, right: 24,
                       flexDirection: 'row', alignItems: 'flex-end', gap: 16 }}>
                       <Image source={{ uri: a.image_poster }}
                         style={{ width: 80, aspectRatio: 3/4.2, borderRadius: 8 }}
                         resizeMode="cover" />
                       <View style={{ flex: 1, marginBottom: 4 }}>
-                        <Text style={{ color: '#fff', fontWeight: '900', fontSize: 18,
+                        <Text style={{ color: theme.text, fontWeight: '900', fontSize: 18,
                           lineHeight: 22, marginBottom: 4 }} numberOfLines={2}>
                           {a.title}
                         </Text>
-                        <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10,
+                        <Text style={{ color: theme.subtext, fontSize: 10,
                           lineHeight: 14, marginBottom: 8 }} numberOfLines={2}>
                           {a.synopsis}
                         </Text>
                         <TouchableOpacity onPress={() => goToAnime(a)}
                           style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
-                            backgroundColor: COLORS.gold, paddingHorizontal: 20, paddingVertical: 8,
+                            backgroundColor: theme.accent, paddingHorizontal: 20, paddingVertical: 8,
                             borderRadius: 4, alignSelf: 'flex-start' }}>
                           <Text style={{ fontSize: 10 }}>▶</Text>
                           <Text style={{ color: '#000', fontWeight: '900', fontSize: 10,
@@ -167,17 +164,16 @@ export default function HomeScreen() {
                 ))}
               </ScrollView>
 
-              {/* Counter + next button — bottom right */}
               {carouselItems.length > 0 && (
                 <View style={{ position: 'absolute', bottom: 24, right: 24,
                   flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 20 }}>
-                  <Text style={{ color: '#fff', fontWeight: '900', fontSize: 10 }}>
+                  <Text style={{ color: theme.text, fontWeight: '900', fontSize: 10 }}>
                     {heroIndex + 1} / {carouselItems.length}
                   </Text>
-                  <View style={{ width: 32, height: 2, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 1 }} />
+                  <View style={{ width: 32, height: 2, backgroundColor: theme.border, borderRadius: 1 }} />
                   <TouchableOpacity onPress={handleHeroNext}
                     style={{ width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }}>
-                    <Text style={{ color: '#fff', fontSize: 18, fontWeight: '900' }}>›</Text>
+                    <Text style={{ color: theme.text, fontSize: 18, fontWeight: '900' }}>›</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -185,63 +181,58 @@ export default function HomeScreen() {
           )}
         </View>
 
-        {/* ── Share Banner ── */}
+        {/* Share Banner */}
         <View style={{ marginHorizontal: 16, marginTop: 20, borderRadius: 24,
-          overflow: 'hidden', backgroundColor: 'rgba(22,22,26,0.6)',
-          borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }}>
+          overflow: 'hidden', backgroundColor: theme.card,
+          borderWidth: 1, borderColor: theme.border }}>
           <Image source={{ uri: 'https://raw.githubusercontent.com/alip-jmbd/alipp/main/bc.jpg' }}
             style={{ position: 'absolute', width: '100%', height: '100%', opacity: 0.15 }}
             resizeMode="cover" />
-
-          {/* ✅ LinearGradient overlay biar lebih premium */}
           <LinearGradient
-            colors={['rgba(246,207,128,0.08)', 'rgba(22,22,26,0.0)']}
+            colors={[theme.accentDim, 'transparent']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
           />
-
           <View style={{ padding: 18 }}>
-            <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13,
+            <Text style={{ color: theme.text, fontWeight: '900', fontSize: 13,
               textTransform: 'uppercase', letterSpacing: 1, marginBottom: 3 }}>
               Sebarkan Keseruan Ini!
             </Text>
-            <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, marginBottom: 14 }}>
+            <Text style={{ color: theme.subtext, fontSize: 11, marginBottom: 14 }}>
               Ajak teman-temanmu marathon anime favorit bareng di NefuSoft.
             </Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               <TouchableOpacity onPress={handleCopy}
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
                   paddingHorizontal: 16, paddingVertical: 9, borderRadius: 999,
-                  backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1,
-                  borderColor: 'rgba(255,255,255,0.12)' }}>
+                  backgroundColor: theme.border, borderWidth: 1, borderColor: theme.border }}>
                 <View style={{ width: 10, height: 10, borderRadius: 2, borderWidth: 1.5,
-                  borderColor: 'rgba(255,255,255,0.6)' }} />
-                <Text style={{ color: '#fff', fontWeight: '800', fontSize: 11 }}>Salin Link</Text>
+                  borderColor: theme.subtext }} />
+                <Text style={{ color: theme.text, fontWeight: '800', fontSize: 11 }}>Salin Link</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={handleShare}
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
                   paddingHorizontal: 16, paddingVertical: 9, borderRadius: 999,
-                  backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1,
-                  borderColor: 'rgba(255,255,255,0.12)' }}>
-                <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>&#8599;</Text>
-                <Text style={{ color: '#fff', fontWeight: '800', fontSize: 11 }}>Lainnya</Text>
+                  backgroundColor: theme.border, borderWidth: 1, borderColor: theme.border }}>
+                <Text style={{ color: theme.subtext, fontSize: 12 }}>&#8599;</Text>
+                <Text style={{ color: theme.text, fontWeight: '800', fontSize: 11 }}>Lainnya</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
 
-        {/* ── Ongoing Section ── */}
+        {/* Ongoing Section */}
         <View style={{ marginTop: 28 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
             paddingHorizontal: 16, marginBottom: 14 }}>
             <TouchableOpacity onPress={() => router.push('/(tabs)/ongoing')}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={{ color: '#fff', fontWeight: '900', fontSize: 16,
+                <Text style={{ color: theme.text, fontWeight: '900', fontSize: 16,
                   textTransform: 'uppercase', letterSpacing: -0.5 }}>Ongoing</Text>
-                <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 16, fontWeight: '900' }}>›</Text>
+                <Text style={{ color: theme.subtext, fontSize: 16, fontWeight: '900' }}>›</Text>
               </View>
-              <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '700',
+              <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '700',
                 textTransform: 'uppercase', letterSpacing: 2, marginTop: 2 }}>
                 Anime yang sedang tayang
               </Text>
@@ -249,13 +240,13 @@ export default function HomeScreen() {
             <View style={{ flexDirection: 'row', gap: 8 }}>
               <TouchableOpacity onPress={() => ongoingRef.current?.scrollTo({ x: -300, animated: true })}
                 style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
-                  backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
-                <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 16 }}>‹</Text>
+                  backgroundColor: theme.border, borderWidth: 1, borderColor: theme.border }}>
+                <Text style={{ color: theme.subtext, fontSize: 16 }}>‹</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => ongoingRef.current?.scrollTo({ x: 300, animated: true })}
                 style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
-                  backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
-                <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 16 }}>›</Text>
+                  backgroundColor: theme.border, borderWidth: 1, borderColor: theme.border }}>
+                <Text style={{ color: theme.subtext, fontSize: 16 }}>›</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -273,17 +264,17 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* ── Terbaru Section ── */}
+        {/* Terbaru Section */}
         <View style={{ marginTop: 24 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
             paddingHorizontal: 16, marginBottom: 14 }}>
             <TouchableOpacity onPress={() => router.push('/(tabs)/schedule')}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={{ color: '#fff', fontWeight: '900', fontSize: 16,
+                <Text style={{ color: theme.text, fontWeight: '900', fontSize: 16,
                   textTransform: 'uppercase', letterSpacing: -0.5 }}>Terbaru</Text>
-                <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 16, fontWeight: '900' }}>›</Text>
+                <Text style={{ color: theme.subtext, fontSize: 16, fontWeight: '900' }}>›</Text>
               </View>
-              <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '700',
+              <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '700',
                 textTransform: 'uppercase', letterSpacing: 2, marginTop: 2 }}>
                 Episode terbaru minggu ini
               </Text>
@@ -291,13 +282,13 @@ export default function HomeScreen() {
             <View style={{ flexDirection: 'row', gap: 8 }}>
               <TouchableOpacity onPress={() => terbaruRef.current?.scrollTo({ x: -300, animated: true })}
                 style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
-                  backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
-                <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 16 }}>‹</Text>
+                  backgroundColor: theme.border, borderWidth: 1, borderColor: theme.border }}>
+                <Text style={{ color: theme.subtext, fontSize: 16 }}>‹</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => terbaruRef.current?.scrollTo({ x: 300, animated: true })}
                 style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
-                  backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
-                <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 16 }}>›</Text>
+                  backgroundColor: theme.border, borderWidth: 1, borderColor: theme.border }}>
+                <Text style={{ color: theme.subtext, fontSize: 16 }}>›</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -315,13 +306,13 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* ── Top 10 Anime ── */}
+        {/* Top 10 */}
         <View style={{ marginTop: 28, paddingHorizontal: 16 }}>
-          <Text style={{ color: '#fff', fontWeight: '900', fontSize: 16,
+          <Text style={{ color: theme.text, fontWeight: '900', fontSize: 16,
             textTransform: 'uppercase', letterSpacing: -0.5, marginBottom: 2 }}>
             Top 10 Anime
           </Text>
-          <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '700',
+          <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '700',
             textTransform: 'uppercase', letterSpacing: 2, marginBottom: 20 }}>
             Anime populer sepanjang waktu
           </Text>
@@ -332,35 +323,27 @@ export default function HomeScreen() {
                 activeOpacity={0.8}
                 style={{ marginBottom: 12, borderRadius: 16, overflow: 'hidden',
                   flexDirection: 'row', alignItems: 'center', height: 88, paddingHorizontal: 16,
-                  backgroundColor: COLORS.card,
-                  borderWidth: 1,
-                  borderColor: index < 3 ? 'rgba(246,207,128,0.2)' : 'rgba(255,255,255,0.05)' }}>
-
-                {/* BG image right */}
+                  backgroundColor: theme.card, borderWidth: 1,
+                  borderColor: index < 3 ? theme.accentDim : theme.border }}>
                 <Image source={{ uri: anime.image_cover || anime.image_poster }}
                   style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '55%', opacity: 0.6 }}
                   resizeMode="cover" />
-
-                {/* ✅ LinearGradient fade left — lebih natural dari flat overlay */}
                 <LinearGradient
-                  colors={[COLORS.card, COLORS.card, 'transparent']}
+                  colors={[theme.card, theme.card, 'transparent']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '75%' }}
                 />
-
-                {/* Rank */}
                 <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center',
                   justifyContent: 'center', marginRight: 16, zIndex: 1,
-                  backgroundColor: index < 3 ? COLORS.gold : 'rgba(255,255,255,0.05)',
-                  borderWidth: index < 3 ? 0 : 1,
-                  borderColor: 'rgba(255,255,255,0.1)' }}>
+                  backgroundColor: index < 3 ? theme.accent : theme.border,
+                  borderWidth: index < 3 ? 0 : 1, borderColor: theme.border }}>
                   <Text style={{ fontWeight: '900', fontSize: 14,
-                    color: index < 3 ? '#000' : 'rgba(255,255,255,0.3)' }}>
+                    color: index < 3 ? '#000' : theme.subtext }}>
                     {index + 1}
                   </Text>
                 </View>
-                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13, flex: 1, zIndex: 1 }}
+                <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13, flex: 1, zIndex: 1 }}
                   numberOfLines={1}>{anime.title}</Text>
               </TouchableOpacity>
             ))
@@ -371,4 +354,4 @@ export default function HomeScreen() {
       <SearchModal visible={searchOpen} onClose={() => setSearchOpen(false)} />
     </SafeAreaView>
   );
-}
+                              }
