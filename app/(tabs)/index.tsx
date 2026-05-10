@@ -1,45 +1,91 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  View, Text, Image, TouchableOpacity, ScrollView,
-  FlatList, Dimensions, RefreshControl, Animated,
-  Share, Clipboard,
+  View, Text, TouchableOpacity, ScrollView,
+  Dimensions, RefreshControl, Share,
 } from 'react-native';
+import FastImage from 'react-native-fast-image';
+import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, DAY_KEYS, DAY_NAMES, LOGO_URL } from '@/constants';
+import { LOGO_URL } from '@/constants';
 import { api, shuffleArray, getAnimeSlug } from '@/hooks/api';
+import { useTheme } from '@/hooks/theme';
 import { Anime, ScheduleDay } from '@/types';
 import AnimeCard from '@/components/AnimeCard';
 import SearchModal from '@/components/SearchModal';
 import { HeroSkeleton, HorizontalCardSkeleton, RankSkeleton } from '@/components/Skeleton';
-import { useTheme } from '@/hooks/theme';
 
 const { width } = Dimensions.get('window');
 
+const getTodayKey = (): string => {
+  const days = ['MINGGU', 'SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU'];
+  return days[new Date().getDay()];
+};
+
+const todayLabel = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'][new Date().getDay()];
+
+// ── Reusable Section Header ────────────────────────────────────────────────────
+function SectionHeader({ title, subtitle, onPress, scrollRef, theme }: {
+  title: string; subtitle: string; onPress: () => void;
+  scrollRef: React.RefObject<ScrollView>; theme: any;
+}) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      paddingHorizontal: 16, marginBottom: 14 }}>
+      <TouchableOpacity onPress={onPress}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={{ color: theme.text, fontWeight: '900', fontSize: 16,
+            textTransform: 'uppercase', letterSpacing: -0.5 }}>{title}</Text>
+          <Text style={{ color: theme.subtext, fontSize: 16, fontWeight: '900' }}>›</Text>
+        </View>
+        <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '700',
+          textTransform: 'uppercase', letterSpacing: 2, marginTop: 2 }}>{subtitle}</Text>
+      </TouchableOpacity>
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <TouchableOpacity onPress={() => scrollRef.current?.scrollTo({ x: -300, animated: true })}
+          style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
+            backgroundColor: theme.border, borderWidth: 1, borderColor: theme.border }}>
+          <Text style={{ color: theme.subtext, fontSize: 16 }}>‹</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => scrollRef.current?.scrollTo({ x: 300, animated: true })}
+          style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
+            backgroundColor: theme.border, borderWidth: 1, borderColor: theme.border }}>
+          <Text style={{ color: theme.subtext, fontSize: 16 }}>›</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+// ── Main ───────────────────────────────────────────────────────────────────────
 export default function HomeScreen() {
   const router = useRouter();
-  const theme = useTheme();
-  const [ongoing, setOngoing] = useState<Anime[]>([]);
-  const [popular, setPopular] = useState<Anime[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [heroIndex, setHeroIndex] = useState(0);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [copyToast, setCopyToast] = useState(false);
+  const theme  = useTheme();
 
-  const heroRef = useRef<ScrollView>(null);
+  const [ongoing, setOngoing]       = useState<Anime[]>([]);
+  const [movies, setMovies]         = useState<Anime[]>([]);
+  const [todayAnime, setTodayAnime] = useState<Anime[]>([]);
+  const [isLoading, setIsLoading]   = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [heroIndex, setHeroIndex]   = useState(0);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [copyToast, setCopyToast]   = useState(false);
+
+  const heroRef    = useRef<ScrollView>(null);
   const ongoingRef = useRef<ScrollView>(null);
-  const terbaruRef = useRef<ScrollView>(null);
+  const todayRef   = useRef<ScrollView>(null);
 
   const carouselItems = ongoing.slice(0, 8);
 
   const fetchData = useCallback(async () => {
     try {
-      const [, ongRes, popRes] = await api.home();
-      const shuffled = shuffleArray(ongRes.data || []);
-      setOngoing(shuffled);
-      setPopular(popRes.data || []);
+      const [schedRes, ongRes, movRes] = await api.home();
+      setOngoing(shuffleArray(ongRes.data || []));
+      setMovies(movRes.data || []);
+      const todayKey = getTodayKey();
+      const schedData = schedRes.data as ScheduleDay;
+      setTodayAnime(schedData?.[todayKey] || []);
     } catch {}
     setIsLoading(false);
     setRefreshing(false);
@@ -47,6 +93,7 @@ export default function HomeScreen() {
 
   useEffect(() => { fetchData(); }, []);
 
+  // Auto-advance hero
   useEffect(() => {
     if (carouselItems.length === 0) return;
     const itv = setInterval(() => {
@@ -76,8 +123,8 @@ export default function HomeScreen() {
     } catch {}
   };
 
-  const handleCopy = () => {
-    Clipboard.setString('https://nefusoft.eu.cc');
+  const handleCopy = async () => {
+    await Clipboard.setStringAsync('https://nefusoft.eu.cc');
     setCopyToast(true);
     setTimeout(() => setCopyToast(false), 2000);
   };
@@ -86,12 +133,12 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }} edges={['top']}>
+
       {/* Copy toast */}
       {copyToast && (
         <View style={{ position: 'absolute', top: 80, left: width / 2 - 120, zIndex: 999,
           backgroundColor: theme.accent, paddingHorizontal: 24, paddingVertical: 12,
-          borderRadius: 999, width: 240, alignItems: 'center',
-          shadowColor: theme.accent, shadowOpacity: 0.4, shadowRadius: 20 }}>
+          borderRadius: 999, width: 240, alignItems: 'center' }}>
           <Text style={{ color: '#000', fontWeight: '900', fontSize: 12 }}>Tautan berhasil disalin!</Text>
         </View>
       )}
@@ -102,12 +149,19 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
       >
-        {/* Hero Carousel */}
+
+        {/* ── Hero Carousel ── */}
         <View style={{ width, height: width * 0.7, backgroundColor: theme.card }}>
+
+          {/* Navbar */}
           <View style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 30,
             flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
             paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10 }}>
-            <Image source={{ uri: LOGO_URL }} style={{ width: 40, height: 40 }} resizeMode="contain" />
+            <FastImage
+              source={{ uri: LOGO_URL, priority: FastImage.priority.high }}
+              style={{ width: 40, height: 40 }}
+              resizeMode={FastImage.resizeMode.contain}
+            />
             <TouchableOpacity onPress={() => setSearchOpen(true)}
               style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center',
                 backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}>
@@ -119,28 +173,30 @@ export default function HomeScreen() {
           {isLoading ? <HeroSkeleton /> : (
             <>
               <ScrollView
-                ref={heroRef}
-                horizontal
-                pagingEnabled
-                scrollEnabled={false}
+                ref={heroRef} horizontal pagingEnabled scrollEnabled={false}
                 showsHorizontalScrollIndicator={false}
                 style={{ width, height: '100%' }}
               >
                 {carouselItems.map((a, i) => (
                   <TouchableOpacity key={i} activeOpacity={0.9} onPress={() => goToAnime(a)}
-                    style={{ width, height: width * 0.7, position: 'relative' }}>
-                    <Image source={{ uri: a.image_cover || a.image_poster }}
-                      style={{ width: '100%', height: '100%', opacity: 0.6 }} resizeMode="cover" />
+                    style={{ width, height: width * 0.7 }}>
+                    <FastImage
+                      source={{ uri: a.image_cover || a.image_poster, priority: FastImage.priority.high }}
+                      style={{ width: '100%', height: '100%', opacity: 0.6 }}
+                      resizeMode={FastImage.resizeMode.cover}
+                    />
                     <LinearGradient
-                      colors={['transparent', `${theme.bg}66`, `${theme.bg}f2`]}
+                      colors={['transparent', `${theme.bg}99`, `${theme.bg}f5`]}
                       locations={[0.2, 0.55, 1]}
                       style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '80%' }}
                     />
                     <View style={{ position: 'absolute', bottom: 24, left: 24, right: 24,
                       flexDirection: 'row', alignItems: 'flex-end', gap: 16 }}>
-                      <Image source={{ uri: a.image_poster }}
+                      <FastImage
+                        source={{ uri: a.image_poster, priority: FastImage.priority.high }}
                         style={{ width: 80, aspectRatio: 3/4.2, borderRadius: 8 }}
-                        resizeMode="cover" />
+                        resizeMode={FastImage.resizeMode.cover}
+                      />
                       <View style={{ flex: 1, marginBottom: 4 }}>
                         <Text style={{ color: theme.text, fontWeight: '900', fontSize: 18,
                           lineHeight: 22, marginBottom: 4 }} numberOfLines={2}>
@@ -181,17 +237,18 @@ export default function HomeScreen() {
           )}
         </View>
 
-        {/* Share Banner */}
-        <View style={{ marginHorizontal: 16, marginTop: 20, borderRadius: 24,
+        {/* ── Share Banner ── */}
+        <View style={{ marginHorizontal: 16, marginTop: 20, borderRadius: 16,
           overflow: 'hidden', backgroundColor: theme.card,
           borderWidth: 1, borderColor: theme.border }}>
-          <Image source={{ uri: 'https://raw.githubusercontent.com/alip-jmbd/alipp/main/bc.jpg' }}
+          <FastImage
+            source={{ uri: 'https://raw.githubusercontent.com/alip-jmbd/alipp/main/bc.jpg' }}
             style={{ position: 'absolute', width: '100%', height: '100%', opacity: 0.15 }}
-            resizeMode="cover" />
+            resizeMode={FastImage.resizeMode.cover}
+          />
           <LinearGradient
             colors={[theme.accentDim, 'transparent']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
           />
           <View style={{ padding: 18 }}>
@@ -202,7 +259,7 @@ export default function HomeScreen() {
             <Text style={{ color: theme.subtext, fontSize: 11, marginBottom: 14 }}>
               Ajak teman-temanmu marathon anime favorit bareng di NefuSoft.
             </Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
               <TouchableOpacity onPress={handleCopy}
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
                   paddingHorizontal: 16, paddingVertical: 9, borderRadius: 999,
@@ -222,34 +279,13 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Ongoing Section */}
+        {/* ── Ongoing ── */}
         <View style={{ marginTop: 28 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-            paddingHorizontal: 16, marginBottom: 14 }}>
-            <TouchableOpacity onPress={() => router.push('/(tabs)/ongoing')}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={{ color: theme.text, fontWeight: '900', fontSize: 16,
-                  textTransform: 'uppercase', letterSpacing: -0.5 }}>Ongoing</Text>
-                <Text style={{ color: theme.subtext, fontSize: 16, fontWeight: '900' }}>›</Text>
-              </View>
-              <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '700',
-                textTransform: 'uppercase', letterSpacing: 2, marginTop: 2 }}>
-                Anime yang sedang tayang
-              </Text>
-            </TouchableOpacity>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <TouchableOpacity onPress={() => ongoingRef.current?.scrollTo({ x: -300, animated: true })}
-                style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
-                  backgroundColor: theme.border, borderWidth: 1, borderColor: theme.border }}>
-                <Text style={{ color: theme.subtext, fontSize: 16 }}>‹</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => ongoingRef.current?.scrollTo({ x: 300, animated: true })}
-                style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
-                  backgroundColor: theme.border, borderWidth: 1, borderColor: theme.border }}>
-                <Text style={{ color: theme.subtext, fontSize: 16 }}>›</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          <SectionHeader
+            title="Ongoing" subtitle="Anime yang sedang tayang"
+            onPress={() => router.push('/(tabs)/ongoing')}
+            scrollRef={ongoingRef} theme={theme}
+          />
           <View style={{ paddingHorizontal: 16 }}>
             <ScrollView ref={ongoingRef} horizontal showsHorizontalScrollIndicator={false}
               snapToInterval={110} decelerationRate="fast" snapToAlignment="start"
@@ -264,76 +300,71 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Terbaru Section */}
-        <View style={{ marginTop: 24 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-            paddingHorizontal: 16, marginBottom: 14 }}>
-            <TouchableOpacity onPress={() => router.push('/(tabs)/schedule')}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={{ color: theme.text, fontWeight: '900', fontSize: 16,
-                  textTransform: 'uppercase', letterSpacing: -0.5 }}>Terbaru</Text>
-                <Text style={{ color: theme.subtext, fontSize: 16, fontWeight: '900' }}>›</Text>
-              </View>
-              <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '700',
-                textTransform: 'uppercase', letterSpacing: 2, marginTop: 2 }}>
-                Episode terbaru minggu ini
-              </Text>
-            </TouchableOpacity>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <TouchableOpacity onPress={() => terbaruRef.current?.scrollTo({ x: -300, animated: true })}
-                style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
-                  backgroundColor: theme.border, borderWidth: 1, borderColor: theme.border }}>
-                <Text style={{ color: theme.subtext, fontSize: 16 }}>‹</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => terbaruRef.current?.scrollTo({ x: 300, animated: true })}
-                style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
-                  backgroundColor: theme.border, borderWidth: 1, borderColor: theme.border }}>
-                <Text style={{ color: theme.subtext, fontSize: 16 }}>›</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+        {/* ── Tayang Hari Ini ── */}
+        <View style={{ marginTop: 28 }}>
+          <SectionHeader
+            title={`Hari ${todayLabel}`} subtitle="Tayang hari ini"
+            onPress={() => router.push('/(tabs)/schedule')}
+            scrollRef={todayRef} theme={theme}
+          />
           <View style={{ paddingHorizontal: 16 }}>
-            <ScrollView ref={terbaruRef} horizontal showsHorizontalScrollIndicator={false}
-              snapToInterval={110} decelerationRate="fast" snapToAlignment="start"
-              contentContainerStyle={{ gap: 10 }}>
-              {isLoading
-                ? [...Array(6)].map((_, i) => <HorizontalCardSkeleton key={i} />)
-                : ongoing.slice(0, 8).map(item => (
+            {isLoading ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+                {[...Array(6)].map((_, i) => <HorizontalCardSkeleton key={i} />)}
+              </ScrollView>
+            ) : todayAnime.length === 0 ? (
+              <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+                <Text style={{ color: theme.subtext, fontSize: 12, fontWeight: '700' }}>
+                  Tidak ada anime hari ini
+                </Text>
+              </View>
+            ) : (
+              <ScrollView ref={todayRef} horizontal showsHorizontalScrollIndicator={false}
+                snapToInterval={110} decelerationRate="fast" snapToAlignment="start"
+                contentContainerStyle={{ gap: 10 }}>
+                {todayAnime.map(item => (
                   <AnimeCard key={item.id} anime={item} onPress={() => goToAnime(item)} width={100} />
-                ))
-              }
-            </ScrollView>
+                ))}
+              </ScrollView>
+            )}
           </View>
         </View>
 
-        {/* Top 10 */}
+        {/* ── Movies ── */}
         <View style={{ marginTop: 28, paddingHorizontal: 16 }}>
-          <Text style={{ color: theme.text, fontWeight: '900', fontSize: 16,
-            textTransform: 'uppercase', letterSpacing: -0.5, marginBottom: 2 }}>
-            Top 10 Anime
-          </Text>
-          <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '700',
-            textTransform: 'uppercase', letterSpacing: 2, marginBottom: 20 }}>
-            Anime populer sepanjang waktu
-          </Text>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/ongoing')} style={{ marginBottom: 20 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={{ color: theme.text, fontWeight: '900', fontSize: 16,
+                textTransform: 'uppercase', letterSpacing: -0.5 }}>Movies</Text>
+              <Text style={{ color: theme.subtext, fontSize: 16, fontWeight: '900' }}>›</Text>
+            </View>
+            <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '700',
+              textTransform: 'uppercase', letterSpacing: 2, marginTop: 2 }}>
+              Film anime terpopuler
+            </Text>
+          </TouchableOpacity>
+
           {isLoading
             ? [...Array(5)].map((_, i) => <RankSkeleton key={i} />)
-            : popular.slice(0, 10).map((anime, index) => (
+            : movies.slice(0, 10).map((anime, index) => (
               <TouchableOpacity key={anime.id} onPress={() => goToAnime(anime)}
                 activeOpacity={0.8}
                 style={{ marginBottom: 12, borderRadius: 16, overflow: 'hidden',
                   flexDirection: 'row', alignItems: 'center', height: 88, paddingHorizontal: 16,
                   backgroundColor: theme.card, borderWidth: 1,
                   borderColor: index < 3 ? theme.accentDim : theme.border }}>
-                <Image source={{ uri: anime.image_cover || anime.image_poster }}
+
+                <FastImage
+                  source={{ uri: anime.image_cover || anime.image_poster, priority: FastImage.priority.normal }}
                   style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '55%', opacity: 0.6 }}
-                  resizeMode="cover" />
+                  resizeMode={FastImage.resizeMode.cover}
+                />
                 <LinearGradient
                   colors={[theme.card, theme.card, 'transparent']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                   style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '75%' }}
                 />
+
                 <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center',
                   justifyContent: 'center', marginRight: 16, zIndex: 1,
                   backgroundColor: index < 3 ? theme.accent : theme.border,
@@ -343,15 +374,24 @@ export default function HomeScreen() {
                     {index + 1}
                   </Text>
                 </View>
-                <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13, flex: 1, zIndex: 1 }}
-                  numberOfLines={1}>{anime.title}</Text>
+
+                <View style={{ flex: 1, zIndex: 1 }}>
+                  <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13 }}
+                    numberOfLines={1}>{anime.title}</Text>
+                  {anime.year ? (
+                    <Text style={{ color: theme.subtext, fontSize: 10, marginTop: 3 }}>
+                      {anime.year}{anime.studio ? ` · ${anime.studio}` : ''}
+                    </Text>
+                  ) : null}
+                </View>
               </TouchableOpacity>
             ))
           }
         </View>
+
       </ScrollView>
 
       <SearchModal visible={searchOpen} onClose={() => setSearchOpen(false)} />
     </SafeAreaView>
   );
-                              }
+}
