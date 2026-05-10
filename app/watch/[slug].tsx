@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, Image,
   ActivityIndicator, FlatList, Share,
-  Dimensions, StatusBar, Modal,
+  Dimensions, StatusBar, Modal, Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Video, ResizeMode, AVPlaybackStatus, Audio } from 'expo-av';
