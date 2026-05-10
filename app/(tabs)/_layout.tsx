@@ -3,12 +3,8 @@ import { View, Text, StyleSheet, Animated } from 'react-native';
 import { useRef, useEffect } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '@/constants';
+import { useTheme } from '@/hooks/theme';
 
-const ACTIVE = COLORS.gold;
-const INACTIVE = 'rgba(255,255,255,0.35)';
-const BAR_BG = 'rgba(10,10,12,0.97)';
-const LABEL_COLOR = COLORS.gold;
 const TAB_HEIGHT = 64;
 const BUBBLE_SIZE = 58;
 
@@ -26,6 +22,7 @@ function TabIcon({ focused, label, iconActive, iconInactive }: {
   iconActive: string;
   iconInactive: string;
 }) {
+  const theme = useTheme();
   const scale = useRef(new Animated.Value(focused ? 1 : 0.85)).current;
   const translateY = useRef(new Animated.Value(focused ? 0 : 4)).current;
   const opacity = useRef(new Animated.Value(focused ? 1 : 0.6)).current;
@@ -58,10 +55,13 @@ function TabIcon({ focused, label, iconActive, iconInactive }: {
         styles.activeBubbleWrapper,
         { transform: [{ scale }, { translateY }] },
       ]}>
-        <View style={styles.activeBubble}>
-          <Ionicons name={iconActive as any} size={26} color={BAR_BG} />
+        <View style={[styles.activeBubble, {
+          backgroundColor: theme.accent,
+          shadowColor: theme.accent,
+        }]}>
+          <Ionicons name={iconActive as any} size={26} color={theme.bg} />
         </View>
-        <Animated.Text style={[styles.activeLabel, { opacity }]}>
+        <Animated.Text style={[styles.activeLabel, { opacity, color: theme.accent }]}>
           {label.toUpperCase()}
         </Animated.Text>
       </Animated.View>
@@ -73,31 +73,32 @@ function TabIcon({ focused, label, iconActive, iconInactive }: {
       styles.inactiveWrapper,
       { opacity, transform: [{ scale }, { translateY }] },
     ]}>
-      <Ionicons name={iconInactive as any} size={24} color={INACTIVE} />
+      <Ionicons name={iconInactive as any} size={24} color={theme.subtext} />
     </Animated.View>
   );
 }
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+  const theme = useTheme();
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        sceneStyle: { backgroundColor: COLORS.bg },
+        sceneStyle: { backgroundColor: theme.bg },
         animation: 'fade',
         tabBarStyle: {
-          backgroundColor: BAR_BG,
+          backgroundColor: theme.bg,
           borderTopWidth: 1,
-          borderTopColor: 'rgba(255,255,255,0.06)',
+          borderTopColor: theme.border,
           height: TAB_HEIGHT + insets.bottom,
           paddingBottom: insets.bottom,
           paddingTop: 0,
         },
         tabBarShowLabel: false,
-        tabBarActiveTintColor: ACTIVE,
-        tabBarInactiveTintColor: INACTIVE,
+        tabBarActiveTintColor: theme.accent,
+        tabBarInactiveTintColor: theme.subtext,
       }}
     >
       {TABS.map(tab => (
@@ -133,17 +134,14 @@ const styles = StyleSheet.create({
     width: BUBBLE_SIZE,
     height: BUBBLE_SIZE,
     borderRadius: BUBBLE_SIZE / 2,
-    backgroundColor: ACTIVE,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: ACTIVE,
     shadowOpacity: 0.45,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 4 },
     elevation: 12,
   },
   activeLabel: {
-    color: LABEL_COLOR,
     fontSize: 9,
     fontWeight: '900',
     marginTop: 5,
