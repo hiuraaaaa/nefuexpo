@@ -8,6 +8,8 @@ const get = async <T>(path: string): Promise<T> => {
 
 // ─── Mappers ──────────────────────────────────────────────────────────────────
 
+// Untuk /latest, /movies, /search
+// Response: [{ id, url, judul, cover, genre[], sinopsis, studio, score, status, rilis, total_episode }]
 function mapAnime(raw: any): Anime {
   return {
     id:           (raw.url ?? String(raw.id ?? '')).replace(/\/+$/, ''),
@@ -29,6 +31,8 @@ function mapAnime(raw: any): Anime {
   };
 }
 
+// Untuk item dalam schedule animeList
+// Response: [{ anime_name, id, link, cover }]
 function mapScheduleItem(raw: any): Anime {
   return {
     id:           (raw.link ?? raw.anime_name ?? '').replace(/\/+$/, ''),
@@ -48,6 +52,8 @@ function mapScheduleItem(raw: any): Anime {
   };
 }
 
+// Untuk /detail?url=
+// Response: { data: [{ series_id, judul, cover, sinopsis, published, author, rating, type, status, genre[], chapter[] }] }
 function mapAnimeDetail(raw: any): AnimeDetail {
   const base: Anime = {
     id:           (raw.series_id ?? raw.url ?? '').replace(/\/+$/, ''),
@@ -68,9 +74,10 @@ function mapAnimeDetail(raw: any): AnimeDetail {
     key_time: '',
   };
 
+  // chapter sudah desc (index 0 = episode terbaru), tidak perlu di-reverse
   const episode_list = (raw.chapter ?? []).map((ch: any) => ({
     id:    (ch.url ?? '').replace(/\/+$/, ''),
-    index: ch.ch,
+    index: ch.ch,   // e.g. "12 (End)", "11", "10"
     title: `Episode ${ch.ch}`,
   }));
 
@@ -79,77 +86,66 @@ function mapAnimeDetail(raw: any): AnimeDetail {
 
 // ─── Endpoints ────────────────────────────────────────────────────────────────
 
+// GET /latest?page=1
+// Response: array of anime objects
 const fetchOngoing = async (page = 0): Promise<ApiResponse<Anime[]>> => {
   const json = await get<any>(`/latest?page=${page + 1}`);
   const list = Array.isArray(json) ? json : (json?.data ?? []);
   return { status: true, data: list.map(mapAnime) };
 };
 
+// GET /movies
+// Response: array of anime objects
 const fetchPopular = async (_page = 0): Promise<ApiResponse<Anime[]>> => {
   const json = await get<any>('/movies');
   const list = Array.isArray(json) ? json : (json?.data ?? []);
   return { status: true, data: list.map(mapAnime) };
 };
 
+// GET /schedule
+// Response: { data: [{ day: "Minggu"|"Senin"|..., animeList: [{ anime_name, id, link, cover }] }] }
+// day pakai huruf kapital pertama → toUpperCase() supaya match DAY_KEYS
 const fetchSchedule = async (): Promise<ApiResponse<ScheduleDay>> => {
   const json = await get<any>('/schedule');
   const raw: any[] = json?.data ?? (Array.isArray(json) ? json : []);
   const days: ScheduleDay = {};
   for (const item of raw) {
-    const key = (item.day ?? '').toUpperCase();
+    const key = (item.day ?? '').toUpperCase(); // "Minggu" → "MINGGU"
     days[key] = (item.animeList ?? []).map(mapScheduleItem);
   }
   return { status: true, data: days };
 };
 
+// GET /search?q=&page=1
+// Response: { data: [{ jumlah, result: [...], pagination: {} }] }
 const fetchSearch = async (q: string, page = 0): Promise<ApiResponse<Anime[]>> => {
   const json = await get<any>(`/search?q=${encodeURIComponent(q)}&page=${page + 1}`);
   const result: any[] = json?.data?.[0]?.result ?? [];
   return { status: true, data: result.map(mapAnime) };
 };
 
+// GET /detail?url=
+// Response: { data: [{ series_id, judul, cover, sinopsis, published, author, chapter[] }] }
 const fetchDetail = async (id: string): Promise<ApiResponse<AnimeDetail>> => {
-  // Pastikan ada trailing slash, tidak perlu full URL
-  const slug = id.replace(/^https?:\/\/[^/]+\//, '').replace(/\/+$/, '') + '/';
-  
-  const json = await get<any>(`/detail?url=${encodeURIComponent(slug)}`);
+  const json = await get<any>(`/detail?url=${encodeURIComponent(id)}`);
   const raw = json?.data?.[0];
   if (!raw) return { status: false, data: null as any };
   return { status: true, data: mapAnimeDetail(raw) };
 };
-    
-    // Log untuk debug
-   // console.log('Detail URL:', `${API_BASE}/detail?url=${encodeURIComponent(id)}`);
-   // console.log('Detail raw JSON:', JSON.stringify(json).substring(0, 500));
-    
-    // Coba berbagai struktur response
-   // const raw = json?.data?.[0] ?? json?.data ?? json?.[0] ?? json;
-    
-   // console.log('Raw data:', JSON.stringify(raw)?.substring(0, 300));
-    
-    //if (!raw || (!raw.judul && !raw.title && !raw.anime_name)) {
-     // return { status: false, data: null as any };
-   // }
-    
-  //  return { status: true, data: mapAnimeDetail(raw) };
- // } catch (e) {
-  //  console.error('fetchDetail error:', e);
-  //  return { status: false, data: null as any };
-//  }
-//};
 
+// GET /episode?url=&reso=720p
+// Response: { data: [{ stream: [{ reso, link, provide, id }] }] }
+// Prioritas: .mp4 dulu (direct play), fallback .m3u8 (HLS)
 const fetchEpisode = async (id: string): Promise<any> => {
-  const slug = id.replace(/\/+$/, '') + '/';
-  const json = await get<any>(`/episode?url=${encodeURIComponent(slug)}&reso=720p`);
+  const json = await get<any>(`/episode?url=${encodeURIComponent(id)}&reso=720p`);
   const streamData: any[] = json?.data?.[0]?.stream ?? [];
 
+  // Prioritas: pixeldrain (paling reliable) → mp4 direct → m3u8
   const pixeldrain = streamData.filter((s: any) =>
     s.link && s.link.includes('pixeldrain.com')
   );
   const mp4s = streamData.filter((s: any) =>
-    s.link &&
-    s.link.split('?')[0].endsWith('.mp4') &&
-    !s.link.includes('pixeldrain.com')
+    s.link && s.link.split('?')[0].endsWith('.mp4') && !s.link.includes('pixeldrain.com')
   );
   const m3u8s = streamData.filter((s: any) =>
     s.link && s.link.includes('.m3u8')
@@ -160,17 +156,16 @@ const fetchEpisode = async (id: string): Promise<any> => {
   const server = combined.map((s: any, i: number) => ({
     id:      String(i),
     quality: s.reso ?? 'AUTO',
-    link:    s.link,
+    link:    s.link,  // link mentah, tanpa proxy
     type:    s.link.includes('.m3u8') ? 'hls' : 'direct',
   }));
 
   return { status: true, data: { server } };
 };
-
 const fetchGenre = async (): Promise<ApiResponse<Genre[]>> => ({ status: true, data: [] });
 const fetchGenreFilter = async (_ids: string[], _page = 0): Promise<ApiResponse<Anime[]>> => ({ status: true, data: [] });
 
-// ─── Public API ───────────────────────────────────────────────────────────────
+// ─── Public API ────────────────────────────────────────────────────────────────
 
 export const api = {
   home: () => Promise.all([fetchSchedule(), fetchOngoing(), fetchPopular()]),
@@ -186,10 +181,10 @@ export const api = {
 
 export const getProxyUrl = (url: string) => `${PROXY_BASE}${url}`;
 
-// ─── Slug encode/decode ───────────────────────────────────────────────────────
+// ─── Slug encode/decode pakai btoa/atob (React Native safe, tanpa Buffer) ─────
 
 export const getAnimeSlug = (anime: Anime): string => {
-  const encodedId  = encodeURIComponent(anime.id).replace(/%/g, '_');
+  const encodedId = encodeURIComponent(anime.id).replace(/%/g, '_');
   const titleKebab = (anime.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
   return `${encodedId}---${titleKebab}`;
 };
