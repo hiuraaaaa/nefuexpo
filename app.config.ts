@@ -24,6 +24,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     jsEngine: 'hermes',
     enableProguardInReleaseBuilds: true,
     enableShrinkResourcesInReleaseBuilds: true,
+    compileSdkVersion: 35,
+    targetSdkVersion: 35,
   },
   plugins: [
     'expo-router',
