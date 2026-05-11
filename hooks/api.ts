@@ -138,7 +138,7 @@ const fetchDetail = async (id: string): Promise<ApiResponse<AnimeDetail>> => {
   //  console.error('fetchDetail error:', e);
   //  return { status: false, data: null as any };
 //  }
-};
+//};
 
 const fetchEpisode = async (id: string): Promise<any> => {
   const json = await get<any>(`/episode?url=${encodeURIComponent(id)}&reso=720p`);
