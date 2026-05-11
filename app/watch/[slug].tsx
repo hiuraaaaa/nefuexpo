@@ -395,23 +395,25 @@ export default function WatchScreen() {
 
   // ── Playback status ───────────────────────────────────────────────────────────
   const handlePlaybackStatus = (status: AVPlaybackStatus) => {
-    if (!status.isLoaded) return;
-    setIsPlaying(status.isPlaying);
-    setPosition(status.positionMillis / 1000);
-    setDuration((status.durationMillis || 0) / 1000);
-    setIsBuffering(status.isBuffering);
-    if (status.didJustFinish && autoNext) handleNext();
+  if (!status.isLoaded) return;
+  setIsPlaying(status.isPlaying);
+  setPosition(status.positionMillis / 1000);
+  setDuration((status.durationMillis || 0) / 1000);
+  setIsBuffering(status.isBuffering);
+  if (status.didJustFinish && autoNext) handleNext();
 
-    // Simpan progress tiap 5 detik saat playing
-    if (status.isPlaying && currentEpId &&
-      Math.floor(status.positionMillis / 1000) % 5 === 0) {
+  // Simpan progress tiap 10 detik saja
+  if (status.isPlaying && currentEpId) {
+    const sec = Math.floor(status.positionMillis / 1000);
+    if (sec > 0 && sec % 10 === 0) {
       progressStorage.save(
         currentEpId,
         status.positionMillis / 1000,
         (status.durationMillis || 0) / 1000,
       );
     }
-  };
+  }
+};
 
   const videoHeight = isFullscreen ? Dimensions.get('window').height : width * (9 / 16);
 
