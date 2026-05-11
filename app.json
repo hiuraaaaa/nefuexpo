@@ -24,7 +24,10 @@
         "backgroundColor": "#F6CF80"
       },
       "package": "com.nefusoft.anime",
-      "permissions": []
+      "permissions": [],
+      "jsEngine": "hermes",
+      "enableProguardInReleaseBuilds": true,
+      "enableShrinkResourcesInReleaseBuilds": true
     },
     "plugins": [
       "expo-router",
