@@ -109,36 +109,29 @@ const fetchSearch = async (q: string, page = 0): Promise<ApiResponse<Anime[]>> =
 };
 
 const fetchDetail = async (id: string): Promise<ApiResponse<AnimeDetail>> => {
-  // ── DEBUG — hapus setelah masalah solved ──
-  console.log('[NefuSoft] fetchDetail id:', id);
   const url = `/detail?url=${encodeURIComponent(id)}`;
-  console.log('[NefuSoft] fetchDetail url:', `${API_BASE}${url}`);
-  // ─────────────────────────────────────────
-
   const json = await get<any>(url);
-
-  // ── DEBUG ──
-  console.log('[NefuSoft] fetchDetail status:', json?.data?.[0] ? 'OK' : 'NULL');
-  console.log('[NefuSoft] fetchDetail chapters:', json?.data?.[0]?.chapter?.length ?? 0);
-  // ──────────
-
   const raw = json?.data?.[0];
+
+  // Kirim log ke VPS — hapus setelah debug selesai
+  fetch('http://20.229.160.60:3333/log', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id,
+      status: raw ? 'OK' : 'NULL',
+      chapters: raw?.chapter?.length ?? 0,
+      fullUrl: `${API_BASE}${url}`,
+    }),
+  }).catch(() => {});
+
   if (!raw) return { status: false, data: null as any };
   return { status: true, data: mapAnimeDetail(raw) };
 };
 
 const fetchEpisode = async (id: string): Promise<any> => {
-  // ── DEBUG ──
-  console.log('[NefuSoft] fetchEpisode id:', id);
-  // ──────────
-
   const json = await get<any>(`/episode?url=${encodeURIComponent(id)}&reso=720p`);
   const streamData: any[] = json?.data?.[0]?.stream ?? [];
-
-  // ── DEBUG ──
-  console.log('[NefuSoft] fetchEpisode streams:', streamData.length);
-  streamData.forEach((s, i) => console.log(`  [${i}] ${s.reso} ${s.link?.substring(0, 60)}`));
-  // ──────────
 
   const pixeldrain = streamData.filter((s: any) =>
     s.link && s.link.includes('pixeldrain.com')
@@ -153,13 +146,6 @@ const fetchEpisode = async (id: string): Promise<any> => {
   );
 
   const combined = [...pixeldrain, ...mp4s, ...m3u8s];
-
-  // ── DEBUG ──
-  console.log('[NefuSoft] fetchEpisode combined:', combined.length,
-    '| pixeldrain:', pixeldrain.length,
-    '| mp4:', mp4s.length,
-    '| m3u8:', m3u8s.length);
-  // ──────────
 
   const server = combined.map((s: any, i: number) => ({
     id:      String(i),
