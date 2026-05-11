@@ -16,7 +16,7 @@ import Animated, {
   withTiming, withSequence, FadeIn, FadeOut,
 } from 'react-native-reanimated';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { COLORS } from '@/constants';
+import { COLORS, API_BASE } from '@/constants';
 import { api, getAnimeSlug, decodeAnimeId, formatTime } from '@/hooks/api';
 import { historyStorage, progressStorage, favoritStorage } from '@/hooks/storage';
 import { xpStorage } from '@/hooks/xp';
@@ -789,6 +789,24 @@ export default function WatchScreen() {
               Bagikan Anime Ini
             </Text>
           </TouchableOpacity>
+
+          {/* Debug */}
+<TouchableOpacity
+  onPress={async () => {
+    try {
+      const url = `${API_BASE}/detail?url=${encodeURIComponent(animeId)}`;
+      const res = await fetch(url);
+      const json = await res.json();
+      Alert.alert('Debug Detail', JSON.stringify(json).substring(0, 600));
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+    }
+  }}
+  style={{ marginHorizontal: 16, marginBottom: 8, padding: 12,
+    backgroundColor: 'red', borderRadius: 8, alignItems: 'center' }}
+>
+  <Text style={{ color: '#fff', fontWeight: '900' }}>DEBUG</Text>
+</TouchableOpacity>
 
           {/* Rekomendasi */}
           {recommendations.length > 0 && (
