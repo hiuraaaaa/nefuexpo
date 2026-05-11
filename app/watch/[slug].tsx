@@ -33,6 +33,7 @@ const EP_COLS    = 6;
 const EP_GAP     = 6;
 const EP_PADDING = 16;
 const EP_SIZE    = Math.floor((width - EP_PADDING * 2 - EP_GAP * (EP_COLS - 1)) / EP_COLS);
+const EP_GRID_W  = EP_COLS * EP_SIZE + (EP_COLS - 1) * EP_GAP;
 
 // Seek amount double tap
 const SEEK_SEC = 10;
@@ -707,7 +708,7 @@ export default function WatchScreen() {
             )}
 
             {/* Grid episode — selalu pas, ga ada kosong */}
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: EP_GAP }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: EP_GAP, width: EP_GRID_W }}>
               {filteredEps.length === 0 ? (
                 <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12,
                   fontWeight: '600', paddingVertical: 8 }}>
