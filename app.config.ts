@@ -19,24 +19,35 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       backgroundColor: '#0a0a0c',
     },
     package: 'com.nefusoft.anime',
-    googleServicesFile: './google-services.json', // ← tambah ini
+    googleServicesFile: './google-services.json',
     permissions: [],
+    jsEngine: 'hermes',
+    enableProguardInReleaseBuilds: true,
+    enableShrinkResourcesInReleaseBuilds: true,
   },
   plugins: [
     'expo-router',
-    'expo-av',
+    ['expo-av', { microphonePermission: false }],
     'expo-screen-orientation',
     '@react-native-firebase/app',
     '@react-native-firebase/auth',
-  //  '@react-native-firebase/firestore',
     '@react-native-google-signin/google-signin',
-    [
-      'expo-font',
-      { fonts: [] }
-    ],
+    ['expo-font', { fonts: [] }],
   ],
   scheme: 'nefusoft',
+  updates: {
+    url: 'https://u.expo.dev/77dcd7b2-4f36-4f1e-92a9-fc8aa7915d1c',
+  },
+  runtimeVersion: {
+    policy: 'appVersion',
+  },
   experiments: {
     typedRoutes: true,
   },
+  extra: {
+    eas: {
+      projectId: '77dcd7b2-4f36-4f1e-92a9-fc8aa7915d1c',
+    },
+  },
+  owner: 'hiuraaa',
 });
