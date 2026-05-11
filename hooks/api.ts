@@ -139,7 +139,8 @@ const fetchDetail = async (id: string): Promise<ApiResponse<AnimeDetail>> => {
 //};
 
 const fetchEpisode = async (id: string): Promise<any> => {
-  const json = await get<any>(`/episode?url=${encodeURIComponent(id)}&reso=720p`);
+  const slug = id.replace(/\/+$/, '') + '/';
+  const json = await get<any>(`/episode?url=${encodeURIComponent(slug)}&reso=720p`);
   const streamData: any[] = json?.data?.[0]?.stream ?? [];
 
   const pixeldrain = streamData.filter((s: any) =>
