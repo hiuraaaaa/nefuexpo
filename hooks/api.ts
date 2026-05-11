@@ -109,12 +109,10 @@ const fetchSearch = async (q: string, page = 0): Promise<ApiResponse<Anime[]>> =
 };
 
 const fetchDetail = async (id: string): Promise<ApiResponse<AnimeDetail>> => {
-  // Kalau id bukan URL lengkap, tambahkan base URL animekita
-  const fullUrl = id.startsWith('http') 
-    ? id 
-    : `https://animekita.org/${id}/`;
+  // Pastikan ada trailing slash, tidak perlu full URL
+  const slug = id.replace(/^https?:\/\/[^/]+\//, '').replace(/\/+$/, '') + '/';
   
-  const json = await get<any>(`/detail?url=${encodeURIComponent(fullUrl)}`);
+  const json = await get<any>(`/detail?url=${encodeURIComponent(slug)}`);
   const raw = json?.data?.[0];
   if (!raw) return { status: false, data: null as any };
   return { status: true, data: mapAnimeDetail(raw) };
