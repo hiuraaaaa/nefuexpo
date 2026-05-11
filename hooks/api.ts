@@ -109,24 +109,27 @@ const fetchSearch = async (q: string, page = 0): Promise<ApiResponse<Anime[]>> =
 };
 
 const fetchDetail = async (id: string): Promise<ApiResponse<AnimeDetail>> => {
-  const url = `/detail?url=${encodeURIComponent(id)}`;
-  const json = await get<any>(url);
-  const raw = json?.data?.[0];
-
-  // Kirim log ke VPS — hapus setelah debug selesai
-  fetch('http://20.229.160.60:2427/log', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      id,
-      status: raw ? 'OK' : 'NULL',
-      chapters: raw?.chapter?.length ?? 0,
-      fullUrl: `${API_BASE}${url}`,
-    }),
-  }).catch(() => {});
-
-  if (!raw) return { status: false, data: null as any };
-  return { status: true, data: mapAnimeDetail(raw) };
+  try {
+    const json = await get<any>(`/detail?url=${encodeURIComponent(id)}`);
+    
+    // Log untuk debug
+    console.log('Detail URL:', `${API_BASE}/detail?url=${encodeURIComponent(id)}`);
+    console.log('Detail raw JSON:', JSON.stringify(json).substring(0, 500));
+    
+    // Coba berbagai struktur response
+    const raw = json?.data?.[0] ?? json?.data ?? json?.[0] ?? json;
+    
+    console.log('Raw data:', JSON.stringify(raw)?.substring(0, 300));
+    
+    if (!raw || (!raw.judul && !raw.title && !raw.anime_name)) {
+      return { status: false, data: null as any };
+    }
+    
+    return { status: true, data: mapAnimeDetail(raw) };
+  } catch (e) {
+    console.error('fetchDetail error:', e);
+    return { status: false, data: null as any };
+  }
 };
 
 const fetchEpisode = async (id: string): Promise<any> => {
