@@ -790,10 +790,18 @@ export default function WatchScreen() {
             </Text>
           </TouchableOpacity>
 
-          {/* Debug */}
+          {/* Debug ID */}
+<TouchableOpacity
+  onPress={() => Alert.alert('Anime ID', animeId)}
+  style={{ marginHorizontal: 16, marginBottom: 8, padding: 12,
+    backgroundColor: 'blue', borderRadius: 8, alignItems: 'center' }}
+>
+  <Text style={{ color: '#fff', fontWeight: '900' }}>SHOW ID</Text>
+</TouchableOpacity>
+
+{/* Debug Detail */}
 <TouchableOpacity
   onPress={async () => {
-    Alert.alert('Anime ID', animeId);
     try {
       const url = `${API_BASE}/detail?url=${encodeURIComponent(animeId)}`;
       const res = await fetch(url);
