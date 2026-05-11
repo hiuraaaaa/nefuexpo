@@ -802,15 +802,17 @@ export default function WatchScreen() {
 {/* Debug Detail */}
 <TouchableOpacity
   onPress={async () => {
-    try {
-      const url = `${API_BASE}/detail?url=${encodeURIComponent(animeId)}`;
-      const res = await fetch(url);
-      const json = await res.json();
-      Alert.alert('Debug Detail', JSON.stringify(json).substring(0, 600));
-    } catch (e: any) {
-      Alert.alert('Error', e.message);
-    }
-  }}
+  try {
+    const epId = episodes[0]?.id ?? 'kosong';
+    const url = `${API_BASE}/episode?url=${encodeURIComponent(epId)}&reso=720p`;
+    Alert.alert('Episode URL', url);
+    const res = await fetch(url);
+    const json = await res.json();
+    Alert.alert('Episode Response', JSON.stringify(json).substring(0, 600));
+  } catch (e: any) {
+    Alert.alert('Error', e.message);
+  }
+}}
   style={{ marginHorizontal: 16, marginBottom: 8, padding: 12,
     backgroundColor: 'red', borderRadius: 8, alignItems: 'center' }}
 >
