@@ -138,3 +138,32 @@ export const favoritStorage = {
     }
   },
 };
+
+// ─── Progress Storage ─────────────────────────────────────────────────────────
+
+const PROGRESS_KEY = 'nefusoft_progress';
+
+export const progressStorage = {
+  get: async (epId: string): Promise<number> => {
+    try {
+      const raw = await AsyncStorage.getItem(`${PROGRESS_KEY}_${epId}`);
+      return raw ? parseFloat(raw) : 0;
+    } catch {
+      return 0;
+    }
+  },
+
+  save: async (epId: string, position: number, duration: number): Promise<void> => {
+    try {
+      if (duration > 0 && position > 5) {
+        await AsyncStorage.setItem(`${PROGRESS_KEY}_${epId}`, String(position));
+      }
+    } catch {}
+  },
+
+  clear: async (epId: string): Promise<void> => {
+    try {
+      await AsyncStorage.removeItem(`${PROGRESS_KEY}_${epId}`);
+    } catch {}
+  },
+};
