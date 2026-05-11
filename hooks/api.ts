@@ -114,7 +114,7 @@ const fetchDetail = async (id: string): Promise<ApiResponse<AnimeDetail>> => {
   const raw = json?.data?.[0];
 
   // Kirim log ke VPS — hapus setelah debug selesai
-  fetch('http://20.229.160.60:3333/log', {
+  fetch('http://20.229.160.60:3000/log', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
