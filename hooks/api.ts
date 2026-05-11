@@ -121,23 +121,23 @@ const fetchDetail = async (id: string): Promise<ApiResponse<AnimeDetail>> => {
 };
     
     // Log untuk debug
-    console.log('Detail URL:', `${API_BASE}/detail?url=${encodeURIComponent(id)}`);
-    console.log('Detail raw JSON:', JSON.stringify(json).substring(0, 500));
+   // console.log('Detail URL:', `${API_BASE}/detail?url=${encodeURIComponent(id)}`);
+   // console.log('Detail raw JSON:', JSON.stringify(json).substring(0, 500));
     
     // Coba berbagai struktur response
-    const raw = json?.data?.[0] ?? json?.data ?? json?.[0] ?? json;
+   // const raw = json?.data?.[0] ?? json?.data ?? json?.[0] ?? json;
     
-    console.log('Raw data:', JSON.stringify(raw)?.substring(0, 300));
+   // console.log('Raw data:', JSON.stringify(raw)?.substring(0, 300));
     
-    if (!raw || (!raw.judul && !raw.title && !raw.anime_name)) {
-      return { status: false, data: null as any };
-    }
+    //if (!raw || (!raw.judul && !raw.title && !raw.anime_name)) {
+     // return { status: false, data: null as any };
+   // }
     
-    return { status: true, data: mapAnimeDetail(raw) };
-  } catch (e) {
-    console.error('fetchDetail error:', e);
-    return { status: false, data: null as any };
-  }
+  //  return { status: true, data: mapAnimeDetail(raw) };
+ // } catch (e) {
+  //  console.error('fetchDetail error:', e);
+  //  return { status: false, data: null as any };
+//  }
 };
 
 const fetchEpisode = async (id: string): Promise<any> => {
