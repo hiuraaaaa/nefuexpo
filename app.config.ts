@@ -24,8 +24,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     jsEngine: 'hermes',
     enableProguardInReleaseBuilds: true,
     enableShrinkResourcesInReleaseBuilds: true,
-    compileSdkVersion: 35,
-    targetSdkVersion: 35,
   },
   plugins: [
     'expo-router',
@@ -35,6 +33,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     '@react-native-firebase/auth',
     '@react-native-google-signin/google-signin',
     ['expo-font', { fonts: [] }],
+    './plugins/withAndroidSdk35',
   ],
   scheme: 'nefusoft',
   updates: {
