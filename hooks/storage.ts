@@ -1,83 +1,106 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MMKV } from 'react-native-mmkv';
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
 import { Anime, HistoryItem } from '@/types';
 
-const HISTORY_KEY = 'nefusoft_history';
-const AUTONEXT_KEY = 'nefusoft_autonext';
+// ─── MMKV instance ────────────────────────────────────────────────────────────
+const storage = new MMKV({ id: 'nefusoft-storage' });
+
+const HISTORY_KEY        = 'nefusoft_history';
+const AUTONEXT_KEY       = 'nefusoft_autonext';
 const SEARCH_HISTORY_KEY = 'nefusoft_search_history';
-const MAX_HISTORY = 50;
+const PROGRESS_PREFIX    = 'nefusoft_progress_';
+const MAX_HISTORY        = 50;
 const MAX_SEARCH_HISTORY = 10;
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const getJSON = <T>(key: string, fallback: T): T => {
+  try {
+    const raw = storage.getString(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const setJSON = (key: string, value: any): void => {
+  try {
+    storage.set(key, JSON.stringify(value));
+  } catch {}
+};
+
+// ─── History ──────────────────────────────────────────────────────────────────
+
 export const historyStorage = {
-  getAll: async (): Promise<HistoryItem[]> => {
-    try {
-      const raw = await AsyncStorage.getItem(HISTORY_KEY);
-      return raw ? JSON.parse(raw) : [];
-    } catch {
-      return [];
-    }
+  getAll: (): HistoryItem[] => getJSON<HistoryItem[]>(HISTORY_KEY, []),
+
+  add: (anime: Anime, episodeIndex: number): void => {
+    const history = historyStorage.getAll();
+    const filtered = history.filter(h => h.anime.id !== anime.id);
+    const updated: HistoryItem[] = [
+      { anime, episodeIndex, timestamp: Date.now() },
+      ...filtered,
+    ].slice(0, MAX_HISTORY);
+    setJSON(HISTORY_KEY, updated);
   },
 
-  add: async (anime: Anime, episodeIndex: number): Promise<void> => {
-    try {
-      const history = await historyStorage.getAll();
-      const filtered = history.filter(h => h.anime.id !== anime.id);
-      const updated: HistoryItem[] = [
-        { anime, episodeIndex, timestamp: Date.now() },
-        ...filtered,
-      ].slice(0, MAX_HISTORY);
-      await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
-    } catch {}
+  clear: (): void => {
+    storage.delete(HISTORY_KEY);
   },
 
-  clear: async (): Promise<void> => {
-    try {
-      await AsyncStorage.removeItem(HISTORY_KEY);
-    } catch {}
+  getAutoNext: (): boolean => {
+    return storage.getBoolean(AUTONEXT_KEY) ?? false;
   },
 
-  getAutoNext: async (): Promise<boolean> => {
-    try {
-      const val = await AsyncStorage.getItem(AUTONEXT_KEY);
-      return val === 'true';
-    } catch {
-      return false;
-    }
-  },
-
-  setAutoNext: async (val: boolean): Promise<void> => {
-    try {
-      await AsyncStorage.setItem(AUTONEXT_KEY, String(val));
-    } catch {}
+  setAutoNext: (val: boolean): void => {
+    storage.set(AUTONEXT_KEY, val);
   },
 };
 
 // ─── Search History ───────────────────────────────────────────────────────────
 
-export const getSearchHistory = async (): Promise<string[]> => {
-  try {
-    const raw = await AsyncStorage.getItem(SEARCH_HISTORY_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-};
+export const getSearchHistory = (): string[] =>
+  getJSON<string[]>(SEARCH_HISTORY_KEY, []);
 
-export const addSearchHistory = async (term: string): Promise<void> => {
+export const addSearchHistory = (term: string): void => {
   if (!term?.trim()) return;
-  try {
-    const prev = await getSearchHistory();
-    const filtered = prev.filter(t => t.toLowerCase() !== term.toLowerCase());
-    const updated = [term.trim(), ...filtered].slice(0, MAX_SEARCH_HISTORY);
-    await AsyncStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(updated));
-  } catch {}
+  const prev = getSearchHistory();
+  const filtered = prev.filter(t => t.toLowerCase() !== term.toLowerCase());
+  const updated = [term.trim(), ...filtered].slice(0, MAX_SEARCH_HISTORY);
+  setJSON(SEARCH_HISTORY_KEY, updated);
 };
 
-export const clearSearchHistory = async (): Promise<void> => {
-  try {
-    await AsyncStorage.removeItem(SEARCH_HISTORY_KEY);
-  } catch {}
+export const clearSearchHistory = (): void => {
+  storage.delete(SEARCH_HISTORY_KEY);
+};
+
+// ─── Progress Storage ─────────────────────────────────────────────────────────
+
+export const progressStorage = {
+  get: (epId: string): number => {
+    try {
+      return storage.getNumber(`${PROGRESS_PREFIX}${epId}`) ?? 0;
+    } catch {
+      return 0;
+    }
+  },
+
+  save: (epId: string, position: number, duration: number): void => {
+    try {
+      if (duration > 0 && position > 5 && position < duration - 30) {
+        storage.set(`${PROGRESS_PREFIX}${epId}`, position);
+      } else if (duration > 0 && position >= duration - 30) {
+        storage.delete(`${PROGRESS_PREFIX}${epId}`);
+      }
+    } catch {}
+  },
+
+  clear: (epId: string): void => {
+    try {
+      storage.delete(`${PROGRESS_PREFIX}${epId}`);
+    } catch {}
+  },
 };
 
 // ─── Favorit (Firestore) ─────────────────────────────────────────────────────
@@ -129,41 +152,7 @@ export const favoritStorage = {
 
   toggle: async (anime: Anime): Promise<boolean> => {
     const isFav = await favoritStorage.isFavorited(anime.id);
-    if (isFav) {
-      await favoritStorage.remove(anime.id);
-      return false;
-    } else {
-      await favoritStorage.add(anime);
-      return true;
-    }
-  },
-};
-
-// ─── Progress Storage ─────────────────────────────────────────────────────────
-
-const PROGRESS_KEY = 'nefusoft_progress';
-
-export const progressStorage = {
-  get: async (epId: string): Promise<number> => {
-    try {
-      const raw = await AsyncStorage.getItem(`${PROGRESS_KEY}_${epId}`);
-      return raw ? parseFloat(raw) : 0;
-    } catch {
-      return 0;
-    }
-  },
-
-  save: async (epId: string, position: number, duration: number): Promise<void> => {
-    try {
-      if (duration > 0 && position > 5) {
-        await AsyncStorage.setItem(`${PROGRESS_KEY}_${epId}`, String(position));
-      }
-    } catch {}
-  },
-
-  clear: async (epId: string): Promise<void> => {
-    try {
-      await AsyncStorage.removeItem(`${PROGRESS_KEY}_${epId}`);
-    } catch {}
+    if (isFav) { await favoritStorage.remove(anime.id); return false; }
+    else { await favoritStorage.add(anime); return true; }
   },
 };
