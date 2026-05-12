@@ -1,32 +1,34 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MMKV } from 'react-native-mmkv';
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
 
-const XP_KEY = 'nefusoft_xp';
+const storage = new MMKV({ id: 'nefusoft-xp' });
+const XP_KEY  = 'nefusoft_xp';
 
 export interface XPData {
   xp: number;
   level: number;
   streak: number;
   lastWatchDate: string;
+  _todayXP?: number;
 }
 
 export const LEVELS = [
-  { level: 1,   title: 'Newbie',         min: 0        },
-  { level: 5,   title: 'Pemula',         min: 500      },
-  { level: 10,  title: 'Wibu',           min: 2000     },
-  { level: 15,  title: 'Otaku',          min: 5000     },
-  { level: 20,  title: 'Weeb',           min: 10000    },
-  { level: 25,  title: 'Anime Freak',    min: 18000    },
-  { level: 30,  title: 'Sub Addict',     min: 30000    },
-  { level: 35,  title: 'No Lifer',       min: 45000    },
-  { level: 40,  title: 'Plot Armor',     min: 65000    },
-  { level: 50,  title: 'Final Boss',     min: 90000    },
-  { level: 60,  title: 'Isekai\'d',      min: 130000   },
-  { level: 70,  title: 'True Ending',    min: 180000   },
-  { level: 80,  title: 'Beyond Canon',   min: 250000   },
-  { level: 90,  title: 'Ascended',       min: 350000   },
-  { level: 100, title: 'Sensei',         min: 500000   },
+  { level: 1,   title: 'Newbie',       min: 0      },
+  { level: 5,   title: 'Pemula',       min: 500    },
+  { level: 10,  title: 'Wibu',         min: 2000   },
+  { level: 15,  title: 'Otaku',        min: 5000   },
+  { level: 20,  title: 'Weeb',         min: 10000  },
+  { level: 25,  title: 'Anime Freak',  min: 18000  },
+  { level: 30,  title: 'Sub Addict',   min: 30000  },
+  { level: 35,  title: 'No Lifer',     min: 45000  },
+  { level: 40,  title: 'Plot Armor',   min: 65000  },
+  { level: 50,  title: 'Final Boss',   min: 90000  },
+  { level: 60,  title: "Isekai'd",     min: 130000 },
+  { level: 70,  title: 'True Ending',  min: 180000 },
+  { level: 80,  title: 'Beyond Canon', min: 250000 },
+  { level: 90,  title: 'Ascended',     min: 350000 },
+  { level: 100, title: 'Sensei',       min: 500000 },
 ];
 
 export const getLevelData = (xp: number) => {
@@ -38,95 +40,94 @@ export const getLevelData = (xp: number) => {
       next = LEVELS[i + 1] ?? null;
     }
   }
-  const progress = next
-    ? (xp - current.min) / (next.min - current.min)
-    : 1;
+  const progress = next ? (xp - current.min) / (next.min - current.min) : 1;
   return { current, next, progress };
 };
 
-// Sync XP ke Firestore kalau user login
-const syncToFirestore = async (data: XPData) => {
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const getLocal = (): XPData => {
+  try {
+    const raw = storage.getString(XP_KEY);
+    return raw ? JSON.parse(raw) : { xp: 0, level: 1, streak: 0, lastWatchDate: '' };
+  } catch {
+    return { xp: 0, level: 1, streak: 0, lastWatchDate: '' };
+  }
+};
+
+const setLocal = (data: XPData): void => {
+  try {
+    storage.set(XP_KEY, JSON.stringify(data));
+  } catch {}
+};
+
+const syncToFirestore = async (data: XPData): Promise<void> => {
   try {
     const user = auth().currentUser;
     if (!user) return;
     await firestore().collection('users').doc(user.uid).update({
-      xp: data.xp,
-      level: data.level,
-      streak: data.streak,
-      lastWatchDate: data.lastWatchDate,
+      xp: data.xp, level: data.level,
+      streak: data.streak, lastWatchDate: data.lastWatchDate,
     });
   } catch {}
 };
 
-// Validasi XP dari Firestore — anti bypass
-const validateXP = async (): Promise<XPData | null> => {
+const getFromFirestore = async (): Promise<XPData | null> => {
   try {
     const user = auth().currentUser;
     if (!user) return null;
     const doc = await firestore().collection('users').doc(user.uid).get();
     if (!doc.exists) return null;
     const d = doc.data()!;
-    return {
-      xp: d.xp ?? 0,
-      level: d.level ?? 1,
-      streak: d.streak ?? 0,
-      lastWatchDate: d.lastWatchDate ?? '',
-    };
+    return { xp: d.xp ?? 0, level: d.level ?? 1, streak: d.streak ?? 0, lastWatchDate: d.lastWatchDate ?? '' };
   } catch {
     return null;
   }
 };
 
+// ─── Public API ───────────────────────────────────────────────────────────────
+
 export const xpStorage = {
   get: async (): Promise<XPData> => {
-    try {
-      // Kalau login, ambil dari Firestore (source of truth)
-      const firestoreData = await validateXP();
-      if (firestoreData) {
-        // Sync ke local juga
-        await AsyncStorage.setItem(XP_KEY, JSON.stringify(firestoreData));
-        return firestoreData;
-      }
-      // Kalau guest, pakai local
-      const raw = await AsyncStorage.getItem(XP_KEY);
-      return raw ? JSON.parse(raw) : { xp: 0, level: 1, streak: 0, lastWatchDate: '' };
-    } catch {
-      return { xp: 0, level: 1, streak: 0, lastWatchDate: '' };
+    // Kalau login, Firestore jadi source of truth
+    const remote = await getFromFirestore();
+    if (remote) {
+      setLocal(remote); // cache ke MMKV
+      return remote;
     }
+    return getLocal();
   },
 
   add: async (amount: number): Promise<XPData> => {
     try {
       const data = await xpStorage.get();
-      const today = new Date().toDateString();
+      const today    = new Date().toDateString();
       const isNewDay = data.lastWatchDate !== today;
-      const streak = isNewDay ? data.streak + 1 : data.streak;
+      const streak   = isNewDay ? data.streak + 1 : data.streak;
       const streakBonus = isNewDay ? 10 : 0;
 
-      // Max XP per hari 500 — anti spam
-      const todayXP = isNewDay ? 0 : (data as any)._todayXP ?? 0;
-      const cappedAmount = Math.min(amount, Math.max(0, 500 - todayXP));
-
-      const newXp = data.xp + cappedAmount + streakBonus;
+      // Max XP per hari 500
+      const todayXP    = isNewDay ? 0 : (data._todayXP ?? 0);
+      const capped     = Math.min(amount, Math.max(0, 500 - todayXP));
+      const newXp      = data.xp + capped + streakBonus;
       const { current } = getLevelData(newXp);
-      const updated: XPData & { _todayXP?: number } = {
-        xp: newXp,
-        level: current.level,
-        streak,
-        lastWatchDate: today,
-        _todayXP: isNewDay ? cappedAmount : todayXP + cappedAmount,
+
+      const updated: XPData = {
+        xp: newXp, level: current.level,
+        streak, lastWatchDate: today,
+        _todayXP: isNewDay ? capped : todayXP + capped,
       };
-      await AsyncStorage.setItem(XP_KEY, JSON.stringify(updated));
-      // Sync ke Firestore
-      await syncToFirestore(updated);
+
+      setLocal(updated);           // sync lokal dulu (instant)
+      syncToFirestore(updated);    // sync remote (background, ga awaited)
       return updated;
     } catch {
-      return await xpStorage.get();
+      return getLocal();
     }
   },
 
   reset: async (): Promise<void> => {
-    await AsyncStorage.removeItem(XP_KEY);
+    storage.delete(XP_KEY);
     try {
       const user = auth().currentUser;
       if (user) {
