@@ -1,26 +1,25 @@
 import { useState, useEffect } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MMKV } from 'react-native-mmkv';
 import { THEMES, Theme } from '@/constants';
 
+const storage   = new MMKV({ id: 'nefusoft-theme' });
 const THEME_KEY = 'nefusoft_theme';
 
-let globalTheme: Theme = THEMES[0];
+let globalTheme: Theme              = THEMES[0];
 let listeners: ((t: Theme) => void)[] = [];
 
-const notifyListeners = (t: Theme) => {
-  listeners.forEach(fn => fn(t));
-};
+const notifyListeners = (t: Theme) => listeners.forEach(fn => fn(t));
 
-export const setGlobalTheme = async (themeId: string) => {
+export const setGlobalTheme = (themeId: string): void => {
   const theme = THEMES.find(t => t.id === themeId) ?? THEMES[0];
   globalTheme = theme;
-  await AsyncStorage.setItem(THEME_KEY, themeId);
+  storage.set(THEME_KEY, themeId); // synchronous — ga perlu await
   notifyListeners(theme);
 };
 
-export const loadSavedTheme = async () => {
+export const loadSavedTheme = (): void => {
   try {
-    const saved = await AsyncStorage.getItem(THEME_KEY);
+    const saved = storage.getString(THEME_KEY);
     if (saved) {
       const theme = THEMES.find(t => t.id === saved) ?? THEMES[0];
       globalTheme = theme;
