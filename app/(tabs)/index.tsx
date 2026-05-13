@@ -5,9 +5,17 @@ import {
 } from 'react-native';
 import FastImage from 'react-native-fast-image';
 import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import Animated, {
+  FadeIn, FadeOut,
+  useSharedValue, useAnimatedStyle, withSpring,
+} from 'react-native-reanimated';
+import Carousel, { ICarouselInstance } from 'react-native-reanimated-carousel';
+import { FlashList } from '@shopify/flash-list';
+
 import { LOGO_URL } from '@/constants';
 import { api, shuffleArray, getAnimeSlug } from '@/hooks/api';
 import { useTheme } from '@/hooks/theme';
@@ -23,38 +31,152 @@ const getTodayKey = (): string => {
   return days[new Date().getDay()];
 };
 
-const todayLabel = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'][new Date().getDay()];
+const todayLabel = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][new Date().getDay()];
 
-// ── Reusable Section Header ────────────────────────────────────────────────────
-function SectionHeader({ title, subtitle, onPress, scrollRef, theme }: {
-  title: string; subtitle: string; onPress: () => void;
-  scrollRef: React.RefObject<ScrollView>; theme: any;
+// ── Section Header ─────────────────────────────────────────────────────────────
+function SectionHeader({ title, subtitle, onPress, theme }: {
+  title: string;
+  subtitle: string;
+  onPress: () => void;
+  theme: any;
 }) {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-      paddingHorizontal: 16, marginBottom: 14 }}>
-      <TouchableOpacity onPress={onPress}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Text style={{ color: theme.text, fontWeight: '900', fontSize: 16,
-            textTransform: 'uppercase', letterSpacing: -0.5 }}>{title}</Text>
-          <Text style={{ color: theme.subtext, fontSize: 16, fontWeight: '900' }}>›</Text>
-        </View>
-        <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '700',
-          textTransform: 'uppercase', letterSpacing: 2, marginTop: 2 }}>{subtitle}</Text>
-      </TouchableOpacity>
-      <View style={{ flexDirection: 'row', gap: 8 }}>
-        <TouchableOpacity onPress={() => scrollRef.current?.scrollTo({ x: -300, animated: true })}
-          style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
-            backgroundColor: theme.border, borderWidth: 1, borderColor: theme.border }}>
-          <Text style={{ color: theme.subtext, fontSize: 16 }}>‹</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => scrollRef.current?.scrollTo({ x: 300, animated: true })}
-          style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
-            backgroundColor: theme.border, borderWidth: 1, borderColor: theme.border }}>
-          <Text style={{ color: theme.subtext, fontSize: 16 }}>›</Text>
-        </TouchableOpacity>
+    <TouchableOpacity
+      onPress={onPress}
+      style={{ paddingHorizontal: 16, marginBottom: 14 }}
+      activeOpacity={0.7}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <Text style={{
+          color: theme.text, fontWeight: '900', fontSize: 16,
+          textTransform: 'uppercase', letterSpacing: -0.5,
+        }}>
+          {title}
+        </Text>
+        <Text style={{ color: theme.subtext, fontSize: 16, fontWeight: '900' }}>›</Text>
       </View>
-    </View>
+      <Text style={{
+        color: theme.subtext, fontSize: 10, fontWeight: '700',
+        textTransform: 'uppercase', letterSpacing: 2, marginTop: 2,
+      }}>
+        {subtitle}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+// ── Hero Slide Item ────────────────────────────────────────────────────────────
+function HeroSlide({ item, onPress, theme }: { item: Anime; onPress: () => void; theme: any }) {
+  return (
+    <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={{ width, height: width * 0.7 }}>
+      <FastImage
+        source={{ uri: item.image_cover || item.image_poster, priority: FastImage.priority.high }}
+        style={{ width: '100%', height: '100%', opacity: 0.6 }}
+        resizeMode={FastImage.resizeMode.cover}
+      />
+      <LinearGradient
+        colors={['transparent', 'transparent', 'rgba(0,0,0,0.95)']}
+        locations={[0, 0.4, 1]}
+        style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '80%' }}
+      />
+      <View style={{
+        position: 'absolute', bottom: 24, left: 24, right: 24,
+        flexDirection: 'row', alignItems: 'flex-end', gap: 16,
+      }}>
+        <FastImage
+          source={{ uri: item.image_poster, priority: FastImage.priority.high }}
+          style={{ width: 80, aspectRatio: 3 / 4.2, borderRadius: 8 }}
+          resizeMode={FastImage.resizeMode.cover}
+        />
+        <View style={{ flex: 1, marginBottom: 4 }}>
+          <Text style={{
+            color: '#fff', fontWeight: '900', fontSize: 18,
+            lineHeight: 22, marginBottom: 4,
+          }} numberOfLines={2}>
+            {item.title}
+          </Text>
+          <Text style={{
+            color: 'rgba(255,255,255,0.55)', fontSize: 10,
+            lineHeight: 14, marginBottom: 8,
+          }} numberOfLines={2}>
+            {item.synopsis}
+          </Text>
+          <TouchableOpacity
+            onPress={onPress}
+            onPressIn={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 6,
+              backgroundColor: theme.accent, paddingHorizontal: 20, paddingVertical: 8,
+              borderRadius: 4, alignSelf: 'flex-start',
+            }}
+          >
+            <Text style={{ fontSize: 10 }}>▶</Text>
+            <Text style={{ color: '#000', fontWeight: '900', fontSize: 10, letterSpacing: 1 }}>
+              TONTON
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+// ── Movie Rank Item ────────────────────────────────────────────────────────────
+function MovieRankItem({ anime, index, onPress, theme }: {
+  anime: Anime; index: number; onPress: () => void; theme: any;
+}) {
+  const scale = useSharedValue(1);
+  const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+
+  return (
+    <Animated.View style={animStyle}>
+      <TouchableOpacity
+        onPress={onPress}
+        onPressIn={() => {
+          scale.value = withSpring(0.97, { damping: 15, stiffness: 300 });
+          Haptics.selectionAsync();
+        }}
+        onPressOut={() => { scale.value = withSpring(1, { damping: 12 }); }}
+        activeOpacity={1}
+        style={{
+          marginBottom: 12, borderRadius: 16, overflow: 'hidden',
+          flexDirection: 'row', alignItems: 'center', height: 88, paddingHorizontal: 16,
+          backgroundColor: theme.card, borderWidth: 1,
+          borderColor: index < 3 ? theme.accentDim : theme.border,
+        }}
+      >
+        <FastImage
+          source={{ uri: anime.image_cover || anime.image_poster, priority: FastImage.priority.normal }}
+          style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '55%', opacity: 0.6 }}
+          resizeMode={FastImage.resizeMode.cover}
+        />
+        <LinearGradient
+          colors={[theme.card, theme.card, 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+          style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '75%' }}
+        />
+        <View style={{
+          width: 40, height: 40, borderRadius: 20, alignItems: 'center',
+          justifyContent: 'center', marginRight: 16, zIndex: 1,
+          backgroundColor: index < 3 ? theme.accent : theme.border,
+          borderWidth: index < 3 ? 0 : 1, borderColor: theme.border,
+        }}>
+          <Text style={{ fontWeight: '900', fontSize: 14, color: index < 3 ? '#000' : theme.subtext }}>
+            {index + 1}
+          </Text>
+        </View>
+        <View style={{ flex: 1, zIndex: 1 }}>
+          <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13 }} numberOfLines={1}>
+            {anime.title}
+          </Text>
+          {anime.year ? (
+            <Text style={{ color: theme.subtext, fontSize: 10, marginTop: 3 }}>
+              {anime.year}{anime.studio ? ` · ${anime.studio}` : ''}
+            </Text>
+          ) : null}
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
   );
 }
 
@@ -72,10 +194,7 @@ export default function HomeScreen() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [copyToast, setCopyToast]   = useState(false);
 
-  const heroRef    = useRef<ScrollView>(null);
-  const ongoingRef = useRef<ScrollView>(null);
-  const todayRef   = useRef<ScrollView>(null);
-
+  const carouselRef = useRef<ICarouselInstance>(null);
   const carouselItems = ongoing.slice(0, 8);
 
   const fetchData = useCallback(async () => {
@@ -93,28 +212,10 @@ export default function HomeScreen() {
 
   useEffect(() => { fetchData(); }, []);
 
-  // Auto-advance hero
-  useEffect(() => {
-    if (carouselItems.length === 0) return;
-    const itv = setInterval(() => {
-      setHeroIndex(p => {
-        const next = (p + 1) % carouselItems.length;
-        heroRef.current?.scrollTo({ x: next * width, animated: true });
-        return next;
-      });
-    }, 6000);
-    return () => clearInterval(itv);
-  }, [carouselItems.length]);
-
   const goToAnime = (a: Anime) => router.push(`/watch/${getAnimeSlug(a)}`);
 
-  const handleHeroNext = () => {
-    const next = (heroIndex + 1) % carouselItems.length;
-    setHeroIndex(next);
-    heroRef.current?.scrollTo({ x: next * width, animated: true });
-  };
-
   const handleShare = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       await Share.share({
         message: 'Ajak temanmu nonton anime favorit bareng di NefuSoft, gratis dan tanpa iklan!!\n\nhttps://nefusoft.eu.cc',
@@ -124,6 +225,7 @@ export default function HomeScreen() {
   };
 
   const handleCopy = async () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await Clipboard.setStringAsync('https://nefusoft.eu.cc');
     setCopyToast(true);
     setTimeout(() => setCopyToast(false), 2000);
@@ -134,18 +236,28 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }} edges={['top']}>
 
-      {/* Copy toast */}
+      {/* ── Copy Toast (animated) ── */}
       {copyToast && (
-        <View style={{ position: 'absolute', top: 80, left: width / 2 - 120, zIndex: 999,
-          backgroundColor: theme.accent, paddingHorizontal: 24, paddingVertical: 12,
-          borderRadius: 999, width: 240, alignItems: 'center' }}>
-          <Text style={{ color: '#000', fontWeight: '900', fontSize: 12 }}>Tautan berhasil disalin!</Text>
-        </View>
+        <Animated.View
+          entering={FadeIn.duration(200)}
+          exiting={FadeOut.duration(300)}
+          style={{
+            position: 'absolute', top: 80, alignSelf: 'center', zIndex: 999,
+            backgroundColor: theme.accent, paddingHorizontal: 24, paddingVertical: 12,
+            borderRadius: 999,
+          }}
+        >
+          <Text style={{ color: '#000', fontWeight: '900', fontSize: 12 }}>
+            Tautan berhasil disalin!
+          </Text>
+        </Animated.View>
       )}
 
       <ScrollView
         style={{ flex: 1 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.accent} />}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.accent} />
+        }
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
       >
@@ -154,82 +266,68 @@ export default function HomeScreen() {
         <View style={{ width, height: width * 0.7, backgroundColor: theme.card }}>
 
           {/* Navbar */}
-          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 30,
+          <View style={{
+            position: 'absolute', top: 0, left: 0, right: 0, zIndex: 30,
             flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-            paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10 }}>
+            paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10,
+          }}>
             <FastImage
               source={{ uri: LOGO_URL, priority: FastImage.priority.high }}
               style={{ width: 40, height: 40 }}
               resizeMode={FastImage.resizeMode.contain}
             />
-            <TouchableOpacity onPress={() => setSearchOpen(true)}
-              style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center',
-                backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}>
-              <View style={{ width: 13, height: 13, borderRadius: 6.5, borderWidth: 2,
-                borderColor: 'rgba(255,255,255,0.8)' }} />
+            <TouchableOpacity
+              onPress={() => {
+                Haptics.selectionAsync();
+                setSearchOpen(true);
+              }}
+              style={{
+                width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center',
+                backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
+              }}
+            >
+              <View style={{
+                width: 13, height: 13, borderRadius: 6.5,
+                borderWidth: 2, borderColor: 'rgba(255,255,255,0.8)',
+              }} />
             </TouchableOpacity>
           </View>
 
           {isLoading ? <HeroSkeleton /> : (
             <>
-              <ScrollView
-                ref={heroRef} horizontal pagingEnabled scrollEnabled={false}
-                showsHorizontalScrollIndicator={false}
-                style={{ width, height: '100%' }}
-              >
-                {carouselItems.map((a, i) => (
-                  <TouchableOpacity key={i} activeOpacity={0.9} onPress={() => goToAnime(a)}
-                    style={{ width, height: width * 0.7 }}>
-                    <FastImage
-                      source={{ uri: a.image_cover || a.image_poster, priority: FastImage.priority.high }}
-                      style={{ width: '100%', height: '100%', opacity: 0.6 }}
-                      resizeMode={FastImage.resizeMode.cover}
-                    />
-                    <LinearGradient
-                      colors={['transparent', `${theme.bg}99`, `${theme.bg}f5`]}
-                      locations={[0.2, 0.55, 1]}
-                      style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '80%' }}
-                    />
-                    <View style={{ position: 'absolute', bottom: 24, left: 24, right: 24,
-                      flexDirection: 'row', alignItems: 'flex-end', gap: 16 }}>
-                      <FastImage
-                        source={{ uri: a.image_poster, priority: FastImage.priority.high }}
-                        style={{ width: 80, aspectRatio: 3/4.2, borderRadius: 8 }}
-                        resizeMode={FastImage.resizeMode.cover}
-                      />
-                      <View style={{ flex: 1, marginBottom: 4 }}>
-                        <Text style={{ color: theme.text, fontWeight: '900', fontSize: 18,
-                          lineHeight: 22, marginBottom: 4 }} numberOfLines={2}>
-                          {a.title}
-                        </Text>
-                        <Text style={{ color: theme.subtext, fontSize: 10,
-                          lineHeight: 14, marginBottom: 8 }} numberOfLines={2}>
-                          {a.synopsis}
-                        </Text>
-                        <TouchableOpacity onPress={() => goToAnime(a)}
-                          style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
-                            backgroundColor: theme.accent, paddingHorizontal: 20, paddingVertical: 8,
-                            borderRadius: 4, alignSelf: 'flex-start' }}>
-                          <Text style={{ fontSize: 10 }}>▶</Text>
-                          <Text style={{ color: '#000', fontWeight: '900', fontSize: 10,
-                            letterSpacing: 1 }}>TONTON</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
+              {/* ✅ Pakai reanimated-carousel — auto-play, gesture, smooth */}
+              <Carousel
+                ref={carouselRef}
+                data={carouselItems}
+                width={width}
+                height={width * 0.7}
+                autoPlay
+                autoPlayInterval={6000}
+                loop
+                onSnapToItem={setHeroIndex}
+                renderItem={({ item }) => (
+                  <HeroSlide item={item} onPress={() => goToAnime(item)} theme={theme} />
+                )}
+              />
 
+              {/* Pagination indicator */}
               {carouselItems.length > 0 && (
-                <View style={{ position: 'absolute', bottom: 24, right: 24,
-                  flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 20 }}>
-                  <Text style={{ color: theme.text, fontWeight: '900', fontSize: 10 }}>
+                <View style={{
+                  position: 'absolute', bottom: 24, right: 24,
+                  flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 20,
+                }}>
+                  <Text style={{ color: '#fff', fontWeight: '900', fontSize: 10 }}>
                     {heroIndex + 1} / {carouselItems.length}
                   </Text>
-                  <View style={{ width: 32, height: 2, backgroundColor: theme.border, borderRadius: 1 }} />
-                  <TouchableOpacity onPress={handleHeroNext}
-                    style={{ width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }}>
-                    <Text style={{ color: theme.text, fontSize: 18, fontWeight: '900' }}>›</Text>
+                  <View style={{ width: 32, height: 2, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 1 }} />
+                  <TouchableOpacity
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      carouselRef.current?.next();
+                    }}
+                    style={{ width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    <Text style={{ color: '#fff', fontSize: 18, fontWeight: '900' }}>›</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -238,9 +336,11 @@ export default function HomeScreen() {
         </View>
 
         {/* ── Share Banner ── */}
-        <View style={{ marginHorizontal: 16, marginTop: 20, borderRadius: 16,
+        <View style={{
+          marginHorizontal: 16, marginTop: 20, borderRadius: 16,
           overflow: 'hidden', backgroundColor: theme.card,
-          borderWidth: 1, borderColor: theme.border }}>
+          borderWidth: 1, borderColor: theme.border,
+        }}>
           <FastImage
             source={{ uri: 'https://raw.githubusercontent.com/alip-jmbd/alipp/main/bc.jpg' }}
             style={{ position: 'absolute', width: '100%', height: '100%', opacity: 0.15 }}
@@ -252,26 +352,35 @@ export default function HomeScreen() {
             style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
           />
           <View style={{ padding: 18 }}>
-            <Text style={{ color: theme.text, fontWeight: '900', fontSize: 13,
-              textTransform: 'uppercase', letterSpacing: 1, marginBottom: 3 }}>
+            <Text style={{
+              color: theme.text, fontWeight: '900', fontSize: 13,
+              textTransform: 'uppercase', letterSpacing: 1, marginBottom: 3,
+            }}>
               Sebarkan Keseruan Ini!
             </Text>
             <Text style={{ color: theme.subtext, fontSize: 11, marginBottom: 14 }}>
               Ajak teman-temanmu marathon anime favorit bareng di NefuSoft.
             </Text>
             <View style={{ flexDirection: 'row', gap: 8 }}>
-              <TouchableOpacity onPress={handleCopy}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
+              <TouchableOpacity
+                onPress={handleCopy}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 6,
                   paddingHorizontal: 16, paddingVertical: 9, borderRadius: 999,
-                  backgroundColor: theme.border, borderWidth: 1, borderColor: theme.border }}>
-                <View style={{ width: 10, height: 10, borderRadius: 2, borderWidth: 1.5,
-                  borderColor: theme.subtext }} />
+                  backgroundColor: theme.border, borderWidth: 1, borderColor: theme.border,
+                }}
+              >
+                <View style={{ width: 10, height: 10, borderRadius: 2, borderWidth: 1.5, borderColor: theme.subtext }} />
                 <Text style={{ color: theme.text, fontWeight: '800', fontSize: 11 }}>Salin Link</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={handleShare}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
+              <TouchableOpacity
+                onPress={handleShare}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 6,
                   paddingHorizontal: 16, paddingVertical: 9, borderRadius: 999,
-                  backgroundColor: theme.border, borderWidth: 1, borderColor: theme.border }}>
+                  backgroundColor: theme.border, borderWidth: 1, borderColor: theme.border,
+                }}
+              >
                 <Text style={{ color: theme.subtext, fontSize: 12 }}>&#8599;</Text>
                 <Text style={{ color: theme.text, fontWeight: '800', fontSize: 11 }}>Lainnya</Text>
               </TouchableOpacity>
@@ -282,32 +391,45 @@ export default function HomeScreen() {
         {/* ── Ongoing ── */}
         <View style={{ marginTop: 28 }}>
           <SectionHeader
-            title="Ongoing" subtitle="Anime yang sedang tayang"
+            title="Ongoing"
+            subtitle="Anime yang sedang tayang"
             onPress={() => router.push('/(tabs)/ongoing')}
-            scrollRef={ongoingRef} theme={theme}
+            theme={theme}
           />
-          <View style={{ paddingHorizontal: 16 }}>
-            <ScrollView ref={ongoingRef} horizontal showsHorizontalScrollIndicator={false}
-              snapToInterval={110} decelerationRate="fast" snapToAlignment="start"
-              contentContainerStyle={{ gap: 10 }}>
-              {isLoading
-                ? [...Array(6)].map((_, i) => <HorizontalCardSkeleton key={i} />)
-                : ongoing.map(item => (
-                  <AnimeCard key={item.id} anime={item} onPress={() => goToAnime(item)} width={100} />
-                ))
-              }
-            </ScrollView>
+          {/* ✅ FlashList horizontal — recycles item, lebih hemat memory */}
+          <View style={{ paddingHorizontal: 16, height: 175 }}>
+            {isLoading ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+                {[...Array(6)].map((_, i) => <HorizontalCardSkeleton key={i} />)}
+              </ScrollView>
+            ) : (
+              <FlashList
+                data={ongoing}
+                horizontal
+                estimatedItemSize={110}
+                keyExtractor={item => item.id}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingRight: 16 }}
+                ItemSeparatorComponent={() => <View style={{ width: 10 }} />}
+                snapToInterval={110}
+                decelerationRate="fast"
+                renderItem={({ item }) => (
+                  <AnimeCard anime={item} onPress={() => goToAnime(item)} width={100} />
+                )}
+              />
+            )}
           </View>
         </View>
 
         {/* ── Tayang Hari Ini ── */}
         <View style={{ marginTop: 28 }}>
           <SectionHeader
-            title={`Hari ${todayLabel}`} subtitle="Tayang hari ini"
+            title={`Hari ${todayLabel}`}
+            subtitle="Tayang hari ini"
             onPress={() => router.push('/(tabs)/schedule')}
-            scrollRef={todayRef} theme={theme}
+            theme={theme}
           />
-          <View style={{ paddingHorizontal: 16 }}>
+          <View style={{ paddingHorizontal: 16, height: 175 }}>
             {isLoading ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
                 {[...Array(6)].map((_, i) => <HorizontalCardSkeleton key={i} />)}
@@ -319,72 +441,60 @@ export default function HomeScreen() {
                 </Text>
               </View>
             ) : (
-              <ScrollView ref={todayRef} horizontal showsHorizontalScrollIndicator={false}
-                snapToInterval={110} decelerationRate="fast" snapToAlignment="start"
-                contentContainerStyle={{ gap: 10 }}>
-                {todayAnime.map(item => (
-                  <AnimeCard key={item.id} anime={item} onPress={() => goToAnime(item)} width={100} />
-                ))}
-              </ScrollView>
+              /* ✅ FlashList horizontal */
+              <FlashList
+                data={todayAnime}
+                horizontal
+                estimatedItemSize={110}
+                keyExtractor={item => item.id}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingRight: 16 }}
+                ItemSeparatorComponent={() => <View style={{ width: 10 }} />}
+                snapToInterval={110}
+                decelerationRate="fast"
+                renderItem={({ item }) => (
+                  <AnimeCard anime={item} onPress={() => goToAnime(item)} width={100} />
+                )}
+              />
             )}
           </View>
         </View>
 
         {/* ── Movies ── */}
         <View style={{ marginTop: 28, paddingHorizontal: 16 }}>
-          <TouchableOpacity onPress={() => router.push('/(tabs)/ongoing')} style={{ marginBottom: 20 }}>
+          <TouchableOpacity
+            onPress={() => router.push('/(tabs)/ongoing')}
+            style={{ marginBottom: 20 }}
+            activeOpacity={0.7}
+          >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={{ color: theme.text, fontWeight: '900', fontSize: 16,
-                textTransform: 'uppercase', letterSpacing: -0.5 }}>Movies</Text>
+              <Text style={{
+                color: theme.text, fontWeight: '900', fontSize: 16,
+                textTransform: 'uppercase', letterSpacing: -0.5,
+              }}>
+                Movies
+              </Text>
               <Text style={{ color: theme.subtext, fontSize: 16, fontWeight: '900' }}>›</Text>
             </View>
-            <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '700',
-              textTransform: 'uppercase', letterSpacing: 2, marginTop: 2 }}>
+            <Text style={{
+              color: theme.subtext, fontSize: 10, fontWeight: '700',
+              textTransform: 'uppercase', letterSpacing: 2, marginTop: 2,
+            }}>
               Film anime terpopuler
             </Text>
           </TouchableOpacity>
 
+          {/* ✅ MovieRankItem — tiap item punya spring animation sendiri */}
           {isLoading
             ? [...Array(5)].map((_, i) => <RankSkeleton key={i} />)
             : movies.slice(0, 10).map((anime, index) => (
-              <TouchableOpacity key={anime.id} onPress={() => goToAnime(anime)}
-                activeOpacity={0.8}
-                style={{ marginBottom: 12, borderRadius: 16, overflow: 'hidden',
-                  flexDirection: 'row', alignItems: 'center', height: 88, paddingHorizontal: 16,
-                  backgroundColor: theme.card, borderWidth: 1,
-                  borderColor: index < 3 ? theme.accentDim : theme.border }}>
-
-                <FastImage
-                  source={{ uri: anime.image_cover || anime.image_poster, priority: FastImage.priority.normal }}
-                  style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '55%', opacity: 0.6 }}
-                  resizeMode={FastImage.resizeMode.cover}
-                />
-                <LinearGradient
-                  colors={[theme.card, theme.card, 'transparent']}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                  style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '75%' }}
-                />
-
-                <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center',
-                  justifyContent: 'center', marginRight: 16, zIndex: 1,
-                  backgroundColor: index < 3 ? theme.accent : theme.border,
-                  borderWidth: index < 3 ? 0 : 1, borderColor: theme.border }}>
-                  <Text style={{ fontWeight: '900', fontSize: 14,
-                    color: index < 3 ? '#000' : theme.subtext }}>
-                    {index + 1}
-                  </Text>
-                </View>
-
-                <View style={{ flex: 1, zIndex: 1 }}>
-                  <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13 }}
-                    numberOfLines={1}>{anime.title}</Text>
-                  {anime.year ? (
-                    <Text style={{ color: theme.subtext, fontSize: 10, marginTop: 3 }}>
-                      {anime.year}{anime.studio ? ` · ${anime.studio}` : ''}
-                    </Text>
-                  ) : null}
-                </View>
-              </TouchableOpacity>
+              <MovieRankItem
+                key={anime.id}
+                anime={anime}
+                index={index}
+                onPress={() => goToAnime(anime)}
+                theme={theme}
+              />
             ))
           }
         </View>
