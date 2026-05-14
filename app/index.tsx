@@ -1,13 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  View, Text, TouchableOpacity,
-  Dimensions, StatusBar,
-} from 'react-native';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { View, Text, TouchableOpacity, Dimensions, StatusBar } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import FastImage from 'react-native-fast-image';
+import * as Haptics from 'expo-haptics';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -25,21 +23,55 @@ import { Anime } from '@/types';
 
 const { width, height } = Dimensions.get('window');
 
-const NUM_COLS  = 4;
-const CARD_GAP  = 6;
-const CARD_W    = (width * 1.3) / NUM_COLS - CARD_GAP;
-const CARD_H    = CARD_W * 1.45;
-const GRID_H    = height * 0.68;
+const NUM_COLS    = 4;
+const CARD_GAP    = 6;
+const CARD_W      = (width * 1.3) / NUM_COLS - CARD_GAP;
+const CARD_H      = CARD_W * 1.45;
+const STEP        = CARD_H + CARD_GAP;
+const GRID_H      = height * 0.68;
+const REPEAT_COUNT = 4;
 
-// ─── Poster Column (Reanimated) ────────────────────────────────────────────────
+const COL_OFFSETS   = [0, -(STEP * 0.6), -(STEP * 0.2), -(STEP * 0.8)] as const;
+const COL_DURATIONS = [3800, 4400, 3400, 4800] as const;
 
-function PosterColumn({ items, offsetY, duration }: {
+const CARD_STYLE = {
+  width: CARD_W,
+  height: CARD_H,
+  borderRadius: 8,
+  overflow: 'hidden' as const,
+  backgroundColor: COLORS.card,
+};
+
+const IMAGE_STYLE = { width: '100%' as const, height: '100%' as const };
+
+// ─── Poster Card ──────────────────────────────────────────────────────────────
+
+const PosterCard = React.memo(({ item, index }: { item: Anime; index: number }) => (
+  <View style={CARD_STYLE}>
+    {item.image_poster ? (
+      <FastImage
+        source={{ uri: item.image_poster, priority: FastImage.priority.low }}
+        style={IMAGE_STYLE}
+        resizeMode={FastImage.resizeMode.cover}
+      />
+    ) : null}
+  </View>
+));
+
+// ─── Poster Column ────────────────────────────────────────────────────────────
+
+const PosterColumn = React.memo(({ items, offsetY, duration }: {
   items: Anime[];
   offsetY: number;
   duration: number;
-}) {
-  const STEP     = CARD_H + CARD_GAP;
+}) => {
   const translateY = useSharedValue(offsetY);
+
+  // Repeat items sekali di memo, bukan tiap render
+  const repeated = useMemo(
+    () => Array.from({ length: REPEAT_COUNT }, () => items).flat(),
+    [items]
+  );
 
   useEffect(() => {
     if (!items.length) return;
@@ -59,28 +91,14 @@ function PosterColumn({ items, offsetY, duration }: {
     transform: [{ translateY: translateY.value }],
   }));
 
-  const repeated = [...items, ...items, ...items, ...items];
-
   return (
     <Animated.View style={[{ width: CARD_W, gap: CARD_GAP }, animStyle]}>
       {repeated.map((a, i) => (
-        <View key={`${a.id}-${i}`} style={{
-          width: CARD_W, height: CARD_H,
-          borderRadius: 8, overflow: 'hidden',
-          backgroundColor: COLORS.card,
-        }}>
-          {a.image_poster ? (
-            <FastImage
-              source={{ uri: a.image_poster, priority: FastImage.priority.low }}
-              style={{ width: '100%', height: '100%' }}
-              resizeMode={FastImage.resizeMode.cover}
-            />
-          ) : null}
-        </View>
+        <PosterCard key={`${a.id}-${i}`} item={a} index={i} />
       ))}
     </Animated.View>
   );
-}
+});
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
@@ -88,12 +106,15 @@ export default function WelcomeScreen() {
   const router  = useRouter();
   const [posters, setPosters] = useState<Anime[]>([]);
 
-  // Animasi masuk konten bawah
-  const opacity   = useSharedValue(0);
+  const opacity    = useSharedValue(0);
   const translateY = useSharedValue(20);
-
-  // Animasi transisi ke main — overlay gelap
   const overlayOpacity = useSharedValue(0);
+
+  // Split kolom di memo, recompute hanya jika posters berubah
+  const cols = useMemo(
+    () => [0, 1, 2, 3].map(i => posters.filter((_, idx) => idx % 4 === i)),
+    [posters]
+  );
 
   useEffect(() => {
     api.ongoing().then(r => {
@@ -114,21 +135,15 @@ export default function WelcomeScreen() {
     opacity: overlayOpacity.value,
   }));
 
-  const goMain    = () => router.replace('/(tabs)/');
-  const goExplore = () => router.push('/(tabs)/explore');
+  const goMain    = useCallback(() => router.replace('/(tabs)/'), [router]);
+  const goExplore = useCallback(() => router.push('/(tabs)/explore'), [router]);
 
-  const navigateTo = (target: 'main' | 'explore') => {
+  const navigateTo = useCallback((target: 'main' | 'explore') => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     overlayOpacity.value = withTiming(1, { duration: 300 }, (done) => {
       if (done) runOnJS(target === 'main' ? goMain : goExplore)();
     });
-  };
-
-  const cols = [0, 1, 2, 3].map(i =>
-    posters.filter((_, idx) => idx % 4 === i)
-  );
-
-  const colOffsets   = [0, -(CARD_H + CARD_GAP) * 0.6, -(CARD_H + CARD_GAP) * 0.2, -(CARD_H + CARD_GAP) * 0.8];
-  const colDurations = [3800, 4400, 3400, 4800];
+  }, [goMain, goExplore]);
 
   return (
     <View style={{ flex: 1, backgroundColor: '#08080a' }}>
@@ -149,8 +164,8 @@ export default function WelcomeScreen() {
             <PosterColumn
               key={i}
               items={col.length >= 4 ? col : posters.slice(i * 4, i * 4 + 8)}
-              offsetY={colOffsets[i]}
-              duration={colDurations[i]}
+              offsetY={COL_OFFSETS[i]}
+              duration={COL_DURATIONS[i]}
             />
           ))}
         </View>
@@ -216,6 +231,7 @@ export default function WelcomeScreen() {
             {/* CTA Utama */}
             <TouchableOpacity
               onPress={() => navigateTo('main')}
+              activeOpacity={0.85}
               style={{
                 backgroundColor: COLORS.gold,
                 paddingVertical: 14, borderRadius: 10,
@@ -232,6 +248,7 @@ export default function WelcomeScreen() {
             {/* CTA Sekunder */}
             <TouchableOpacity
               onPress={() => navigateTo('explore')}
+              activeOpacity={0.85}
               style={{
                 paddingVertical: 14, borderRadius: 10,
                 alignItems: 'center',
@@ -248,7 +265,7 @@ export default function WelcomeScreen() {
         </SafeAreaView>
       </Animated.View>
 
-      {/* Overlay transisi — fade to black sebelum navigate */}
+      {/* Overlay transisi */}
       <Animated.View style={[{
         position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
         backgroundColor: '#08080a', pointerEvents: 'none',
