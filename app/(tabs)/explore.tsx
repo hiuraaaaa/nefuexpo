@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, ScrollView, Dimensions,
+  View, Text, TextInput, TouchableOpacity,
+  FlatList, ScrollView, Dimensions,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { FlashList } from '@shopify/flash-list';
 import { api, getAnimeSlug } from '@/hooks/api';
 import { Anime, Genre } from '@/types';
 import { CardSkeleton } from '@/components/Skeleton';
@@ -26,7 +26,7 @@ const AnimeGridCard = React.memo(({ item, index, onPress, theme }: {
 }) => (
   <Animated.View
     entering={FadeInDown.delay(Math.min(index * 30, 300)).springify()}
-    style={{ flex: 1, margin: GAP / 2 }}
+    style={{ width: CARD_WIDTH }}
   >
     <TouchableOpacity
       onPress={onPress}
@@ -62,61 +62,48 @@ const AnimeGridCard = React.memo(({ item, index, onPress, theme }: {
   </Animated.View>
 ));
 
-// ── Skeleton Grid ─────────────────────────────────────────────────────────────
-const SkeletonGrid = ({ theme }: { theme: any }) => (
-  <View style={{ flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: H_PAD, gap: GAP }}>
-    {[...Array(12)].map((_, i) => (
-      <View key={i} style={{ width: CARD_WIDTH }}>
-        <CardSkeleton />
-      </View>
-    ))}
-  </View>
-);
-
 // ── Pagination ────────────────────────────────────────────────────────────────
-const Pagination = React.memo(({ page, hasResults, onPrev, onNext }: {
-  page: number; hasResults: boolean; onPrev: () => void; onNext: () => void;
-}) => {
-  const theme = useTheme();
-  return (
+const Pagination = React.memo(({ page, hasResults, onPrev, onNext, theme }: {
+  page: number; hasResults: boolean;
+  onPrev: () => void; onNext: () => void; theme: any;
+}) => (
+  <View style={{
+    flexDirection: 'row', justifyContent: 'center',
+    alignItems: 'center', gap: 12, marginTop: 16, marginBottom: 16,
+  }}>
+    <TouchableOpacity
+      onPress={onPrev}
+      disabled={page === 0}
+      style={{
+        width: 44, height: 44, borderRadius: 12, alignItems: 'center',
+        justifyContent: 'center', backgroundColor: theme.card,
+        borderWidth: 1, borderColor: theme.border, opacity: page === 0 ? 0.3 : 1,
+      }}
+    >
+      <Ionicons name="chevron-back" size={18} color={theme.text} />
+    </TouchableOpacity>
+
     <View style={{
-      flexDirection: 'row', justifyContent: 'center',
-      alignItems: 'center', gap: 12, marginTop: 16, marginBottom: 16,
+      paddingHorizontal: 20, height: 44, borderRadius: 12,
+      backgroundColor: theme.accent, alignItems: 'center',
+      justifyContent: 'center', minWidth: 44,
     }}>
-      <TouchableOpacity
-        onPress={onPrev}
-        disabled={page === 0}
-        style={{
-          width: 44, height: 44, borderRadius: 12, alignItems: 'center',
-          justifyContent: 'center', backgroundColor: theme.card,
-          borderWidth: 1, borderColor: theme.border, opacity: page === 0 ? 0.3 : 1,
-        }}
-      >
-        <Ionicons name="chevron-back" size={18} color={theme.text} />
-      </TouchableOpacity>
-
-      <View style={{
-        paddingHorizontal: 20, height: 44, borderRadius: 12,
-        backgroundColor: theme.accent, alignItems: 'center',
-        justifyContent: 'center', minWidth: 44,
-      }}>
-        <Text style={{ color: '#000', fontWeight: '900', fontSize: 14 }}>{page + 1}</Text>
-      </View>
-
-      <TouchableOpacity
-        onPress={onNext}
-        disabled={!hasResults}
-        style={{
-          width: 44, height: 44, borderRadius: 12, alignItems: 'center',
-          justifyContent: 'center', backgroundColor: theme.card,
-          borderWidth: 1, borderColor: theme.border, opacity: !hasResults ? 0.3 : 1,
-        }}
-      >
-        <Ionicons name="chevron-forward" size={18} color={theme.text} />
-      </TouchableOpacity>
+      <Text style={{ color: '#000', fontWeight: '900', fontSize: 14 }}>{page + 1}</Text>
     </View>
-  );
-});
+
+    <TouchableOpacity
+      onPress={onNext}
+      disabled={!hasResults}
+      style={{
+        width: 44, height: 44, borderRadius: 12, alignItems: 'center',
+        justifyContent: 'center', backgroundColor: theme.card,
+        borderWidth: 1, borderColor: theme.border, opacity: !hasResults ? 0.3 : 1,
+      }}
+    >
+      <Ionicons name="chevron-forward" size={18} color={theme.text} />
+    </TouchableOpacity>
+  </View>
+));
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function ExploreScreen() {
@@ -124,12 +111,12 @@ export default function ExploreScreen() {
   const router = useRouter();
   const theme  = useTheme();
 
-  const [query, setQuery]               = useState(params.q || '');
-  const [genres, setGenres]             = useState<Genre[]>([]);
+  const [query, setQuery]                   = useState(params.q || '');
+  const [genres, setGenres]                 = useState<Genre[]>([]);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
-  const [results, setResults]           = useState<Anime[]>([]);
-  const [page, setPage]                 = useState(0);
-  const [isLoading, setIsLoading]       = useState(true);
+  const [results, setResults]               = useState<Anime[]>([]);
+  const [page, setPage]                     = useState(0);
+  const [isLoading, setIsLoading]           = useState(true);
 
   useEffect(() => {
     api.genre().then(r => setGenres(r.data || [])).catch(() => {});
@@ -143,9 +130,9 @@ export default function ExploreScreen() {
       setIsLoading(true);
       try {
         let res;
-        if (query)                    res = await api.search(query, page);
+        if (query)                          res = await api.search(query, page);
         else if (selectedGenres.length > 0) res = await api.genreFilter(selectedGenres, page);
-        else                          res = await api.popular(page);
+        else                                res = await api.popular(page);
         if (mounted) setResults(res.data || []);
       } catch { if (mounted) setResults([]); }
       if (mounted) setIsLoading(false);
@@ -180,6 +167,16 @@ export default function ExploreScreen() {
       }}
     />
   ), [theme, router]);
+
+  // Pad buat fill row terakhir
+  const paddedResults = results.length % NUM_COLUMNS === 0
+    ? results
+    : [...results, ...Array(NUM_COLUMNS - (results.length % NUM_COLUMNS)).fill(null)];
+
+  const renderPadded = useCallback(({ item, index }: { item: Anime | null; index: number }) => {
+    if (!item) return <View style={{ width: CARD_WIDTH }} />;
+    return renderItem({ item, index });
+  }, [renderItem]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }} edges={['top']}>
@@ -264,7 +261,15 @@ export default function ExploreScreen() {
 
       {/* Content */}
       {isLoading ? (
-        <SkeletonGrid theme={theme} />
+        <FlatList
+          data={[...Array(12)]}
+          keyExtractor={(_, i) => String(i)}
+          numColumns={NUM_COLUMNS}
+          contentContainerStyle={{ paddingHorizontal: H_PAD, paddingBottom: 100 }}
+          columnWrapperStyle={{ gap: GAP, marginBottom: GAP }}
+          renderItem={() => <View style={{ width: CARD_WIDTH }}><CardSkeleton /></View>}
+          scrollEnabled={false}
+        />
       ) : results.length === 0 ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
           <Ionicons name="search-outline" size={56} color={theme.subtext} />
@@ -272,20 +277,24 @@ export default function ExploreScreen() {
             textTransform: 'uppercase', letterSpacing: 2 }}>Tidak ditemukan</Text>
         </View>
       ) : (
-        /* ✅ FlashList — lebih performa dari FlatList untuk grid banyak item */
-        <FlashList
-          data={results}
-          keyExtractor={item => item.id}
+        <FlatList
+          data={paddedResults}
+          keyExtractor={(item, i) => item?.id ?? `empty-${i}`}
           numColumns={NUM_COLUMNS}
-          estimatedItemSize={CARD_WIDTH * (4.2 / 3) + 40}
-          contentContainerStyle={{ paddingHorizontal: H_PAD / 2, paddingBottom: 100 }}
-          renderItem={renderItem}
+          contentContainerStyle={{ paddingHorizontal: H_PAD, paddingBottom: 100 }}
+          columnWrapperStyle={{ gap: GAP, marginBottom: GAP }}
+          renderItem={renderPadded}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={12}
+          windowSize={5}
+          initialNumToRender={12}
           ListFooterComponent={
             <Pagination
               page={page}
               hasResults={results.length > 0}
               onPrev={handlePrev}
               onNext={handleNext}
+              theme={theme}
             />
           }
         />
