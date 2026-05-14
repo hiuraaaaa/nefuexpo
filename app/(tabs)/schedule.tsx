@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Dimensions, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, ScrollView, Dimensions, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { DAY_KEYS, DAY_NAMES } from '@/constants';
@@ -21,7 +21,6 @@ const DAY_ITEM_W = (width - 32) / 7;
 const s = StyleSheet.create({
   flex1:        { flex: 1 },
   row:          { flexDirection: 'row' },
-  center:       { alignItems: 'center', justifyContent: 'center' },
   header:       { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16 },
   title:        { fontWeight: '900', fontSize: 28, letterSpacing: -0.5 },
   subtitle:     { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, marginTop: 2 },
@@ -47,6 +46,7 @@ const s = StyleSheet.create({
   cardTitle:    { fontWeight: '800', fontSize: 12, lineHeight: 16 },
   cardGenre:    { fontSize: 9, fontWeight: '600' },
   arrowWrap:    { justifyContent: 'center', paddingRight: 12 },
+  skeletonContent: { paddingHorizontal: 16, paddingBottom: 100 },
 });
 
 // ─── DayItem ──────────────────────────────────────────────────────────────────
@@ -162,7 +162,7 @@ const ScheduleCard = React.memo(({ anime, index, onPress, theme }: ScheduleCardP
 export default function ScheduleScreen() {
   const router    = useRouter();
   const theme     = useTheme();
-  const scrollRef = useRef<ScrollView>(null);
+  const listRef   = useRef<FlatList>(null);
 
   const [schedule, setSchedule]   = useState<ScheduleDay>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -196,13 +196,25 @@ export default function ScheduleScreen() {
   const handleDayPress = useCallback((key: string) => {
     Haptics.selectionAsync();
     setSelectedDay(key);
-    scrollRef.current?.scrollTo({ y: 0, animated: true });
+    listRef.current?.scrollToOffset({ offset: 0, animated: true });
   }, []);
 
   const handleCardPress = useCallback((anime: Anime) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push(`/watch/${getAnimeSlug(anime)}`);
   }, [router]);
+
+  const renderItem = useCallback(({ item, index }: { item: Anime; index: number }) => (
+    <ScheduleCard
+      anime={item}
+      index={index}
+      onPress={handleCardPress}
+      theme={theme}
+    />
+  ), [handleCardPress, theme]);
+
+  const keyExtractor = useCallback((item: Anime, index: number) =>
+    `${item.id}-${index}`, []);
 
   return (
     <SafeAreaView style={[s.flex1, { backgroundColor: theme.bg }]} edges={['top']}>
@@ -238,7 +250,7 @@ export default function ScheduleScreen() {
 
       {/* Content */}
       {isLoading ? (
-        <ScrollView contentContainerStyle={s.listContent}>
+        <ScrollView contentContainerStyle={s.skeletonContent}>
           {[...Array(5)].map((_, i) => <ScheduleCardSkeleton key={i} />)}
         </ScrollView>
       ) : animeList.length === 0 ? (
@@ -247,22 +259,20 @@ export default function ScheduleScreen() {
           <Text style={[s.emptyText, { color: theme.subtext }]}>Belum ada jadwal</Text>
         </View>
       ) : (
-        <ScrollView
-          ref={scrollRef}
+        <FlatList
+          ref={listRef}
+          data={animeList}
+          keyExtractor={keyExtractor}
+          renderItem={renderItem}
           contentContainerStyle={s.listContent}
           showsVerticalScrollIndicator={false}
-        >
-          {animeList.map((a, index) => (
-            <ScheduleCard
-              key={`${a.id}-${index}`}
-              anime={a}
-              index={index}
-              onPress={handleCardPress}
-              theme={theme}
-            />
-          ))}
-        </ScrollView>
+          initialNumToRender={8}
+          maxToRenderPerBatch={6}
+          windowSize={5}
+          removeClippedSubviews={true}
+        />
       )}
+
     </SafeAreaView>
   );
-              }
+            }
