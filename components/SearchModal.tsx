@@ -1,11 +1,17 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, FlatList,
-  Image, ActivityIndicator, Modal, KeyboardAvoidingView,
-  Platform, Animated, StyleSheet,
+  ActivityIndicator, Modal, KeyboardAvoidingView,
+  Platform, StyleSheet,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import FastImage from 'react-native-fast-image';
+import Animated, {
+  useSharedValue, useAnimatedStyle,
+  withTiming, withSpring, FadeIn,
+} from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import { COLORS } from '@/constants';
 import { api, getAnimeSlug } from '@/hooks/api';
 import { Anime } from '@/types';
@@ -17,26 +23,36 @@ interface Props {
 }
 
 // ─── Result Item ──────────────────────────────────────────────────────────────
+const ResultItem = React.memo(({ item, query, onPress }: {
+  item: Anime; query: string; onPress: () => void;
+}) => {
+  const scale = useSharedValue(1);
+  const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
-function ResultItem({ item, query, onPress }: { item: Anime; query: string; onPress: () => void }) {
-  const scale = useRef(new Animated.Value(1)).current;
-
-  const onPressIn = () => Animated.spring(scale, { toValue: 0.96, useNativeDriver: true, speed: 50, bounciness: 4 }).start();
-  const onPressOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 8 }).start();
+  const onPressIn  = () => { scale.value = withSpring(0.96, { damping: 15, stiffness: 300 }); };
+  const onPressOut = () => { scale.value = withSpring(1,    { damping: 12 }); };
 
   // Highlight matched query in title
   const title = item.title ?? '';
-  const idx = title.toLowerCase().indexOf(query.toLowerCase());
+  const idx   = title.toLowerCase().indexOf(query.toLowerCase());
   const highlighted = idx >= 0 && query.length >= 3
     ? [title.slice(0, idx), title.slice(idx, idx + query.length), title.slice(idx + query.length)]
     : null;
 
-  const statusColor = item.status === 'ONGOING' ? '#4ade80' : item.status === 'COMPLETED' ? COLORS.gold : 'rgba(255,255,255,0.3)';
+  const statusColor =
+    item.status === 'ONGOING'   ? '#4ade80' :
+    item.status === 'COMPLETED' ? COLORS.gold :
+    'rgba(255,255,255,0.3)';
 
   return (
     <TouchableOpacity onPress={onPress} onPressIn={onPressIn} onPressOut={onPressOut} activeOpacity={1}>
-      <Animated.View style={[styles.resultItem, { transform: [{ scale }] }]}>
-        <Image source={{ uri: item.image_poster }} style={styles.resultThumb} resizeMode="cover" />
+      <Animated.View style={[styles.resultItem, animStyle]}>
+        {/* ✅ FastImage — konsisten sama screen lain, lebih cepat */}
+        <FastImage
+          source={{ uri: item.image_poster, priority: FastImage.priority.normal }}
+          style={styles.resultThumb}
+          resizeMode={FastImage.resizeMode.cover}
+        />
         <View style={{ flex: 1 }}>
           <Text style={styles.resultTitle} numberOfLines={2}>
             {highlighted ? (
@@ -58,36 +74,57 @@ function ResultItem({ item, query, onPress }: { item: Anime; query: string; onPr
               </View>
             ) : null}
           </View>
-          {item.studio ? <Text style={styles.studioText} numberOfLines={1}>{item.studio}</Text> : null}
+          {item.studio ? (
+            <Text style={styles.studioText} numberOfLines={1}>{item.studio}</Text>
+          ) : null}
         </View>
         <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.2)" />
       </Animated.View>
     </TouchableOpacity>
   );
-}
+});
+
+// ─── History Item ─────────────────────────────────────────────────────────────
+const HistoryItem = React.memo(({ term, onPress }: { term: string; onPress: () => void }) => (
+  <TouchableOpacity onPress={onPress} style={styles.historyItem}>
+    <Ionicons name="time-outline" size={15} color="rgba(255,255,255,0.3)" />
+    <Text style={styles.historyText} numberOfLines={1}>{term}</Text>
+    <Ionicons name="arrow-up-back-outline" size={13} color="rgba(255,255,255,0.2)" />
+  </TouchableOpacity>
+));
 
 // ─── Main Modal ───────────────────────────────────────────────────────────────
-
 export default function SearchModal({ visible, onClose }: Props) {
   const router = useRouter();
-  const [query, setQuery] = useState('');
+
+  const [query, setQuery]     = useState('');
   const [results, setResults] = useState<Anime[]>([]);
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState<string[]>([]);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const inputRef = useRef<TextInput>(null);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  const timerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const focusRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inputRef  = useRef<TextInput>(null);
+
+  // ✅ reanimated opacity — lebih smooth di Hermes
+  const opacity = useSharedValue(0);
+  const overlayStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
 
   useEffect(() => {
     if (visible) {
-      setTimeout(() => inputRef.current?.focus(), 200);
+      opacity.value = withTiming(1, { duration: 200 });
       loadHistory();
-      Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+      // ✅ track ref biar bisa di-cleanup kalau modal tutup sebelum 200ms
+      focusRef.current = setTimeout(() => inputRef.current?.focus(), 200);
     } else {
+      opacity.value = withTiming(0, { duration: 150 });
       setQuery('');
       setResults([]);
-      fadeAnim.setValue(0);
+      if (focusRef.current) clearTimeout(focusRef.current);
     }
+    return () => {
+      if (focusRef.current) clearTimeout(focusRef.current);
+    };
   }, [visible]);
 
   const loadHistory = async () => {
@@ -95,6 +132,7 @@ export default function SearchModal({ visible, onClose }: Props) {
     setHistory(h);
   };
 
+  // Debounce search
   useEffect(() => {
     if (query.length < 3) { setResults([]); return; }
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -106,28 +144,38 @@ export default function SearchModal({ visible, onClose }: Props) {
       } catch { setResults([]); }
       setLoading(false);
     }, 400);
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [query]);
 
-  const go = async (a: Anime) => {
+  const go = useCallback(async (a: Anime) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await addSearchHistory(a.title ?? '');
     onClose();
     router.push(`/watch/${getAnimeSlug(a)}`);
-  };
+  }, [onClose, router]);
 
-  const handleHistoryTap = (term: string) => setQuery(term);
+  const handleHistoryTap = useCallback((term: string) => {
+    Haptics.selectionAsync();
+    setQuery(term);
+  }, []);
 
-  const handleClearHistory = async () => {
+  const handleClearHistory = useCallback(async () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     await clearSearchHistory();
     setHistory([]);
-  };
+  }, []);
+
+  const renderResult = useCallback(({ item }: { item: Anime }) => (
+    <ResultItem item={item} query={query} onPress={() => go(item)} />
+  ), [query, go]);
 
   const showHistory = query.length === 0 && history.length > 0;
-  const showEmpty = query.length >= 3 && !loading && results.length === 0;
+  const showEmpty   = query.length >= 3 && !loading && results.length === 0;
 
   return (
-    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
+    <Modal visible={visible} animationType="none" transparent onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
+        <Animated.View style={[styles.overlay, overlayStyle]}>
 
           {/* ── Search bar ── */}
           <View style={styles.searchBar}>
@@ -159,8 +207,9 @@ export default function SearchModal({ visible, onClose }: Props) {
               <ActivityIndicator color={COLORS.gold} size="small" />
               <Text style={styles.loadingText}>Mencari...</Text>
             </View>
+
           ) : showHistory ? (
-            <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
+            <Animated.View entering={FadeIn.duration(200)} style={{ paddingHorizontal: 16, paddingTop: 8 }}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Pencarian terakhir</Text>
                 <TouchableOpacity onPress={handleClearHistory}>
@@ -168,28 +217,27 @@ export default function SearchModal({ visible, onClose }: Props) {
                 </TouchableOpacity>
               </View>
               {history.map((term, i) => (
-                <TouchableOpacity key={i} onPress={() => handleHistoryTap(term)} style={styles.historyItem}>
-                  <Ionicons name="time-outline" size={15} color="rgba(255,255,255,0.3)" />
-                  <Text style={styles.historyText} numberOfLines={1}>{term}</Text>
-                  <Ionicons name="arrow-up-back-outline" size={13} color="rgba(255,255,255,0.2)" />
-                </TouchableOpacity>
+                <HistoryItem key={i} term={term} onPress={() => handleHistoryTap(term)} />
               ))}
-            </View>
+            </Animated.View>
+
           ) : showEmpty ? (
             <View style={styles.centered}>
               <Ionicons name="search-outline" size={40} color="rgba(255,255,255,0.08)" />
               <Text style={styles.emptyText}>Anime tidak ditemukan</Text>
               <Text style={styles.emptySubText}>Coba kata kunci lain</Text>
             </View>
+
           ) : (
             <FlatList
               data={results}
               keyExtractor={i => i.id}
               contentContainerStyle={{ padding: 16, gap: 8 }}
               keyboardShouldPersistTaps="handled"
-              renderItem={({ item }) => (
-                <ResultItem item={item} query={query} onPress={() => go(item)} />
-              )}
+              renderItem={renderResult}
+              removeClippedSubviews={true}
+              maxToRenderPerBatch={10}
+              windowSize={5}
             />
           )}
 
@@ -200,7 +248,6 @@ export default function SearchModal({ visible, onClose }: Props) {
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
