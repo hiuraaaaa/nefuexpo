@@ -30,18 +30,13 @@ const setJSON = (key: string, value: any): void => {
   } catch {}
 };
 
-/**
- * Sanitize string buat Firestore doc ID.
- * Firestore ga boleh: '/', '.', '..', spasi, karakter kontrol.
- * Kalau anime.id berisi URL atau path, ini prevent crash.
- */
 const sanitizeDocId = (id: string): string =>
   id
-    .replace(/\//g, '_')   // slash → underscore
-    .replace(/\./g, '_')   // dot → underscore
-    .replace(/\s+/g, '_')  // spasi → underscore
-    .replace(/[^\w-]/g, '') // hapus karakter non-alphanumeric kecuali _ dan -
-    .slice(0, 500)          // max 500 char (Firestore limit)
+    .replace(/\//g, '_')
+    .replace(/\./g, '_')
+    .replace(/\s+/g, '_')
+    .replace(/[^\w-]/g, '')
+    .slice(0, 500)
     || 'unknown';
 
 // ─── History ──────────────────────────────────────────────────────────────────
@@ -91,14 +86,24 @@ export const clearSearchHistory = (): void => {
 
 // ─── Progress Storage ─────────────────────────────────────────────────────────
 
+export type ProgressData = { position: number; duration: number };
+
 export const progressStorage = {
-  get: (epId: string): number => {
+  /**
+   * Return { position, duration } atau null kalau belum ada data.
+   * Backward-compat: kalau key lama masih berupa number (getNumber),
+   * kita skip dan return null supaya nggak crash.
+   */
+  get: (epId: string): ProgressData | null => {
     try {
-      // ✅ sanitize key buat MMKV juga — epId bisa berisi karakter aneh
       const key = `${PROGRESS_PREFIX}${sanitizeDocId(epId)}`;
-      return storage.getNumber(key) ?? 0;
+      const raw = storage.getString(key);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as ProgressData;
+      if (typeof parsed.position !== 'number') return null;
+      return parsed;
     } catch {
-      return 0;
+      return null;
     }
   },
 
@@ -106,8 +111,10 @@ export const progressStorage = {
     try {
       const key = `${PROGRESS_PREFIX}${sanitizeDocId(epId)}`;
       if (duration > 0 && position > 5 && position < duration - 30) {
-        storage.set(key, position);
+        // Simpan sebagai JSON string supaya bisa store duration juga
+        storage.set(key, JSON.stringify({ position, duration }));
       } else if (duration > 0 && position >= duration - 30) {
+        // Episode selesai → hapus supaya nggak resume dari sini
         storage.delete(key);
       }
     } catch {}
@@ -144,7 +151,6 @@ export const favoritStorage = {
     try {
       const ref = getUserFavRef();
       if (!ref) return;
-      // ✅ sanitize doc ID — prevent crash kalau anime.id berisi slash/URL
       await ref.doc(sanitizeDocId(anime.id)).set({ anime, savedAt: Date.now() });
     } catch {}
   },
