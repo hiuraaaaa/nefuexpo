@@ -33,8 +33,6 @@ const PIP_KEY = 'nefusoft_pip';
 
 const EP_COLS    = 6;
 const EP_GAP     = 6;
-const EP_PADDING = 16;
-const EP_SIZE    = Math.floor((width - EP_PADDING * 2 - EP_GAP * (EP_COLS - 1)) / EP_COLS);
 const SEEK_SEC   = 10;
 
 type ServerGroup = { [quality: string]: Server[] };
@@ -727,28 +725,31 @@ useEffect(() => {
             )}
 
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: EP_GAP }}>
-              {filteredEps.length === 0 ? (
-                <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12,
-                  fontWeight: '600', paddingVertical: 8 }}>Episode tidak ditemukan</Text>
-              ) : filteredEps.map(item => {
-                const isActive = currentEpId === item.id;
-                return (
-                  <TouchableOpacity key={item.id}
-                    onPress={() => { Haptics.selectionAsync(); changeEpisode(item); }}
-                    style={{ width: EP_SIZE, height: EP_SIZE, borderRadius: 6,
-                      alignItems: 'center', justifyContent: 'center',
-                      backgroundColor: isActive ? COLORS.gold : COLORS.bg,
-                      borderWidth: 1,
-                      borderColor: isActive ? COLORS.gold : 'rgba(255,255,255,0.05)' }}>
-                    <Text style={{ fontSize: 11, fontWeight: '900',
-                      color: isActive ? '#000' : 'rgba(255,255,255,0.5)' }}>
-                      {item.index}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
+  {filteredEps.length === 0 ? (
+    <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12,
+      fontWeight: '600', paddingVertical: 8 }}>Episode tidak ditemukan</Text>
+  ) : filteredEps.map(item => {
+    const isActive = currentEpId === item.id;
+    return (
+      <TouchableOpacity key={item.id}
+        onPress={() => { Haptics.selectionAsync(); changeEpisode(item); }}
+        style={{
+          width: `${(100 / EP_COLS) - 1.2}%`,
+          aspectRatio: 1,
+          borderRadius: 6,
+          alignItems: 'center', justifyContent: 'center',
+          backgroundColor: isActive ? COLORS.gold : COLORS.bg,
+          borderWidth: 1,
+          borderColor: isActive ? COLORS.gold : 'rgba(255,255,255,0.05)',
+        }}>
+        <Text style={{ fontSize: 11, fontWeight: '900',
+          color: isActive ? '#000' : 'rgba(255,255,255,0.5)' }}>
+          {item.index}
+        </Text>
+      </TouchableOpacity>
+    );
+  })}
+</View>
 
           {/* ── Info Anime ── */}
           {anime && (
