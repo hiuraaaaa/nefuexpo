@@ -1,7 +1,10 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Text, Animated, StyleSheet } from 'react-native';
-import { getLevelData, LEVELS } from '@/hooks/xp';
-import { COLORS } from '@/constants';
+import React, { useEffect } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import Animated, {
+  useSharedValue, useAnimatedStyle,
+  withSpring,
+} from 'react-native-reanimated';
+import { getLevelData } from '@/hooks/xp';
 
 const LEVEL_COLORS = [
   '#9ca3af','#60a5fa','#34d399','#a78bfa',
@@ -10,25 +13,25 @@ const LEVEL_COLORS = [
 
 export function XPBar({ xp }: { xp: number }) {
   const { current, next, progress } = getLevelData(xp);
-  const color = LEVEL_COLORS[current.level - 1];
-  const animWidth = useRef(new Animated.Value(0)).current;
+  const color = LEVEL_COLORS[Math.min(current.level - 1, LEVEL_COLORS.length - 1)];
+
+  // ✅ reanimated — jalan di UI thread, ga blocking JS
+  const animProgress = useSharedValue(0);
 
   useEffect(() => {
-    Animated.spring(animWidth, {
-      toValue: progress,
-      useNativeDriver: false,
-      tension: 50,
-      friction: 10,
-    }).start();
+    animProgress.value = withSpring(progress, { damping: 14, stiffness: 60 });
   }, [progress]);
+
+  const fillStyle = useAnimatedStyle(() => ({
+    width: `${animProgress.value * 100}%`,
+  }));
 
   return (
     <View style={styles.wrapper}>
       {/* Label atas */}
       <View style={styles.row}>
         <Text style={styles.label}>
-          {current.title}
-          {next ? ` → ${next.title}` : ' (MAX)'}
+          {current.title}{next ? ` → ${next.title}` : ' (MAX)'}
         </Text>
         <Text style={[styles.xpText, { color }]}>
           {xp} XP
@@ -39,14 +42,8 @@ export function XPBar({ xp }: { xp: number }) {
       <View style={styles.track}>
         <Animated.View style={[
           styles.fill,
-          {
-            backgroundColor: color,
-            width: animWidth.interpolate({
-              inputRange: [0, 1],
-              outputRange: ['0%', '100%'],
-            }),
-            shadowColor: color,
-          }
+          fillStyle,
+          { backgroundColor: color, shadowColor: color },
         ]} />
       </View>
 
