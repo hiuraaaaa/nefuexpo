@@ -30,6 +30,20 @@ const setJSON = (key: string, value: any): void => {
   } catch {}
 };
 
+/**
+ * Sanitize string buat Firestore doc ID.
+ * Firestore ga boleh: '/', '.', '..', spasi, karakter kontrol.
+ * Kalau anime.id berisi URL atau path, ini prevent crash.
+ */
+const sanitizeDocId = (id: string): string =>
+  id
+    .replace(/\//g, '_')   // slash → underscore
+    .replace(/\./g, '_')   // dot → underscore
+    .replace(/\s+/g, '_')  // spasi → underscore
+    .replace(/[^\w-]/g, '') // hapus karakter non-alphanumeric kecuali _ dan -
+    .slice(0, 500)          // max 500 char (Firestore limit)
+    || 'unknown';
+
 // ─── History ──────────────────────────────────────────────────────────────────
 
 export const historyStorage = {
@@ -80,7 +94,9 @@ export const clearSearchHistory = (): void => {
 export const progressStorage = {
   get: (epId: string): number => {
     try {
-      return storage.getNumber(`${PROGRESS_PREFIX}${epId}`) ?? 0;
+      // ✅ sanitize key buat MMKV juga — epId bisa berisi karakter aneh
+      const key = `${PROGRESS_PREFIX}${sanitizeDocId(epId)}`;
+      return storage.getNumber(key) ?? 0;
     } catch {
       return 0;
     }
@@ -88,17 +104,18 @@ export const progressStorage = {
 
   save: (epId: string, position: number, duration: number): void => {
     try {
+      const key = `${PROGRESS_PREFIX}${sanitizeDocId(epId)}`;
       if (duration > 0 && position > 5 && position < duration - 30) {
-        storage.set(`${PROGRESS_PREFIX}${epId}`, position);
+        storage.set(key, position);
       } else if (duration > 0 && position >= duration - 30) {
-        storage.delete(`${PROGRESS_PREFIX}${epId}`);
+        storage.delete(key);
       }
     } catch {}
   },
 
   clear: (epId: string): void => {
     try {
-      storage.delete(`${PROGRESS_PREFIX}${epId}`);
+      storage.delete(`${PROGRESS_PREFIX}${sanitizeDocId(epId)}`);
     } catch {}
   },
 };
@@ -127,7 +144,8 @@ export const favoritStorage = {
     try {
       const ref = getUserFavRef();
       if (!ref) return;
-      await ref.doc(anime.id).set({ anime, savedAt: Date.now() });
+      // ✅ sanitize doc ID — prevent crash kalau anime.id berisi slash/URL
+      await ref.doc(sanitizeDocId(anime.id)).set({ anime, savedAt: Date.now() });
     } catch {}
   },
 
@@ -135,7 +153,7 @@ export const favoritStorage = {
     try {
       const ref = getUserFavRef();
       if (!ref) return;
-      await ref.doc(animeId).delete();
+      await ref.doc(sanitizeDocId(animeId)).delete();
     } catch {}
   },
 
@@ -143,7 +161,7 @@ export const favoritStorage = {
     try {
       const ref = getUserFavRef();
       if (!ref) return false;
-      const doc = await ref.doc(animeId).get();
+      const doc = await ref.doc(sanitizeDocId(animeId)).get();
       return doc.exists;
     } catch {
       return false;
