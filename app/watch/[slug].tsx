@@ -8,7 +8,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Video, ResizeMode, AVPlaybackStatus, Audio } from 'expo-av';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import * as Haptics from 'expo-haptics';
-import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Slider from '@react-native-community/slider';
 import FastImage from 'react-native-fast-image';
@@ -18,7 +17,6 @@ import Animated, {
   withTiming, FadeIn, FadeOut,
 } from 'react-native-reanimated';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { COLORS } from '@/constants';
 import { api, getAnimeSlug, decodeAnimeId, formatTime } from '@/hooks/api';
 import { historyStorage, progressStorage, favoritStorage } from '@/hooks/storage';
@@ -31,13 +29,20 @@ import { getCurrentUser } from '@/hooks/auth';
 const { width } = Dimensions.get('window');
 const PIP_KEY = 'nefusoft_pip';
 
+// ── Episode grid: 6 kolom, ukuran pakai % biar responsive ─────────────────────
 const EP_COLS    = 6;
 const EP_GAP     = 6;
+const EP_PADDING = 16;
+// Pakai persentase dari lebar layar, bukan nilai fixed
+const EP_SIZE    = `${Math.floor(100 / EP_COLS)}%` as unknown as number; // dipakai sebagai string di style width
+const EP_SIZE_NUM = Math.floor((width - EP_PADDING * 2 - EP_GAP * (EP_COLS - 1)) / EP_COLS);
+
 const SEEK_SEC   = 10;
 
 type ServerGroup = { [quality: string]: Server[] };
 
 // ── Icons ──────────────────────────────────────────────────────────────────────
+
 const IconPrev = ({ color = '#fff', size = 28 }: { color?: string; size?: number }) => (
   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
     <View style={{ width: 3, height: size * 0.75, backgroundColor: color, borderRadius: 2 }} />
@@ -111,6 +116,7 @@ const IconFullscreen = ({ exit = false }: { exit?: boolean }) => {
 };
 
 // ── Seek Toast ─────────────────────────────────────────────────────────────────
+
 function SeekToast({ direction, visible }: { direction: 'left' | 'right'; visible: boolean }) {
   if (!visible) return null;
   return (
@@ -122,22 +128,21 @@ function SeekToast({ direction, visible }: { direction: 'left' | 'right'; visibl
         [direction === 'left' ? 'left' : 'right']: width * 0.05,
         top: '35%',
         alignItems: 'center', gap: 4,
-        overflow: 'hidden', borderRadius: 10,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        paddingHorizontal: 16, paddingVertical: 10,
+        borderRadius: 10,
       }}
     >
-      {/* ✅ BlurView buat seek toast */}
-      <BlurView intensity={60} tint="dark"
-        style={{ paddingHorizontal: 16, paddingVertical: 10, alignItems: 'center', gap: 4 }}>
-        <Ionicons name={direction === 'left' ? 'play-back' : 'play-forward'} size={22} color="#fff" />
-        <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>
-          {direction === 'left' ? `-${SEEK_SEC}s` : `+${SEEK_SEC}s`}
-        </Text>
-      </BlurView>
+      <Ionicons name={direction === 'left' ? 'play-back' : 'play-forward'} size={22} color="#fff" />
+      <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>
+        {direction === 'left' ? `-${SEEK_SEC}s` : `+${SEEK_SEC}s`}
+      </Text>
     </Animated.View>
   );
 }
 
 // ── Info Row ───────────────────────────────────────────────────────────────────
+
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between',
@@ -155,7 +160,90 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+// ── Episode Button dengan Progress Indicator ───────────────────────────────────
+
+function EpisodeButton({
+  item,
+  isActive,
+  progress,
+  onPress,
+}: {
+  item: Episode;
+  isActive: boolean;
+  progress: number; // 0–1, -1 = belum ada data
+  onPress: () => void;
+}) {
+  // progress bar hanya muncul kalau ada data (>0) dan bukan episode aktif
+  const showProgress = !isActive && progress > 0;
+
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={{
+        // Pakai flex basis % supaya responsive tanpa hardcode pixel
+        flexBasis: `${Math.floor(100 / EP_COLS)}%`,
+        // Kurangi setengah total gap per kolom supaya pas
+        maxWidth: `${Math.floor(100 / EP_COLS)}%`,
+        aspectRatio: 1,
+        paddingHorizontal: EP_GAP / 2,
+        marginBottom: EP_GAP,
+      }}
+    >
+      <View
+        style={{
+          flex: 1,
+          borderRadius: 6,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: isActive ? COLORS.gold : COLORS.bg,
+          borderWidth: 1,
+          borderColor: isActive
+            ? COLORS.gold
+            : showProgress
+            ? `${COLORS.gold}40`
+            : 'rgba(255,255,255,0.05)',
+          overflow: 'hidden',
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 11,
+            fontWeight: '900',
+            color: isActive ? '#000' : 'rgba(255,255,255,0.5)',
+          }}
+        >
+          {item.index}
+        </Text>
+
+        {/* Progress bar di bagian bawah button */}
+        {showProgress && (
+          <View
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: 3,
+              backgroundColor: 'rgba(255,255,255,0.08)',
+            }}
+          >
+            <View
+              style={{
+                height: '100%',
+                width: `${Math.min(progress * 100, 100)}%`,
+                backgroundColor: progress >= 0.9 ? '#4ade80' : COLORS.gold,
+                borderRadius: 2,
+              }}
+            />
+          </View>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+}
+
 // ── Main ───────────────────────────────────────────────────────────────────────
+
 export default function WatchScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const epParam  = useLocalSearchParams<{ ep?: string }>().ep;
@@ -188,9 +276,11 @@ export default function WatchScreen() {
   const [duration, setDuration]       = useState(0);
   const [isBuffering, setIsBuffering] = useState(false);
 
+  // ── Map progress per episode id: { [epId]: 0–1 } ─────────────────────────────
+  const [epProgress, setEpProgress] = useState<Record<string, number>>({});
+
   const [seekLeft, setSeekLeft]   = useState(false);
   const [seekRight, setSeekRight] = useState(false);
-
   const seekLeftTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seekRightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTapLeft    = useRef(0);
@@ -198,15 +288,7 @@ export default function WatchScreen() {
   const controlsTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSaveTime   = useRef(0);
 
-  // ✅ Reanimated controls fade — smooth di UI thread
-  const controlsOpacity = useSharedValue(1);
-  const controlsStyle   = useAnimatedStyle(() => ({ opacity: controlsOpacity.value }));
-
-  useEffect(() => {
-    controlsOpacity.value = withTiming(showControls ? 1 : 0, { duration: 250 });
-  }, [showControls]);
-
-  // ── PiP ───────────────────────────────────────────────────────────────────────
+  // ── PiP ──────────────────────────────────────────────────────────────────────
   useEffect(() => {
     AsyncStorage.getItem(PIP_KEY).then(v => {
       Audio.setAudioModeAsync({
@@ -223,20 +305,11 @@ export default function WatchScreen() {
   // ── Cleanup ───────────────────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
-      if (controlsTimer.current)  clearTimeout(controlsTimer.current);
-      if (seekLeftTimer.current)  clearTimeout(seekLeftTimer.current);
+      if (controlsTimer.current) clearTimeout(controlsTimer.current);
+      if (seekLeftTimer.current) clearTimeout(seekLeftTimer.current);
       if (seekRightTimer.current) clearTimeout(seekRightTimer.current);
     };
   }, []);
-
-  // ── Keep Awake ────────────────────────────────────────────────────────────────
-useEffect(() => {
-  if (isPlaying) {
-    activateKeepAwakeAsync();
-  } else {
-    deactivateKeepAwake();
-  }
-}, [isPlaying]);
 
   // ── Load detail ───────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -254,7 +327,7 @@ useEffect(() => {
           setEpisodes(eps);
           setFilteredEps(eps);
           const target = epParam
-            ? eps.find((e: Episode) => e.index.toString() === epParam)
+            ? eps.find(e => e.index.toString() === epParam)
             : eps[eps.length - 1];
           if (target) setCurrentEpId(target.id);
         }
@@ -264,6 +337,29 @@ useEffect(() => {
     };
     load();
   }, [animeId]);
+
+  // ── Load progress semua episode setelah episodes tersedia ────────────────────
+  useEffect(() => {
+    if (episodes.length === 0) return;
+    const loadAllProgress = async () => {
+      const map: Record<string, number> = {};
+      await Promise.all(
+        episodes.map(async ep => {
+          try {
+            const saved = await progressStorage.get(ep.id);
+            if (saved && saved.duration > 0) {
+              map[ep.id] = Math.min(saved.position / saved.duration, 1);
+            }
+          } catch {
+            // progressStorage.get mungkin return number langsung di versi lama
+            // fallback: skip
+          }
+        })
+      );
+      setEpProgress(map);
+    };
+    loadAllProgress();
+  }, [episodes]);
 
   // ── Episode search ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -300,8 +396,10 @@ useEffect(() => {
             setSelectedQuality(bestQ);
             setSelectedServer(group[bestQ][0]);
             const saved = await progressStorage.get(currentEpId);
-            if (saved && saved > 5) {
-              setTimeout(() => videoRef.current?.setPositionAsync(saved * 1000), 800);
+            // Support both {position, duration} object dan number langsung
+            const savedPos = typeof saved === 'object' ? saved?.position : saved;
+            if (savedPos && savedPos > 5) {
+              setTimeout(() => videoRef.current?.setPositionAsync(savedPos * 1000), 800);
             }
           }
         }
@@ -334,64 +432,52 @@ useEffect(() => {
   const currentEpNum = episodes.find(e => e.id === currentEpId)?.index || 0;
   const availableQualities = Object.keys(serverGroup).filter(q => serverGroup[q]?.length > 0);
 
-  const changeEpisode = useCallback((ep: Episode) => {
-    setEpSearch('');
-    setCurrentEpId(ep.id);
-  }, []);
+  const changeEpisode = (ep: Episode) => { setEpSearch(''); setCurrentEpId(ep.id); };
+  const handlePrev = () => { if (epIndex < episodes.length - 1) changeEpisode(episodes[epIndex + 1]); };
+  const handleNext = () => { if (epIndex > 0) changeEpisode(episodes[epIndex - 1]); };
 
-  const handlePrev = useCallback(() => {
-    if (epIndex < episodes.length - 1) changeEpisode(episodes[epIndex + 1]);
-  }, [epIndex, episodes, changeEpisode]);
-
-  const handleNext = useCallback(() => {
-    if (epIndex > 0) changeEpisode(episodes[epIndex - 1]);
-  }, [epIndex, episodes, changeEpisode]);
-
-  const selectQualityAndServer = useCallback((quality: string, server: Server) => {
+  const selectQualityAndServer = (quality: string, server: Server) => {
     const cur = position;
     setSelectedQuality(quality);
     setSelectedServer(server);
     setShowServerModal(false);
     setTimeout(() => videoRef.current?.setPositionAsync(cur * 1000), 300);
-  }, [position]);
+  };
 
-  const togglePlayPause = useCallback(() => {
+  const togglePlayPause = () => {
     if (isPlaying) videoRef.current?.pauseAsync();
     else videoRef.current?.playAsync();
     resetControlsTimer();
-  }, [isPlaying, resetControlsTimer]);
+  };
 
-  const toggleFullscreen = useCallback(async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  const toggleFullscreen = async () => {
     if (isFullscreen) {
       await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-      setIsFullscreen(false);
-      StatusBar.setHidden(false);
+      setIsFullscreen(false); StatusBar.setHidden(false);
     } else {
       await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
-      setIsFullscreen(true);
-      StatusBar.setHidden(true);
+      setIsFullscreen(true); StatusBar.setHidden(true);
     }
-  }, [isFullscreen]);
+  };
 
-  const handleShare = useCallback(async () => {
+  const handleShare = async () => {
     try {
       await Share.share({
         message: `Tonton ${anime?.title || 'Anime'} di NefuSoft, Gratis & Tanpa Iklan!\nhttps://nefusoft.cloud`,
         title: 'NefuSoft',
       });
     } catch {}
-  }, [anime]);
+  };
 
-  const handleBookmark = useCallback(async () => {
+  const handleBookmark = async () => {
     if (!getCurrentUser()) { Alert.alert('Login Dulu', 'Login untuk menyimpan favorit'); return; }
     if (!anime) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const result = await favoritStorage.toggle(anime as any);
     setIsFavorited(result);
-  }, [anime]);
+  };
 
-  const handleTapLeft = useCallback(() => {
+  const handleTapLeft = () => {
     const now = Date.now();
     if (now - lastTapLeft.current < 300) {
       videoRef.current?.setPositionAsync(Math.max(0, position - SEEK_SEC) * 1000);
@@ -402,9 +488,9 @@ useEffect(() => {
       resetControlsTimer();
     } else { resetControlsTimer(); }
     lastTapLeft.current = now;
-  }, [position, resetControlsTimer]);
+  };
 
-  const handleTapRight = useCallback(() => {
+  const handleTapRight = () => {
     const now = Date.now();
     if (now - lastTapRight.current < 300) {
       videoRef.current?.setPositionAsync(Math.min(duration, position + SEEK_SEC) * 1000);
@@ -415,7 +501,7 @@ useEffect(() => {
       resetControlsTimer();
     } else { resetControlsTimer(); }
     lastTapRight.current = now;
-  }, [position, duration, resetControlsTimer]);
+  };
 
   const handlePlaybackStatus = useCallback((status: AVPlaybackStatus) => {
     if (!status.isLoaded) return;
@@ -428,10 +514,16 @@ useEffect(() => {
       const now = Date.now();
       if (now - lastSaveTime.current > 5000) {
         lastSaveTime.current = now;
-        progressStorage.save(currentEpId, status.positionMillis / 1000, (status.durationMillis || 0) / 1000);
+        const pos = status.positionMillis / 1000;
+        const dur = (status.durationMillis || 0) / 1000;
+        progressStorage.save(currentEpId, pos, dur);
+        // Update progress map live
+        if (dur > 0) {
+          setEpProgress(prev => ({ ...prev, [currentEpId]: Math.min(pos / dur, 1) }));
+        }
       }
     }
-  }, [autoNext, currentEpId, handleNext]);
+  }, [autoNext, currentEpId]);
 
   const videoHeight = isFullscreen ? Dimensions.get('window').height : width * (9 / 16);
 
@@ -444,55 +536,36 @@ useEffect(() => {
       {/* ── Server Modal ── */}
       <Modal visible={showServerModal} transparent animationType="slide"
         onRequestClose={() => setShowServerModal(false)}>
-        <TouchableOpacity style={{ flex: 1 }}
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' }}
           activeOpacity={1} onPress={() => setShowServerModal(false)}>
-
-          {/* ✅ BlurView buat modal backdrop */}
-          <BlurView intensity={30} tint="dark" style={{ flex: 1 }}>
-            <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0,
-              backgroundColor: `${COLORS.card}f0`, borderTopLeftRadius: 20,
-              borderTopRightRadius: 20, padding: 20, paddingBottom: 40,
-              borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }}>
-
-              {/* Handle bar */}
-              <View style={{ width: 40, height: 4, backgroundColor: 'rgba(255,255,255,0.15)',
-                borderRadius: 2, alignSelf: 'center', marginBottom: 16 }} />
-
-              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 14, marginBottom: 16,
-                textTransform: 'uppercase', letterSpacing: 1 }}>
-                Pilih Kualitas & Server
-              </Text>
-
-              {availableQualities.map(quality => (
-                <View key={quality} style={{ marginBottom: 16 }}>
-                  <Text style={{ color: COLORS.gold, fontWeight: '900', fontSize: 12, marginBottom: 8 }}>
-                    {quality}
-                  </Text>
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                    {serverGroup[quality].map((s, idx) => {
-                      const isActive = selectedServer?.id === s.id;
-                      return (
-                        <TouchableOpacity key={s.id}
-                          onPress={() => {
-                            Haptics.selectionAsync();
-                            selectQualityAndServer(quality, s);
-                          }}
-                          style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8,
-                            backgroundColor: isActive ? COLORS.gold : 'rgba(255,255,255,0.07)',
-                            borderWidth: 1,
-                            borderColor: isActive ? COLORS.gold : 'rgba(255,255,255,0.1)' }}>
-                          <Text style={{ color: isActive ? '#000' : '#fff',
-                            fontWeight: '900', fontSize: 12 }}>
-                            Server {idx + 1}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
+          <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0,
+            backgroundColor: COLORS.card, borderTopLeftRadius: 16, borderTopRightRadius: 16,
+            padding: 20, paddingBottom: 40 }}>
+            <Text style={{ color: '#fff', fontWeight: '900', fontSize: 14, marginBottom: 16,
+              textTransform: 'uppercase', letterSpacing: 1 }}>Pilih Kualitas & Server</Text>
+            {availableQualities.map(quality => (
+              <View key={quality} style={{ marginBottom: 16 }}>
+                <Text style={{ color: COLORS.gold, fontWeight: '900', fontSize: 12, marginBottom: 8 }}>
+                  {quality}
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {serverGroup[quality].map((s, idx) => {
+                    const isActive = selectedServer?.id === s.id;
+                    return (
+                      <TouchableOpacity key={s.id} onPress={() => selectQualityAndServer(quality, s)}
+                        style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8,
+                          backgroundColor: isActive ? COLORS.gold : COLORS.bg,
+                          borderWidth: 1, borderColor: isActive ? COLORS.gold : 'rgba(255,255,255,0.1)' }}>
+                        <Text style={{ color: isActive ? '#000' : '#fff', fontWeight: '900', fontSize: 12 }}>
+                          Server {idx + 1}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
-              ))}
-            </View>
-          </BlurView>
+              </View>
+            ))}
+          </View>
         </TouchableOpacity>
       </Modal>
 
@@ -532,35 +605,20 @@ useEffect(() => {
         <SeekToast direction="left" visible={seekLeft} />
         <SeekToast direction="right" visible={seekRight} />
 
-        {/* ✅ Controls dengan reanimated fade — smooth di UI thread */}
-        {selectedServer && !isEpLoading && (
-          <Animated.View style={[
-            { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
-            controlsStyle,
-          ]} pointerEvents={showControls ? 'box-none' : 'none'}>
+        {/* Controls */}
+        {showControls && selectedServer && !isEpLoading && (
+          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+            pointerEvents="box-none">
+            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 80,
+              backgroundColor: 'rgba(0,0,0,0.55)' }} pointerEvents="none" />
+            <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 90,
+              backgroundColor: 'rgba(0,0,0,0.65)' }} pointerEvents="none" />
 
-            {/* Top gradient */}
-            <LinearGradient
-              colors={['rgba(0,0,0,0.7)', 'transparent']}
-              style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 80 }}
-              pointerEvents="none"
-            />
-            {/* Bottom gradient */}
-            <LinearGradient
-              colors={['transparent', 'rgba(0,0,0,0.8)']}
-              style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 90 }}
-              pointerEvents="none"
-            />
-
-            {/* Top bar */}
             <View style={{ position: 'absolute', top: 0, left: 0, right: 0,
               flexDirection: 'row', alignItems: 'center',
               paddingHorizontal: 12, paddingTop: 12, gap: 10 }}>
               <TouchableOpacity
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  if (isFullscreen) toggleFullscreen(); else router.back();
-                }}
+                onPress={() => { if (isFullscreen) toggleFullscreen(); else router.back(); }}
                 style={{ width: 36, height: 36, borderRadius: 18,
                   backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' }}>
                 <View style={{ width: 0, height: 0,
@@ -580,12 +638,10 @@ useEffect(() => {
               </TouchableOpacity>
             </View>
 
-            {/* Center controls */}
             <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
               alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 36 }}
               pointerEvents="box-none">
-              <TouchableOpacity
-                onPress={() => { handlePrev(); resetControlsTimer(); }}
+              <TouchableOpacity onPress={() => { handlePrev(); resetControlsTimer(); }}
                 disabled={epIndex >= episodes.length - 1}
                 style={{ opacity: epIndex >= episodes.length - 1 ? 0.25 : 1,
                   width: 52, height: 52, alignItems: 'center', justifyContent: 'center' }}>
@@ -598,8 +654,7 @@ useEffect(() => {
                   alignItems: 'center', justifyContent: 'center' }}>
                 {isPlaying ? <IconPause size={26} /> : <IconPlay size={26} />}
               </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => { handleNext(); resetControlsTimer(); }}
+              <TouchableOpacity onPress={() => { handleNext(); resetControlsTimer(); }}
                 disabled={epIndex <= 0}
                 style={{ opacity: epIndex <= 0 ? 0.25 : 1,
                   width: 52, height: 52, alignItems: 'center', justifyContent: 'center' }}>
@@ -607,7 +662,6 @@ useEffect(() => {
               </TouchableOpacity>
             </View>
 
-            {/* Bottom bar */}
             <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0,
               paddingHorizontal: 12, paddingBottom: 10 }}>
               <Slider style={{ width: '100%', height: 20 }}
@@ -615,10 +669,7 @@ useEffect(() => {
                 minimumTrackTintColor={COLORS.gold}
                 maximumTrackTintColor="rgba(255,255,255,0.25)"
                 thumbTintColor={COLORS.gold}
-                onSlidingComplete={val => {
-                  videoRef.current?.setPositionAsync(val * 1000);
-                  resetControlsTimer();
-                }}
+                onSlidingComplete={val => { videoRef.current?.setPositionAsync(val * 1000); resetControlsTimer(); }}
               />
               <View style={{ flexDirection: 'row', justifyContent: 'space-between',
                 alignItems: 'center', marginTop: 2 }}>
@@ -629,17 +680,13 @@ useEffect(() => {
                   {formatTime(duration)}
                 </Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-                  <TouchableOpacity
-                    onPress={() => { Haptics.selectionAsync(); setShowServerModal(true); resetControlsTimer(); }}
-                    style={{ overflow: 'hidden', borderRadius: 6 }}>
-                    {/* ✅ BlurView buat quality badge */}
-                    <BlurView intensity={50} tint="dark"
-                      style={{ paddingHorizontal: 10, paddingVertical: 4,
-                        borderWidth: 1, borderColor: `${COLORS.gold}90`, borderRadius: 6 }}>
-                      <Text style={{ color: COLORS.gold, fontSize: 11, fontWeight: '900' }}>
-                        {selectedQuality || 'AUTO'}
-                      </Text>
-                    </BlurView>
+                  <TouchableOpacity onPress={() => { setShowServerModal(true); resetControlsTimer(); }}
+                    style={{ backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 10,
+                      paddingVertical: 4, borderRadius: 6,
+                      borderWidth: 1, borderColor: `${COLORS.gold}90` }}>
+                    <Text style={{ color: COLORS.gold, fontSize: 11, fontWeight: '900' }}>
+                      {selectedQuality || 'AUTO'}
+                    </Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={toggleFullscreen}
                     style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
@@ -648,7 +695,7 @@ useEffect(() => {
                 </View>
               </View>
             </View>
-          </Animated.View>
+          </View>
         )}
       </View>
 
@@ -658,17 +705,13 @@ useEffect(() => {
 
           {/* Episode nav */}
           <View style={{ flexDirection: 'row', gap: 12, padding: 16 }}>
-            <TouchableOpacity
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); handlePrev(); }}
-              disabled={epIndex >= episodes.length - 1}
+            <TouchableOpacity onPress={handlePrev} disabled={epIndex >= episodes.length - 1}
               style={{ flex: 1, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
                 borderRadius: 10, paddingVertical: 14, alignItems: 'center',
                 opacity: epIndex >= episodes.length - 1 ? 0.3 : 1 }}>
               <Text style={{ color: '#fff', fontWeight: '900' }}>‹ Sebelumnya</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); handleNext(); }}
-              disabled={epIndex <= 0}
+            <TouchableOpacity onPress={handleNext} disabled={epIndex <= 0}
               style={{ flex: 1, borderWidth: 1, borderColor: `${COLORS.gold}60`,
                 borderRadius: 10, paddingVertical: 14, alignItems: 'center',
                 opacity: epIndex <= 0 ? 0.3 : 1 }}>
@@ -677,8 +720,7 @@ useEffect(() => {
           </View>
 
           {/* AutoNext */}
-          <TouchableOpacity
-            onPress={() => { Haptics.selectionAsync(); setAutoNext(p => !p); }}
+          <TouchableOpacity onPress={() => { Haptics.selectionAsync(); setAutoNext(p => !p); }}
             style={{ marginHorizontal: 16, marginBottom: 16, paddingVertical: 14,
               borderRadius: 10, borderWidth: 1,
               borderColor: autoNext ? `${COLORS.gold}60` : 'rgba(255,255,255,0.1)',
@@ -696,7 +738,8 @@ useEffect(() => {
           {/* ── Daftar Episode ── */}
           <View style={{ marginHorizontal: 16, backgroundColor: COLORS.card, borderRadius: 12,
             borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
-            padding: EP_PADDING, marginBottom: 16 }}>
+            paddingHorizontal: EP_PADDING, paddingTop: EP_PADDING, paddingBottom: EP_PADDING - EP_GAP,
+            marginBottom: 16 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center',
               justifyContent: 'space-between', marginBottom: 12 }}>
               <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13,
@@ -724,32 +767,22 @@ useEffect(() => {
               </View>
             )}
 
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: EP_GAP }}>
-  {filteredEps.length === 0 ? (
-    <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12,
-      fontWeight: '600', paddingVertical: 8 }}>Episode tidak ditemukan</Text>
-  ) : filteredEps.map(item => {
-    const isActive = currentEpId === item.id;
-    return (
-      <TouchableOpacity key={item.id}
-        onPress={() => { Haptics.selectionAsync(); changeEpisode(item); }}
-        style={{
-          width: `${(100 / EP_COLS) - 1.2}%`,
-          aspectRatio: 1,
-          borderRadius: 6,
-          alignItems: 'center', justifyContent: 'center',
-          backgroundColor: isActive ? COLORS.gold : COLORS.bg,
-          borderWidth: 1,
-          borderColor: isActive ? COLORS.gold : 'rgba(255,255,255,0.05)',
-        }}>
-        <Text style={{ fontSize: 11, fontWeight: '900',
-          color: isActive ? '#000' : 'rgba(255,255,255,0.5)' }}>
-          {item.index}
-        </Text>
-      </TouchableOpacity>
-    );
-  })}
-</View>
+            {/* Grid — pakai flexBasis % supaya responsive */}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+              {filteredEps.length === 0 ? (
+                <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12,
+                  fontWeight: '600', paddingVertical: 8 }}>Episode tidak ditemukan</Text>
+              ) : filteredEps.map(item => (
+                <EpisodeButton
+                  key={item.id}
+                  item={item}
+                  isActive={currentEpId === item.id}
+                  progress={epProgress[item.id] ?? -1}
+                  onPress={() => { Haptics.selectionAsync(); changeEpisode(item); }}
+                />
+              ))}
+            </View>
+          </View>
 
           {/* ── Info Anime ── */}
           {anime && (
@@ -757,6 +790,7 @@ useEffect(() => {
               overflow: 'hidden', backgroundColor: COLORS.card,
               borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' }}>
 
+              {/* Poster + bg blur */}
               <View style={{ height: 200, alignItems: 'center', justifyContent: 'flex-end' }}>
                 <FastImage
                   source={{ uri: anime.image_cover || anime.image_poster, priority: FastImage.priority.normal }}
@@ -792,18 +826,16 @@ useEffect(() => {
                     <View style={{ backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 10,
                       paddingVertical: 4, borderRadius: 6, borderWidth: 1,
                       borderColor: 'rgba(255,255,255,0.15)' }}>
-                      <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: '700' }}>
-                        {anime.status}
-                      </Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 11,
+                        fontWeight: '700' }}>{anime.status}</Text>
                     </View>
                   ) : null}
                   {anime.aired_start ? (
                     <View style={{ backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 10,
                       paddingVertical: 4, borderRadius: 6, borderWidth: 1,
                       borderColor: 'rgba(255,255,255,0.15)' }}>
-                      <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: '700' }}>
-                        {anime.aired_start}
-                      </Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 11,
+                        fontWeight: '700' }}>{anime.aired_start}</Text>
                     </View>
                   ) : null}
                 </View>
@@ -816,8 +848,7 @@ useEffect(() => {
                       {anime.synopsis}
                     </Text>
                     {anime.synopsis.length > 100 && (
-                      <TouchableOpacity
-                        onPress={() => { Haptics.selectionAsync(); setSynopsisExpanded(p => !p); }}
+                      <TouchableOpacity onPress={() => setSynopsisExpanded(p => !p)}
                         style={{ marginTop: 6, alignItems: 'center' }}>
                         <Text style={{ color: COLORS.gold, fontSize: 11, fontWeight: '700' }}>
                           {synopsisExpanded ? 'Sembunyikan ▲' : 'Selengkapnya ▼'}
@@ -829,8 +860,8 @@ useEffect(() => {
 
                 <View style={{ borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)' }}>
                   {anime.studio ? <InfoRow label="Studio" value={anime.studio} /> : null}
-                  {anime.year   ? <InfoRow label="Tahun"  value={anime.year}   /> : null}
-                  {anime.genre  ? (
+                  {anime.year ? <InfoRow label="Tahun" value={anime.year} /> : null}
+                  {anime.genre ? (
                     <View style={{ paddingVertical: 12 }}>
                       <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11,
                         fontWeight: '700', textTransform: 'uppercase',
@@ -840,9 +871,8 @@ useEffect(() => {
                           <View key={i} style={{ backgroundColor: `${COLORS.gold}20`,
                             paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6,
                             borderWidth: 1, borderColor: `${COLORS.gold}40` }}>
-                            <Text style={{ color: COLORS.gold, fontSize: 10, fontWeight: '700' }}>
-                              {g.trim()}
-                            </Text>
+                            <Text style={{ color: COLORS.gold, fontSize: 10,
+                              fontWeight: '700' }}>{g.trim()}</Text>
                           </View>
                         ))}
                       </View>
