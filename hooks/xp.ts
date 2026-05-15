@@ -49,9 +49,9 @@ export const getLevelData = (xp: number) => {
 const getLocal = (): XPData => {
   try {
     const raw = storage.getString(XP_KEY);
-    return raw ? JSON.parse(raw) : { xp: 0, level: 1, streak: 0, lastWatchDate: '' };
+    return raw ? JSON.parse(raw) : { xp: 0, level: 1, streak: 0, lastWatchDate: '', _todayXP: 0 };
   } catch {
-    return { xp: 0, level: 1, streak: 0, lastWatchDate: '' };
+    return { xp: 0, level: 1, streak: 0, lastWatchDate: '', _todayXP: 0 };
   }
 };
 
@@ -65,9 +65,13 @@ const syncToFirestore = async (data: XPData): Promise<void> => {
   try {
     const user = auth().currentUser;
     if (!user) return;
+    // ✅ _todayXP ikut di-sync — biar daily cap ga ke-reset pas logout/login
     await firestore().collection('users').doc(user.uid).update({
-      xp: data.xp, level: data.level,
-      streak: data.streak, lastWatchDate: data.lastWatchDate,
+      xp:            data.xp,
+      level:         data.level,
+      streak:        data.streak,
+      lastWatchDate: data.lastWatchDate,
+      _todayXP:      data._todayXP ?? 0,
     });
   } catch {}
 };
@@ -79,7 +83,14 @@ const getFromFirestore = async (): Promise<XPData | null> => {
     const doc = await firestore().collection('users').doc(user.uid).get();
     if (!doc.exists) return null;
     const d = doc.data()!;
-    return { xp: d.xp ?? 0, level: d.level ?? 1, streak: d.streak ?? 0, lastWatchDate: d.lastWatchDate ?? '' };
+    return {
+      xp:            d.xp            ?? 0,
+      level:         d.level         ?? 1,
+      streak:        d.streak        ?? 0,
+      lastWatchDate: d.lastWatchDate ?? '',
+      // ✅ _todayXP diambil dari Firestore juga
+      _todayXP:      d._todayXP      ?? 0,
+    };
   } catch {
     return null;
   }
@@ -89,10 +100,9 @@ const getFromFirestore = async (): Promise<XPData | null> => {
 
 export const xpStorage = {
   get: async (): Promise<XPData> => {
-    // Kalau login, Firestore jadi source of truth
     const remote = await getFromFirestore();
     if (remote) {
-      setLocal(remote); // cache ke MMKV
+      setLocal(remote);
       return remote;
     }
     return getLocal();
@@ -100,26 +110,31 @@ export const xpStorage = {
 
   add: async (amount: number): Promise<XPData> => {
     try {
-      const data = await xpStorage.get();
+      const data  = await xpStorage.get();
       const today    = new Date().toDateString();
       const isNewDay = data.lastWatchDate !== today;
-      const streak   = isNewDay ? data.streak + 1 : data.streak;
+
+      // ✅ streak hanya naik kalau user beneran nonton (ada episode yang di-add)
+      // bukan sekedar buka app
+      const streak      = isNewDay ? data.streak + 1 : data.streak;
       const streakBonus = isNewDay ? 10 : 0;
 
-      // Max XP per hari 500
-      const todayXP    = isNewDay ? 0 : (data._todayXP ?? 0);
-      const capped     = Math.min(amount, Math.max(0, 500 - todayXP));
-      const newXp      = data.xp + capped + streakBonus;
+      // Daily cap 500 XP — _todayXP sekarang persisten via Firestore
+      const todayXP = isNewDay ? 0 : (data._todayXP ?? 0);
+      const capped  = Math.min(amount, Math.max(0, 500 - todayXP));
+      const newXp   = data.xp + capped + streakBonus;
       const { current } = getLevelData(newXp);
 
       const updated: XPData = {
-        xp: newXp, level: current.level,
-        streak, lastWatchDate: today,
-        _todayXP: isNewDay ? capped : todayXP + capped,
+        xp:            newXp,
+        level:         current.level,
+        streak,
+        lastWatchDate: today,
+        _todayXP:      isNewDay ? capped : todayXP + capped,
       };
 
-      setLocal(updated);           // sync lokal dulu (instant)
-      syncToFirestore(updated);    // sync remote (background, ga awaited)
+      setLocal(updated);        // instant lokal
+      syncToFirestore(updated); // background, ga di-await
       return updated;
     } catch {
       return getLocal();
@@ -132,7 +147,7 @@ export const xpStorage = {
       const user = auth().currentUser;
       if (user) {
         await firestore().collection('users').doc(user.uid).update({
-          xp: 0, level: 1, streak: 0, lastWatchDate: '',
+          xp: 0, level: 1, streak: 0, lastWatchDate: '', _todayXP: 0,
         });
       }
     } catch {}
