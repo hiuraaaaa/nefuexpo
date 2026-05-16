@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
   ActivityIndicator, Share, Dimensions, StatusBar,
-  Modal, Alert, TextInput,
+  Modal, Alert, TextInput, useWindowDimensions,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Video, ResizeMode, AVPlaybackStatus, Audio } from 'expo-av';
@@ -31,9 +31,10 @@ import { getCurrentUser } from '@/hooks/auth';
 const { width } = Dimensions.get('window');
 const PIP_KEY  = 'nefusoft_pip';
 
-const EP_COLS  = 6;
-const EP_GAP   = 6;
-const SEEK_SEC = 10;
+const EP_COLS    = 6;
+const EP_GAP     = 6;
+const EP_PADDING = 16;
+const SEEK_SEC   = 10;
 
 type ServerGroup = { [quality: string]: Server[] };
 
@@ -155,27 +156,30 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 }
 
 // ── Episode Button ─────────────────────────────────────────────────────────────
-const EpisodeButton = React.memo(({ item, isActive, isWatched, progress, onPress }: {
+// ✅ size prop dari parent — fixed number biar beneran square
+const EpisodeButton = React.memo(({ item, isActive, isWatched, progress, onPress, size }: {
   item: Episode;
   isActive: boolean;
   isWatched: boolean;
-  progress: number; // 0-1
+  progress: number;
   onPress: () => void;
+  size: number;
 }) => (
   <TouchableOpacity
     onPress={onPress}
     style={{
-      width: `${(100 / EP_COLS) - 1.2}%`,
-      aspectRatio: 1,
+      width: size,
+      height: size,
       borderRadius: 6,
-      alignItems: 'center', justifyContent: 'center',
+      alignItems: 'center',
+      justifyContent: 'center',
       overflow: 'hidden',
       backgroundColor: isActive ? COLORS.gold : COLORS.bg,
       borderWidth: 1,
       borderColor: isActive ? COLORS.gold : isWatched ? `${COLORS.gold}40` : 'rgba(255,255,255,0.05)',
     }}
   >
-    {/* ✅ Progress bar di bawah button — kalau udah pernah nonton */}
+    {/* Progress bar bawah */}
     {!isActive && progress > 0 && (
       <View style={{
         position: 'absolute', bottom: 0, left: 0, right: 0, height: 3,
@@ -189,16 +193,13 @@ const EpisodeButton = React.memo(({ item, isActive, isWatched, progress, onPress
         }} />
       </View>
     )}
-    {/* Checkmark kecil kalau udah selesai */}
+    {/* Dot kecil kalau udah selesai */}
     {!isActive && isWatched && progress === 0 && (
       <View style={{
         position: 'absolute', top: 3, right: 3,
-        width: 8, height: 8, borderRadius: 4,
-        backgroundColor: `${COLORS.gold}80`,
-        alignItems: 'center', justifyContent: 'center',
-      }}>
-        <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: COLORS.gold }} />
-      </View>
+        width: 6, height: 6, borderRadius: 3,
+        backgroundColor: COLORS.gold,
+      }} />
     )}
     <Text style={{
       fontSize: 11, fontWeight: '900',
@@ -216,6 +217,10 @@ export default function WatchScreen() {
   const router   = useRouter();
   const insets   = useSafeAreaInsets();
   const videoRef = useRef<Video>(null);
+
+  // ✅ Dynamic EP_SIZE berdasarkan screen width — selalu square
+  const { width: screenWidth } = useWindowDimensions();
+  const EP_SIZE = Math.floor((screenWidth - EP_PADDING * 2 - EP_GAP * (EP_COLS - 1)) / EP_COLS);
 
   const animeId = decodeAnimeId(slug ?? '');
 
@@ -237,9 +242,7 @@ export default function WatchScreen() {
   const [isFavorited, setIsFavorited]           = useState(false);
   const [synopsisExpanded, setSynopsisExpanded] = useState(false);
 
-  // ✅ Track progress per episode — { [epId]: progress 0-1 }
   const [epProgress, setEpProgress] = useState<Record<string, number>>({});
-  // ✅ Track watched episodes
   const [watchedEps, setWatchedEps] = useState<Set<string>>(new Set());
 
   const [isPlaying, setIsPlaying]     = useState(false);
@@ -257,7 +260,6 @@ export default function WatchScreen() {
   const controlsTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSaveTime   = useRef(0);
 
-  // ✅ Reanimated controls fade
   const controlsOpacity = useSharedValue(1);
   const controlsStyle   = useAnimatedStyle(() => ({ opacity: controlsOpacity.value }));
 
@@ -265,13 +267,11 @@ export default function WatchScreen() {
     controlsOpacity.value = withTiming(showControls ? 1 : 0, { duration: 250 });
   }, [showControls]);
 
-  // ✅ Keep awake saat video playing
   useEffect(() => {
     if (isPlaying) activateKeepAwakeAsync();
     else deactivateKeepAwake();
   }, [isPlaying]);
 
-  // ── PiP ───────────────────────────────────────────────────────────────────────
   useEffect(() => {
     AsyncStorage.getItem(PIP_KEY).then(v => {
       Audio.setAudioModeAsync({
@@ -285,7 +285,6 @@ export default function WatchScreen() {
     });
   }, []);
 
-  // ── Cleanup ───────────────────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
       if (controlsTimer.current)  clearTimeout(controlsTimer.current);
@@ -295,7 +294,6 @@ export default function WatchScreen() {
     };
   }, []);
 
-  // ── Load detail ───────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!animeId) return;
     const load = async () => {
@@ -311,7 +309,6 @@ export default function WatchScreen() {
           setEpisodes(eps);
           setFilteredEps(eps);
 
-          // ✅ Load progress semua episode sekaligus
           const progressMap: Record<string, number> = {};
           const watched = new Set<string>();
           for (const ep of eps) {
@@ -336,7 +333,6 @@ export default function WatchScreen() {
     load();
   }, [animeId]);
 
-  // ── Episode search ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!epSearch.trim()) setFilteredEps(episodes);
     else setFilteredEps(episodes.filter(e =>
@@ -344,7 +340,6 @@ export default function WatchScreen() {
     ));
   }, [epSearch, episodes]);
 
-  // ── Load servers + resume ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!currentEpId) return;
     const load = async () => {
@@ -382,14 +377,12 @@ export default function WatchScreen() {
     load();
   }, [currentEpId]);
 
-  // ── History & XP ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!anime || !currentEpId) return;
     const ep = episodes.find(e => e.id === currentEpId);
     if (ep) { historyStorage.add(anime, ep.index); xpStorage.add(10); }
   }, [currentEpId, anime]);
 
-  // ── Favorit ───────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!anime) return;
     favoritStorage.isFavorited(anime.id).then(setIsFavorited);
@@ -502,13 +495,10 @@ export default function WatchScreen() {
         const pos = status.positionMillis / 1000;
         const dur = (status.durationMillis || 0) / 1000;
         progressStorage.save(currentEpId, pos, dur);
-
-        // ✅ Update progress state realtime
         if (dur > 0) {
           const prog = pos / dur;
           setEpProgress(prev => ({ ...prev, [currentEpId]: prog }));
           if (prog > 0.9) {
-            // Episode selesai — masuk watched, hapus progress bar
             setWatchedEps(prev => new Set([...prev, currentEpId]));
             setEpProgress(prev => { const n = { ...prev }; delete n[currentEpId]; return n; });
           }
@@ -594,7 +584,6 @@ export default function WatchScreen() {
           </View>
         )}
 
-        {/* Double tap zones */}
         <TouchableOpacity activeOpacity={1} onPress={handleTapLeft}
           style={{ position: 'absolute', top: 0, left: 0, width: '40%', bottom: 0 }} />
         <TouchableOpacity activeOpacity={1} onPress={resetControlsTimer}
@@ -605,7 +594,6 @@ export default function WatchScreen() {
         <SeekToast direction="left" visible={seekLeft} />
         <SeekToast direction="right" visible={seekRight} />
 
-        {/* ✅ Controls dengan reanimated fade */}
         {selectedServer && !isEpLoading && (
           <Animated.View style={[
             { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
@@ -619,7 +607,6 @@ export default function WatchScreen() {
               style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 90 }}
               pointerEvents="none" />
 
-            {/* Top bar */}
             <View style={{ position: 'absolute', top: 0, left: 0, right: 0,
               flexDirection: 'row', alignItems: 'center',
               paddingHorizontal: 12, paddingTop: 12, gap: 10 }}>
@@ -647,7 +634,6 @@ export default function WatchScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Center controls */}
             <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
               alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 36 }}
               pointerEvents="box-none">
@@ -672,7 +658,6 @@ export default function WatchScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Bottom bar */}
             <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0,
               paddingHorizontal: 12, paddingBottom: 10 }}>
               <Slider style={{ width: '100%', height: 20 }}
@@ -720,7 +705,6 @@ export default function WatchScreen() {
       {!isFullscreen && (
         <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
 
-          {/* Episode nav */}
           <View style={{ flexDirection: 'row', gap: 12, padding: 16 }}>
             <TouchableOpacity
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); handlePrev(); }}
@@ -740,7 +724,6 @@ export default function WatchScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* AutoNext */}
           <TouchableOpacity onPress={() => { Haptics.selectionAsync(); setAutoNext(p => !p); }}
             style={{ marginHorizontal: 16, marginBottom: 16, paddingVertical: 14,
               borderRadius: 10, borderWidth: 1,
@@ -759,7 +742,7 @@ export default function WatchScreen() {
           {/* ── Daftar Episode ── */}
           <View style={{ marginHorizontal: 16, backgroundColor: COLORS.card, borderRadius: 12,
             borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
-            padding: 16, marginBottom: 16 }}>
+            padding: EP_PADDING, marginBottom: 16 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center',
               justifyContent: 'space-between', marginBottom: 12 }}>
               <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13,
@@ -787,7 +770,7 @@ export default function WatchScreen() {
               </View>
             )}
 
-            {/* ✅ Episode grid — % width, rata, ada progress indicator */}
+            {/* ✅ Episode grid — fixed number size, selalu kotak */}
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: EP_GAP }}>
               {filteredEps.length === 0 ? (
                 <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12,
@@ -796,6 +779,7 @@ export default function WatchScreen() {
                 <EpisodeButton
                   key={item.id}
                   item={item}
+                  size={EP_SIZE}
                   isActive={currentEpId === item.id}
                   isWatched={watchedEps.has(item.id)}
                   progress={epProgress[item.id] ?? 0}
@@ -815,8 +799,7 @@ export default function WatchScreen() {
                 <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 9, fontWeight: '600' }}>Progress</Text>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                <View style={{ width: 8, height: 8, borderRadius: 4,
-                  backgroundColor: COLORS.bg, borderWidth: 1, borderColor: `${COLORS.gold}40` }} />
+                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: COLORS.gold }} />
                 <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 9, fontWeight: '600' }}>Selesai</Text>
               </View>
             </View>
@@ -922,7 +905,6 @@ export default function WatchScreen() {
             </View>
           )}
 
-          {/* Share */}
           <TouchableOpacity onPress={handleShare}
             style={{ marginHorizontal: 16, marginBottom: 16, paddingVertical: 14,
               borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
@@ -933,7 +915,6 @@ export default function WatchScreen() {
             </Text>
           </TouchableOpacity>
 
-          {/* Rekomendasi */}
           {recommendations.length > 0 && (
             <View style={{ marginHorizontal: 16 }}>
               <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13, marginBottom: 12,
@@ -965,4 +946,4 @@ export default function WatchScreen() {
       )}
     </View>
   );
-            }
+}
