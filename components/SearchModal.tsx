@@ -16,6 +16,7 @@ import { COLORS } from '@/constants';
 import { api, getAnimeSlug } from '@/hooks/api';
 import { Anime } from '@/types';
 import { getSearchHistory, addSearchHistory, clearSearchHistory } from '@/hooks/storage';
+import TraceMoeModal from '@/components/TraceMoeModal';
 
 interface Props {
   visible: boolean;
@@ -101,6 +102,7 @@ export default function SearchModal({ visible, onClose }: Props) {
   const [results, setResults] = useState<Anime[]>([]);
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState<string[]>([]);
+  const [traceMoeVisible, setTraceMoeVisible] = useState(false);
 
   const timerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const focusRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -195,6 +197,15 @@ export default function SearchModal({ visible, onClose }: Props) {
                 <Ionicons name="close-circle" size={18} color="rgba(255,255,255,0.3)" />
               </TouchableOpacity>
             )}
+            <TouchableOpacity
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setTraceMoeVisible(true);
+              }}
+              style={styles.clearBtn}
+            >
+              <Ionicons name="scan-outline" size={20} color={COLORS.gold} />
+            </TouchableOpacity>
             <View style={styles.divider} />
             <TouchableOpacity onPress={onClose} style={styles.cancelBtn}>
               <Text style={styles.cancelText}>Batal</Text>
@@ -243,6 +254,11 @@ export default function SearchModal({ visible, onClose }: Props) {
 
         </Animated.View>
       </KeyboardAvoidingView>
+
+      <TraceMoeModal
+        visible={traceMoeVisible}
+        onClose={() => setTraceMoeVisible(false)}
+      />
     </Modal>
   );
 }
