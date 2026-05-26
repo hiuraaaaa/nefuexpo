@@ -135,7 +135,7 @@ export default function WelcomeScreen() {
     opacity: overlayOpacity.value,
   }));
 
-  const goMain    = useCallback(() => router.replace('/(tabs)/'), [router]);
+  const goMain    = useCallback(() => router.replace('/(tabs)'), [router]);
   const goExplore = useCallback(() => router.push('/(tabs)/explore'), [router]);
 
   const navigateTo = useCallback((target: 'main' | 'explore') => {
