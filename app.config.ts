@@ -37,7 +37,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ],
   scheme: 'nefusoft',
   updates: {
-    url: 'https://u.expo.dev/77dcd7b2-4f36-4f1e-92a9-fc8aa7915d1c',
+    url: 'https://u.expo.dev/6e2fd9c8-8a82-474e-b71d-0428d2ce108b',
   },
   runtimeVersion: {
     policy: 'appVersion',
@@ -47,8 +47,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   extra: {
     eas: {
-      projectId: '84bec026-9bfb-4ff8-9ce2-eb8f8be30e45',
+      projectId: '6e2fd9c8-8a82-474e-b71d-0428d2ce108b',
     },
   },
-  owner: 'xena444', 
+  owner: 'henxena', 
 });
