@@ -50,5 +50,5 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       projectId: '84bec026-9bfb-4ff8-9ce2-eb8f8be30e45',
     },
   },
-  owner: 'xena444', //
+  owner: 'xena444', 
 });
