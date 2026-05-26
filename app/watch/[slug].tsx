@@ -4,6 +4,7 @@ import {
   ActivityIndicator, Share, Dimensions, StatusBar,
   Modal, Alert, TextInput, useWindowDimensions,
 } from 'react-native';
+import NetInfo from '@react-native-community/netinfo';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Video, ResizeMode, AVPlaybackStatus, Audio } from 'expo-av';
 import * as ScreenOrientation from 'expo-screen-orientation';
@@ -299,10 +300,8 @@ export default function WatchScreen() {
     const load = async () => {
       setIsLoading(true);
       try {
-        const [detailRes, recRes] = await Promise.all([
-          api.detail(animeId),
-          api.popular(),
-        ]);
+        // Bug 1 fix: fetch detail dulu, jangan tunggu popular sebelum render
+        const detailRes = await api.detail(animeId);
         if (detailRes.status && detailRes.data) {
           setAnime(detailRes.data);
           const eps = detailRes.data.episode_list || [];
@@ -326,11 +325,22 @@ export default function WatchScreen() {
             : eps[eps.length - 1];
           if (target) setCurrentEpId(target.id);
         }
-        setRecommendations((recRes.data || []).slice(0, 5));
-      } catch {}
-      setIsLoading(false);
+        setIsLoading(false);
+        // Fetch popular di background, ga blok skeleton
+        api.popular().then(recRes => {
+          setRecommendations((recRes.data || []).slice(0, 5));
+        }).catch(() => {});
+      } catch (e) {
+        setIsLoading(false);
+      }
     };
     load();
+
+    // Bug 2 fix: retry otomatis kalau koneksi balik dan data belum ada
+    const unsubNet = NetInfo.addEventListener(state => {
+      if (state.isConnected && !anime) load();
+    });
+    return () => unsubNet();
   }, [animeId]);
 
   useEffect(() => {
@@ -399,9 +409,22 @@ export default function WatchScreen() {
   const availableQualities = Object.keys(serverGroup).filter(q => serverGroup[q]?.length > 0);
 
   const changeEpisode = useCallback((ep: Episode) => {
+    // Bug 4 fix: reset search biar episode aktif pasti keliatan di grid
     setEpSearch('');
+    setFilteredEps(prev => {
+      // Kalau episodes belum di-reset (filter aktif), kembalikan full list dulu
+      return prev;
+    });
     setCurrentEpId(ep.id);
   }, []);
+
+  // Bug 4 fix: saat currentEpId berubah, pastiin filteredEps ga filter out episode tsb
+  useEffect(() => {
+    if (!currentEpId) return;
+    setEpSearch('');
+    // Reset ke full list biar episode aktif pasti keliatan
+    setFilteredEps(episodes);
+  }, [currentEpId, episodes]);
 
   const handlePrev = useCallback(() => {
     if (epIndex < episodes.length - 1) changeEpisode(episodes[epIndex + 1]);
@@ -613,7 +636,7 @@ export default function WatchScreen() {
               <TouchableOpacity
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  if (isFullscreen) toggleFullscreen(); else router.back();
+                  if (isFullscreen) toggleFullscreen(); else if (router.canGoBack()) router.back(); else router.replace('/(tabs)');
                 }}
                 style={{ width: 36, height: 36, borderRadius: 18,
                   backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' }}>
