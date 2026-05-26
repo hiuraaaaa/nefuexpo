@@ -34,20 +34,24 @@ const saveUserToFirestore = async (user: FirebaseAuthTypes.User) => {
         isAdmin,
       });
     }
-  } catch {}
+  } catch (e) {
+    console.warn('[Firestore] saveUserToFirestore failed:', e);
+  }
 };
 
 export const signInWithGoogle = async (): Promise<FirebaseAuthTypes.User | null> => {
   try {
     await GoogleSignin.hasPlayServices();
-    const userInfo = await GoogleSignin.signIn();
-    const idToken = userInfo?.data?.idToken ?? (userInfo as any)?.idToken ?? '';
+    const signInResult = await GoogleSignin.signIn();
+    const idToken = signInResult?.data?.idToken ?? (signInResult as any)?.idToken ?? '';
+    if (!idToken) throw new Error('No ID token received');
     const credential = auth.GoogleAuthProvider.credential(idToken);
     const result = await auth().signInWithCredential(credential);
-    await saveUserToFirestore(result.user);
+    // Firestore save di background — ga blok auth state update
+    saveUserToFirestore(result.user).catch(e => console.warn('[Firestore] background save failed:', e));
     return result.user;
-  } catch (e) {
-    console.error('Google Sign-In error:', e);
+  } catch (e: any) {
+    console.error('[Auth] Google Sign-In error:', e?.code, e?.message);
     return null;
   }
 };
