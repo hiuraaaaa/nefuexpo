@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  View, Text, TouchableOpacity, ScrollView,
-  Switch, Alert, Modal, TextInput,
-  FlatList, Dimensions,
+  View, Text, TouchableOpacity, ScrollView, Switch,
+  Alert, Modal, TextInput, FlatList, Dimensions,
+  Linking, StyleSheet,
 } from 'react-native';
 import FastImage from 'react-native-fast-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,7 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { COLORS, THEMES } from '@/constants';
 import { signInWithGoogle, signOut, onAuthStateChanged, isAdmin } from '@/hooks/auth';
 import { xpStorage, XPData, LEVELS } from '@/hooks/xp';
@@ -26,68 +26,258 @@ import firestore from '@react-native-firebase/firestore';
 const { width } = Dimensions.get('window');
 const PIP_KEY = 'nefusoft_pip';
 
-const THEME_COLS = 4;
-const THEME_GAP  = 10;
-const THEME_PAD  = 16;
-const THEME_W    = (width - THEME_PAD * 2 - THEME_GAP * (THEME_COLS - 1)) / THEME_COLS;
-
-// ── Section Wrapper ────────────────────────────────────────────────────────────
-function Section({ children, style, delay = 0 }: {
-  children: React.ReactNode; style?: object; delay?: number;
-}) {
-  const theme = useTheme();
-  return (
-    <Animated.View
-      entering={FadeInDown.delay(delay).springify()}
-      style={[{
-        marginHorizontal: 16, marginBottom: 12, borderRadius: 16,
-        backgroundColor: theme.card, padding: 16,
-        borderWidth: 1, borderColor: theme.border,
-      }, style]}
-    >
-      {children}
-    </Animated.View>
-  );
-}
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function SectionLabel({ label }: { label: string }) {
   const theme = useTheme();
   return (
     <Text style={{
       color: theme.subtext, fontSize: 10, fontWeight: '800',
-      letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 14,
+      letterSpacing: 1.5, textTransform: 'uppercase',
+      marginBottom: 10, marginTop: 4,
+      paddingHorizontal: 16,
     }}>
       {label}
     </Text>
   );
 }
 
-function Divider() {
+function SettingRow({
+  icon, label, subtitle, onPress, right, last = false,
+}: {
+  icon: string; label: string; subtitle?: string;
+  onPress?: () => void; right?: React.ReactNode; last?: boolean;
+}) {
   const theme = useTheme();
-  return <View style={{ height: 1, backgroundColor: theme.border, marginVertical: 12 }} />;
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={onPress ? 0.7 : 1}
+      style={{
+        flexDirection: 'row', alignItems: 'center', gap: 12,
+        paddingHorizontal: 16, paddingVertical: 14,
+        borderBottomWidth: last ? 0 : 1, borderBottomColor: theme.border,
+      }}
+    >
+      <View style={{
+        width: 34, height: 34, borderRadius: 9,
+        alignItems: 'center', justifyContent: 'center',
+        backgroundColor: theme.accentDim,
+      }}>
+        <Ionicons name={icon as any} size={17} color={theme.accent} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: theme.text, fontSize: 13, fontWeight: '600' }}>{label}</Text>
+        {subtitle && (
+          <Text style={{ color: theme.subtext, fontSize: 10, marginTop: 1 }}>{subtitle}</Text>
+        )}
+      </View>
+      {right ?? <Ionicons name="chevron-forward" size={16} color={theme.subtext} />}
+    </TouchableOpacity>
+  );
+}
+
+function Card({ children, style }: { children: React.ReactNode; style?: object }) {
+  const theme = useTheme();
+  return (
+    <View style={[{
+      marginHorizontal: 16, marginBottom: 8,
+      backgroundColor: theme.card, borderRadius: 16,
+      borderWidth: 1, borderColor: theme.border,
+      overflow: 'hidden',
+    }, style]}>
+      {children}
+    </View>
+  );
+}
+
+// ── Theme Picker Modal ────────────────────────────────────────────────────────
+
+function ThemePickerModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const theme = useTheme();
+  const CARD_W = 110;
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose}>
+        <BlurView intensity={40} tint="dark" style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <TouchableOpacity activeOpacity={1}>
+            <View style={{
+              backgroundColor: theme.card,
+              borderTopLeftRadius: 24, borderTopRightRadius: 24,
+              paddingBottom: 40, paddingTop: 16,
+              borderWidth: 1, borderColor: theme.border,
+            }}>
+              {/* Handle */}
+              <View style={{
+                width: 40, height: 4, borderRadius: 2,
+                backgroundColor: 'rgba(255,255,255,0.15)',
+                alignSelf: 'center', marginBottom: 20,
+              }} />
+
+              <Text style={{
+                color: theme.text, fontSize: 16, fontWeight: '900',
+                paddingHorizontal: 20, marginBottom: 16,
+              }}>
+                Pilih Tema
+              </Text>
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}
+              >
+                {THEMES.map(t => {
+                  const isActive = theme.id === t.id;
+                  return (
+                    <TouchableOpacity
+                      key={t.id}
+                      onPress={() => {
+                        Haptics.selectionAsync();
+                        setGlobalTheme(t.id);
+                      }}
+                      style={{
+                        width: CARD_W, borderRadius: 14, padding: 12,
+                        backgroundColor: t.bg,
+                        borderWidth: isActive ? 2 : 1,
+                        borderColor: isActive ? t.accent : 'rgba(255,255,255,0.06)',
+                      }}
+                    >
+                      {/* Preview */}
+                      <View style={{ gap: 4, marginBottom: 8 }}>
+                        <View style={{ height: 6, borderRadius: 3, backgroundColor: t.accent, width: '75%' }} />
+                        <View style={{ height: 3, borderRadius: 2, backgroundColor: t.card, width: '100%' }} />
+                        <View style={{ height: 3, borderRadius: 2, backgroundColor: t.card, width: '60%' }} />
+                        <View style={{ flexDirection: 'row', gap: 4, marginTop: 2 }}>
+                          <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: t.accent }} />
+                          <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: t.card }} />
+                        </View>
+                      </View>
+                      <Text style={{ color: t.text, fontSize: 10, fontWeight: '700' }} numberOfLines={1}>
+                        {t.name}
+                      </Text>
+                      {isActive && (
+                        <View style={{
+                          position: 'absolute', top: 6, right: 6,
+                          width: 16, height: 16, borderRadius: 8,
+                          backgroundColor: t.accent, alignItems: 'center', justifyContent: 'center',
+                        }}>
+                          <Ionicons name="checkmark" size={10} color={t.bg} />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          </TouchableOpacity>
+        </BlurView>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
+
+// ── Tentang Modal ─────────────────────────────────────────────────────────────
+
+function TentangModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const theme = useTheme();
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose}>
+        <BlurView intensity={40} tint="dark" style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <TouchableOpacity activeOpacity={1}>
+            <View style={{
+              backgroundColor: theme.card,
+              borderTopLeftRadius: 24, borderTopRightRadius: 24,
+              paddingBottom: 48, paddingTop: 16, paddingHorizontal: 24,
+              borderWidth: 1, borderColor: theme.border,
+            }}>
+              <View style={{
+                width: 40, height: 4, borderRadius: 2,
+                backgroundColor: 'rgba(255,255,255,0.15)',
+                alignSelf: 'center', marginBottom: 24,
+              }} />
+
+              <Text style={{
+                color: theme.text, fontSize: 18, fontWeight: '900',
+                marginBottom: 4, textAlign: 'center',
+              }}>
+                NefuSoft
+              </Text>
+              <Text style={{
+                color: theme.subtext, fontSize: 12, textAlign: 'center',
+                marginBottom: 24,
+              }}>
+                Versi 1.0.0
+              </Text>
+
+              {[
+                { icon: 'document-text-outline', label: 'Kebijakan Privasi', onPress: () => Linking.openURL('https://nefusoft.cloud/privacy') },
+                { icon: 'shield-checkmark-outline', label: 'Syarat & Ketentuan', onPress: () => Linking.openURL('https://nefusoft.cloud/terms') },
+                { icon: 'globe-outline', label: 'Website', onPress: () => Linking.openURL('https://nefusoft.cloud') },
+                { icon: 'logo-instagram', label: 'Instagram', onPress: () => Linking.openURL('https://instagram.com/nefusoft') },
+              ].map((item, i, arr) => (
+                <TouchableOpacity
+                  key={item.label}
+                  onPress={item.onPress}
+                  activeOpacity={0.7}
+                  style={{
+                    flexDirection: 'row', alignItems: 'center', gap: 12,
+                    paddingVertical: 14,
+                    borderBottomWidth: i < arr.length - 1 ? 1 : 0,
+                    borderBottomColor: theme.border,
+                  }}
+                >
+                  <View style={{
+                    width: 34, height: 34, borderRadius: 9,
+                    alignItems: 'center', justifyContent: 'center',
+                    backgroundColor: theme.accentDim,
+                  }}>
+                    <Ionicons name={item.icon as any} size={17} color={theme.accent} />
+                  </View>
+                  <Text style={{ color: theme.text, fontSize: 13, fontWeight: '600', flex: 1 }}>
+                    {item.label}
+                  </Text>
+                  <Ionicons name="open-outline" size={14} color={theme.subtext} />
+                </TouchableOpacity>
+              ))}
+
+              <Text style={{
+                color: theme.subtext, fontSize: 10, textAlign: 'center',
+                marginTop: 24,
+              }}>
+                Made with ♥ by NefuSoft Team
+              </Text>
+            </View>
+          </TouchableOpacity>
+        </BlurView>
+      </TouchableOpacity>
+    </Modal>
+  );
 }
 
 // ── Main ───────────────────────────────────────────────────────────────────────
+
 export default function ProfileScreen() {
   const router = useRouter();
   const theme  = useTheme();
 
-  // ✅ Safe default values — prevent crash kalau data belum ready
-  const [user, setUser]         = useState<any>(null);
-  const [xpData, setXpData]     = useState<XPData>({ xp: 0, level: 1, streak: 0, lastWatchDate: '', _todayXP: 0 });
-  const [history, setHistory]   = useState<HistoryItem[]>([]);
+  const [user, setUser]           = useState<any>(null);
+  const [xpData, setXpData]       = useState<XPData>({ xp: 0, level: 1, streak: 0, lastWatchDate: '', _todayXP: 0 });
+  const [history, setHistory]     = useState<HistoryItem[]>([]);
   const [favorites, setFavorites] = useState<Anime[]>([]);
-  const [pip, setPip]           = useState(false);
-  const [loading, setLoading]   = useState(false);
-  const [admin, setAdmin]       = useState(false);
-  const [dataReady, setDataReady] = useState(false);
+  const [pip, setPip]             = useState(false);
+  const [loading, setLoading]     = useState(false);
+  const [admin, setAdmin]         = useState(false);
 
-  const [showAdmin, setShowAdmin]           = useState(false);
-  const [allUsers, setAllUsers]             = useState<any[]>([]);
-  const [adminLoading, setAdminLoading]     = useState(false);
-  const [selectedUser, setSelectedUser]     = useState<any>(null);
-  const [xpInput, setXpInput]               = useState('');
-  const [showUserModal, setShowUserModal]   = useState(false);
+  const [showTheme, setShowTheme]   = useState(false);
+  const [showTentang, setShowTentang] = useState(false);
+  const [showAdmin, setShowAdmin]   = useState(false);
+  const [allUsers, setAllUsers]     = useState<any[]>([]);
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [xpInput, setXpInput]       = useState('');
+  const [showUserModal, setShowUserModal] = useState(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged((u: any) => {
@@ -97,10 +287,8 @@ export default function ProfileScreen() {
     return unsub;
   }, []);
 
-  // ✅ useFocusEffect dengan proper error handling — prevent FC dari async throw
   useFocusEffect(useCallback(() => {
     let mounted = true;
-
     const loadData = async () => {
       try {
         const [xp, hist, pipVal] = await Promise.all([
@@ -108,24 +296,16 @@ export default function ProfileScreen() {
           Promise.resolve(historyStorage.getAll()).catch(() => []),
           AsyncStorage.getItem(PIP_KEY).catch(() => null),
         ]);
-
         if (!mounted) return;
-
         setXpData(xp as XPData);
-        // ✅ guard array — historyStorage.getAll() bisa return null/undefined
         setHistory(Array.isArray(hist) ? (hist as HistoryItem[]).slice(0, 5) : []);
         setPip(pipVal === 'true');
       } catch {}
-
-      if (!mounted) return;
-      setDataReady(true);
     };
-
     loadData();
     return () => { mounted = false; };
   }, []));
 
-  // ✅ Favorites di-load terpisah — butuh user, ga perlu blocking main load
   useEffect(() => {
     if (!user) { setFavorites([]); return; }
     let mounted = true;
@@ -159,14 +339,11 @@ export default function ProfileScreen() {
   const loadAllUsers = async () => {
     setAdminLoading(true);
     try {
-      // Tanpa orderBy biar ga crash kalau ada doc lama yg ga punya field lastLoginAt
       const snap = await firestore().collection('users').get();
       const users = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      // Sort di client
       users.sort((a: any, b: any) => (b.lastLoginAt ?? 0) - (a.lastLoginAt ?? 0));
       setAllUsers(users);
     } catch (e) {
-      console.error('[Admin] loadAllUsers error:', e);
       Alert.alert('Error', 'Gagal memuat data user: ' + String(e));
     }
     setAdminLoading(false);
@@ -195,7 +372,7 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }} edges={['top']}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
 
         {/* ── Header ── */}
         <View style={{
@@ -218,19 +395,20 @@ export default function ProfileScreen() {
                 paddingVertical: 6, borderRadius: 8,
               }}
             >
-              <Ionicons name="shield" size={13} color="#000" />
-              <Text style={{ color: '#000', fontSize: 11, fontWeight: '900' }}>Admin</Text>
+              <Ionicons name="shield" size={13} color={theme.bg} />
+              <Text style={{ color: theme.bg, fontSize: 11, fontWeight: '900' }}>Admin</Text>
             </TouchableOpacity>
           )}
         </View>
 
         {user ? (
-          <>
+          <Animated.View entering={FadeIn.duration(300)}>
+
             {/* ── User Card ── */}
             <Animated.View
               entering={FadeInDown.delay(0).springify()}
               style={{
-                marginHorizontal: 16, marginBottom: 12, borderRadius: 16,
+                marginHorizontal: 16, marginBottom: 8, borderRadius: 16,
                 overflow: 'hidden', backgroundColor: theme.card,
                 borderWidth: 1, borderColor: theme.border,
               }}
@@ -243,20 +421,21 @@ export default function ProfileScreen() {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16 }}>
                 <FastImage
                   source={{ uri: user.photoURL ?? `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName ?? 'User')}` }}
-                  style={{ width: 56, height: 56, borderRadius: 28, borderWidth: 2, borderColor: theme.accent }}
+                  style={{ width: 58, height: 58, borderRadius: 29, borderWidth: 2, borderColor: theme.accent }}
                 />
                 <View style={{ flex: 1, gap: 3 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Text style={{ color: theme.text, fontSize: 15, fontWeight: '800' }}
-                      numberOfLines={1}>{user.displayName}</Text>
+                    <Text style={{ color: theme.text, fontSize: 15, fontWeight: '800' }} numberOfLines={1}>
+                      {user.displayName}
+                    </Text>
                     {admin && (
                       <View style={{
                         flexDirection: 'row', alignItems: 'center', gap: 3,
                         backgroundColor: theme.accent, paddingHorizontal: 5,
                         paddingVertical: 2, borderRadius: 4,
                       }}>
-                        <Ionicons name="shield-checkmark" size={9} color="#000" />
-                        <Text style={{ color: '#000', fontSize: 8, fontWeight: '900' }}>ADMIN</Text>
+                        <Ionicons name="shield-checkmark" size={9} color={theme.bg} />
+                        <Text style={{ color: theme.bg, fontSize: 8, fontWeight: '900' }}>ADMIN</Text>
                       </View>
                     )}
                   </View>
@@ -277,30 +456,40 @@ export default function ProfileScreen() {
               </View>
             </Animated.View>
 
-            {/* ── XP & Level ── */}
-            <Section delay={60}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between',
-                alignItems: 'center', marginBottom: 14 }}>
-                <View>
-                  <SectionLabel label="Level & XP" />
-                  <Text style={{ color: theme.subtext, fontSize: 11, marginTop: -10 }}>
-                    🔥 {xpData.streak} hari streak
-                  </Text>
+            {/* ── XP Card ── */}
+            <Animated.View entering={FadeInDown.delay(60).springify()}>
+              <Card>
+                <View style={{ padding: 16 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <View>
+                      <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '800', letterSpacing: 1.5, textTransform: 'uppercase' }}>
+                        Level & XP
+                      </Text>
+                      <Text style={{ color: theme.subtext, fontSize: 11, marginTop: 3 }}>
+                        🔥 {xpData.streak} hari streak
+                      </Text>
+                    </View>
+                    <LevelBadge xp={xpData.xp} size="md" />
+                  </View>
+                  <XPBar xp={xpData.xp} />
                 </View>
-                <LevelBadge xp={xpData.xp} size="md" />
-              </View>
-              <XPBar xp={xpData.xp} />
-            </Section>
+              </Card>
+            </Animated.View>
 
             {/* ── Favorit ── */}
             {favorites.length > 0 && (
-              <Section delay={120}>
+              <Animated.View entering={FadeInDown.delay(120).springify()}>
                 <SectionLabel label="Favorit" />
-                <View style={{ gap: 12 }}>
+                <Card>
                   {favorites.slice(0, 5).map((a, i) => (
                     <TouchableOpacity
                       key={`fav-${i}`}
-                      style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
+                      style={{
+                        flexDirection: 'row', alignItems: 'center', gap: 12,
+                        paddingHorizontal: 14, paddingVertical: 12,
+                        borderBottomWidth: i < Math.min(favorites.length, 5) - 1 ? 1 : 0,
+                        borderBottomColor: theme.border,
+                      }}
                       onPress={() => {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                         router.push(`/watch/${a.id}`);
@@ -308,32 +497,34 @@ export default function ProfileScreen() {
                     >
                       <FastImage
                         source={{ uri: a.image_poster, priority: FastImage.priority.normal }}
-                        style={{ width: 36, aspectRatio: 3/4.5, borderRadius: 6 }}
+                        style={{ width: 38, aspectRatio: 3 / 4.5, borderRadius: 6 }}
                         resizeMode={FastImage.resizeMode.cover}
                       />
                       <View style={{ flex: 1 }}>
-                        <Text style={{ color: theme.text, fontSize: 12, fontWeight: '600' }}
-                          numberOfLines={1}>{a.title}</Text>
-                        <Text style={{ color: theme.subtext, fontSize: 10, marginTop: 2 }}>
-                          {a.type} • {a.status}
-                        </Text>
+                        <Text style={{ color: theme.text, fontSize: 12, fontWeight: '600' }} numberOfLines={1}>{a.title}</Text>
+                        <Text style={{ color: theme.subtext, fontSize: 10, marginTop: 2 }}>{a.type} • {a.status}</Text>
                       </View>
                       <Ionicons name="bookmark" size={15} color={theme.accent} />
                     </TouchableOpacity>
                   ))}
-                </View>
-              </Section>
+                </Card>
+              </Animated.View>
             )}
 
             {/* ── History ── */}
             {history.length > 0 && (
-              <Section delay={180}>
+              <Animated.View entering={FadeInDown.delay(160).springify()}>
                 <SectionLabel label="Terakhir Ditonton" />
-                <View style={{ gap: 12 }}>
+                <Card>
                   {history.map((h, i) => (
                     <TouchableOpacity
                       key={`hist-${i}`}
-                      style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
+                      style={{
+                        flexDirection: 'row', alignItems: 'center', gap: 12,
+                        paddingHorizontal: 14, paddingVertical: 12,
+                        borderBottomWidth: i < history.length - 1 ? 1 : 0,
+                        borderBottomColor: theme.border,
+                      }}
                       onPress={() => {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                         router.push(`/watch/${h.anime.id}`);
@@ -341,152 +532,129 @@ export default function ProfileScreen() {
                     >
                       <FastImage
                         source={{ uri: h.anime.image_poster, priority: FastImage.priority.low }}
-                        style={{ width: 36, aspectRatio: 3/4.5, borderRadius: 6 }}
+                        style={{ width: 38, aspectRatio: 3 / 4.5, borderRadius: 6 }}
                         resizeMode={FastImage.resizeMode.cover}
                       />
                       <View style={{ flex: 1 }}>
-                        <Text style={{ color: theme.text, fontSize: 12, fontWeight: '600' }}
-                          numberOfLines={1}>{h.anime.title}</Text>
-                        <Text style={{ color: theme.subtext, fontSize: 10, marginTop: 2 }}>
-                          Episode {h.episodeIndex}
-                        </Text>
+                        <Text style={{ color: theme.text, fontSize: 12, fontWeight: '600' }} numberOfLines={1}>{h.anime.title}</Text>
+                        <Text style={{ color: theme.subtext, fontSize: 10, marginTop: 2 }}>Episode {h.episodeIndex}</Text>
                       </View>
                       <Ionicons name="time-outline" size={14} color={theme.subtext} />
                     </TouchableOpacity>
                   ))}
-                </View>
-              </Section>
+                </Card>
+              </Animated.View>
             )}
-          </>
+
+            {/* ── Pengaturan (hanya muncul kalau sudah login) ── */}
+            <Animated.View entering={FadeInDown.delay(200).springify()}>
+              <SectionLabel label="Pengaturan" />
+              <Card>
+                <SettingRow
+                  icon="color-palette-outline"
+                  label="Tema"
+                  subtitle={`Sekarang: ${THEMES.find(t => t.id === theme.id)?.name ?? 'Gold'}`}
+                  onPress={() => { Haptics.selectionAsync(); setShowTheme(true); }}
+                />
+                <SettingRow
+                  icon="tv-outline"
+                  label="Picture in Picture"
+                  subtitle="Video tetap jalan saat minimize"
+                  last
+                  right={
+                    <Switch
+                      value={pip}
+                      onValueChange={togglePip}
+                      trackColor={{ false: theme.border, true: theme.accent }}
+                      thumbColor={pip ? theme.bg : theme.subtext}
+                    />
+                  }
+                />
+              </Card>
+            </Animated.View>
+
+            {/* ── Tentang ── */}
+            <Animated.View entering={FadeInDown.delay(240).springify()}>
+              <SectionLabel label="Tentang" />
+              <Card>
+                <SettingRow
+                  icon="information-circle-outline"
+                  label="Tentang Aplikasi"
+                  subtitle="Versi, kebijakan privasi, & lainnya"
+                  last
+                  onPress={() => { Haptics.selectionAsync(); setShowTentang(true); }}
+                />
+              </Card>
+            </Animated.View>
+
+          </Animated.View>
         ) : (
-          /* ── Login Box ── */
-          <Animated.View
-            entering={FadeInDown.delay(60).springify()}
-            style={{
-              marginHorizontal: 16, marginBottom: 12, borderRadius: 16,
-              overflow: 'hidden', backgroundColor: theme.card,
-              padding: 32, alignItems: 'center', gap: 8,
-              borderWidth: 1, borderColor: theme.border,
-            }}
-          >
-            <LinearGradient
-              colors={[theme.accentDim, 'transparent']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-            />
-            <Ionicons name="person-circle-outline" size={64} color={theme.subtext} />
-            <Text style={{ color: theme.text, fontSize: 18, fontWeight: '800', marginTop: 4 }}>
-              Belum Login
-            </Text>
-            <Text style={{ color: theme.subtext, fontSize: 12, textAlign: 'center' }}>
-              Login untuk simpan history & XP kamu
-            </Text>
-            <TouchableOpacity
-              onPress={handleLogin}
-              disabled={loading}
+          <>
+            {/* ── Login Box ── */}
+            <Animated.View
+              entering={FadeInDown.delay(60).springify()}
               style={{
-                flexDirection: 'row', alignItems: 'center', gap: 8,
-                backgroundColor: theme.accent, paddingHorizontal: 20,
-                paddingVertical: 12, borderRadius: 10, marginTop: 8,
+                marginHorizontal: 16, marginBottom: 12, borderRadius: 16,
+                overflow: 'hidden', backgroundColor: theme.card,
+                padding: 32, alignItems: 'center', gap: 8,
+                borderWidth: 1, borderColor: theme.border,
               }}
             >
-              <Ionicons name="logo-google" size={16} color="#000" />
-              <Text style={{ color: '#000', fontWeight: '800', fontSize: 14 }}>
-                {loading ? 'Memuat...' : 'Login dengan Google'}
+              <LinearGradient
+                colors={[theme.accentDim, 'transparent']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+              />
+              <Ionicons name="person-circle-outline" size={64} color={theme.subtext} />
+              <Text style={{ color: theme.text, fontSize: 18, fontWeight: '800', marginTop: 4 }}>
+                Belum Login
               </Text>
-            </TouchableOpacity>
-          </Animated.View>
-        )}
-
-        {/* ── Pengaturan ── */}
-        <Section delay={240}>
-          <SectionLabel label="Pengaturan" />
-
-          {/* PiP */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <View style={{
-                width: 32, height: 32, borderRadius: 8, alignItems: 'center',
-                justifyContent: 'center', backgroundColor: theme.border,
-              }}>
-                <Ionicons name="picture-in-picture-outline" size={16} color={theme.subtext} />
-              </View>
-              <View>
-                <Text style={{ color: theme.text, fontSize: 13, fontWeight: '600' }}>
-                  Picture in Picture
-                </Text>
-                <Text style={{ color: theme.subtext, fontSize: 10, marginTop: 1 }}>
-                  Video tetap jalan saat minimize
-                </Text>
-              </View>
-            </View>
-            <Switch
-              value={pip}
-              onValueChange={togglePip}
-              trackColor={{ false: theme.border, true: theme.accent }}
-              thumbColor={pip ? '#000' : theme.subtext}
-            />
-          </View>
-
-          <Divider />
-
-          {/* Tema */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-            <View style={{
-              width: 32, height: 32, borderRadius: 8, alignItems: 'center',
-              justifyContent: 'center', backgroundColor: theme.border,
-            }}>
-              <Ionicons name="color-palette-outline" size={16} color={theme.subtext} />
-            </View>
-            <Text style={{ color: theme.text, fontSize: 13, fontWeight: '600' }}>Tema</Text>
-          </View>
-
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: THEME_GAP }}>
-            {THEMES.map(t => (
+              <Text style={{ color: theme.subtext, fontSize: 12, textAlign: 'center' }}>
+                Login untuk simpan history & XP kamu
+              </Text>
               <TouchableOpacity
-                key={t.id}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  setGlobalTheme(t.id);
-                }}
+                onPress={handleLogin}
+                disabled={loading}
                 style={{
-                  width: THEME_W, borderRadius: 10, padding: 8,
-                  backgroundColor: t.bg, position: 'relative',
-                  borderWidth: theme.id === t.id ? 2 : 1,
-                  borderColor: theme.id === t.id ? t.accent : 'rgba(255,255,255,0.06)',
+                  flexDirection: 'row', alignItems: 'center', gap: 8,
+                  backgroundColor: theme.accent, paddingHorizontal: 20,
+                  paddingVertical: 12, borderRadius: 10, marginTop: 8,
                 }}
               >
-                <View style={{ gap: 3, marginBottom: 6 }}>
-                  <View style={{ height: 5, borderRadius: 3, backgroundColor: t.accent, width: '70%' }} />
-                  <View style={{ height: 3, borderRadius: 2, backgroundColor: t.card, width: '100%' }} />
-                  <View style={{ height: 3, borderRadius: 2, backgroundColor: t.card, width: '80%' }} />
-                </View>
-                <View style={{ flexDirection: 'row', gap: 3 }}>
-                  <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: t.accent }} />
-                  <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: t.card }} />
-                </View>
-                <Text style={{ color: t.text, fontSize: 8, fontWeight: '700', marginTop: 5 }}
-                  numberOfLines={1}>{t.name}</Text>
-                {theme.id === t.id && (
-                  <View style={{
-                    position: 'absolute', top: 4, right: 4,
-                    width: 14, height: 14, borderRadius: 7,
-                    backgroundColor: t.accent, alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    <Ionicons name="checkmark" size={8} color="#000" />
-                  </View>
-                )}
+                <Ionicons name="logo-google" size={16} color={theme.bg} />
+                <Text style={{ color: theme.bg, fontWeight: '800', fontSize: 14 }}>
+                  {loading ? 'Memuat...' : 'Login dengan Google'}
+                </Text>
               </TouchableOpacity>
-            ))}
-          </View>
-        </Section>
+            </Animated.View>
+
+            {/* ── Tentang (tetap muncul meski belum login) ── */}
+            <Animated.View entering={FadeInDown.delay(120).springify()}>
+              <SectionLabel label="Tentang" />
+              <Card>
+                <SettingRow
+                  icon="information-circle-outline"
+                  label="Tentang Aplikasi"
+                  subtitle="Versi, kebijakan privasi, & lainnya"
+                  last
+                  onPress={() => { Haptics.selectionAsync(); setShowTentang(true); }}
+                />
+              </Card>
+            </Animated.View>
+          </>
+        )}
 
       </ScrollView>
+
+      {/* ── Theme Picker Modal ── */}
+      <ThemePickerModal visible={showTheme} onClose={() => setShowTheme(false)} />
+
+      {/* ── Tentang Modal ── */}
+      <TentangModal visible={showTentang} onClose={() => setShowTentang(false)} />
 
       {/* ── Admin Panel Modal ── */}
       <Modal visible={showAdmin} animationType="slide" onRequestClose={() => setShowAdmin(false)}>
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }}>
-
           <View style={{
             flexDirection: 'row', alignItems: 'center',
             paddingHorizontal: 16, paddingVertical: 14, gap: 12,
@@ -508,12 +676,11 @@ export default function ProfileScreen() {
               backgroundColor: theme.accent, paddingHorizontal: 8,
               paddingVertical: 4, borderRadius: 6,
             }}>
-              <Ionicons name="shield-checkmark" size={11} color="#000" />
-              <Text style={{ color: '#000', fontSize: 10, fontWeight: '900' }}>ADMIN</Text>
+              <Ionicons name="shield-checkmark" size={11} color={theme.bg} />
+              <Text style={{ color: theme.bg, fontSize: 10, fontWeight: '900' }}>ADMIN</Text>
             </View>
           </View>
 
-          {/* Stats */}
           <View style={{ flexDirection: 'row', gap: 12, paddingHorizontal: 16, marginBottom: 16 }}>
             {[
               { label: 'Total User', value: allUsers.length },
@@ -529,12 +696,8 @@ export default function ProfileScreen() {
                 borderRadius: 12, padding: 16, alignItems: 'center',
                 borderWidth: 1, borderColor: theme.border,
               }}>
-                <Text style={{ color: theme.accent, fontSize: 28, fontWeight: '900' }}>
-                  {s.value}
-                </Text>
-                <Text style={{ color: theme.subtext, fontSize: 11, fontWeight: '700', marginTop: 2 }}>
-                  {s.label}
-                </Text>
+                <Text style={{ color: theme.accent, fontSize: 28, fontWeight: '900' }}>{s.value}</Text>
+                <Text style={{ color: theme.subtext, fontSize: 11, fontWeight: '700', marginTop: 2 }}>{s.label}</Text>
               </View>
             ))}
           </View>
@@ -556,7 +719,7 @@ export default function ProfileScreen() {
               data={allUsers}
               keyExtractor={item => item.id}
               contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40, gap: 8 }}
-              removeClippedSubviews={true}
+              removeClippedSubviews
               maxToRenderPerBatch={10}
               windowSize={5}
               renderItem={({ item }) => (
@@ -579,28 +742,20 @@ export default function ProfileScreen() {
                   />
                   <View style={{ flex: 1 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13 }}
-                        numberOfLines={1}>{item.displayName}</Text>
+                      <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13 }} numberOfLines={1}>
+                        {item.displayName}
+                      </Text>
                       {item.isAdmin && (
-                        <View style={{
-                          backgroundColor: theme.accent,
-                          paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4,
-                        }}>
-                          <Text style={{ color: '#000', fontSize: 8, fontWeight: '900' }}>ADMIN</Text>
+                        <View style={{ backgroundColor: theme.accent, paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 }}>
+                          <Text style={{ color: theme.bg, fontSize: 8, fontWeight: '900' }}>ADMIN</Text>
                         </View>
                       )}
                     </View>
-                    <Text style={{ color: theme.subtext, fontSize: 10, marginTop: 2 }}>
-                      {item.email}
-                    </Text>
+                    <Text style={{ color: theme.subtext, fontSize: 10, marginTop: 2 }}>{item.email}</Text>
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={{ color: theme.accent, fontWeight: '900', fontSize: 13 }}>
-                      Lv {item.level ?? 1}
-                    </Text>
-                    <Text style={{ color: theme.subtext, fontSize: 10, marginTop: 2 }}>
-                      {item.xp ?? 0} XP
-                    </Text>
+                    <Text style={{ color: theme.accent, fontWeight: '900', fontSize: 13 }}>Lv {item.level ?? 1}</Text>
+                    <Text style={{ color: theme.subtext, fontSize: 10, marginTop: 2 }}>{item.xp ?? 0} XP</Text>
                   </View>
                 </TouchableOpacity>
               )}
@@ -610,14 +765,8 @@ export default function ProfileScreen() {
       </Modal>
 
       {/* ── Edit XP Modal ── */}
-      <Modal visible={showUserModal} transparent animationType="slide"
-        onRequestClose={() => setShowUserModal(false)}>
-        <TouchableOpacity
-          style={{ flex: 1 }}
-          activeOpacity={1}
-          onPress={() => setShowUserModal(false)}
-        >
-          {/* ✅ BlurView buat backdrop modal */}
+      <Modal visible={showUserModal} transparent animationType="slide" onRequestClose={() => setShowUserModal(false)}>
+        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setShowUserModal(false)}>
           <BlurView intensity={30} tint="dark" style={{ flex: 1 }}>
             <View style={{
               position: 'absolute', bottom: 0, left: 0, right: 0,
@@ -626,23 +775,17 @@ export default function ProfileScreen() {
               padding: 24, paddingBottom: 40,
               borderWidth: 1, borderColor: theme.border,
             }}>
-              {/* Handle bar */}
               <View style={{
                 width: 40, height: 4, backgroundColor: 'rgba(255,255,255,0.15)',
                 borderRadius: 2, alignSelf: 'center', marginBottom: 16,
               }} />
-
               <Text style={{ color: theme.text, fontWeight: '900', fontSize: 16, marginBottom: 2 }}>
                 {selectedUser?.displayName}
               </Text>
               <Text style={{ color: theme.subtext, fontSize: 11, marginBottom: 20 }}>
                 {selectedUser?.email}
               </Text>
-
-              <Text style={{
-                color: theme.subtext, fontSize: 10, fontWeight: '800',
-                textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8,
-              }}>
+              <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
                 Set XP
               </Text>
               <TextInput
@@ -662,12 +805,9 @@ export default function ProfileScreen() {
               </Text>
               <TouchableOpacity
                 onPress={handleSetXP}
-                style={{
-                  backgroundColor: theme.accent, paddingVertical: 14,
-                  borderRadius: 10, alignItems: 'center',
-                }}
+                style={{ backgroundColor: theme.accent, paddingVertical: 14, borderRadius: 10, alignItems: 'center' }}
               >
-                <Text style={{ color: '#000', fontWeight: '900', fontSize: 14 }}>Simpan</Text>
+                <Text style={{ color: theme.bg, fontWeight: '900', fontSize: 14 }}>Simpan</Text>
               </TouchableOpacity>
             </View>
           </BlurView>
