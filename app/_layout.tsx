@@ -4,6 +4,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useEffect } from 'react';
 import { loadSavedTheme, useTheme } from '@/hooks/theme';
+import DebugOverlay from '@/components/DebugOverlay';
 import '../global.css';
 
 function AppLayout() {
@@ -21,11 +22,10 @@ function AppLayout() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen
           name="watch/[slug]"
-          options={{
-            animation: 'slide_from_bottom',
-          }}
+          options={{ animation: 'slide_from_bottom' }}
         />
       </Stack>
+      <DebugOverlay />
     </>
   );
 }
