@@ -47,8 +47,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   extra: {
     eas: {
-      projectId: '77dcd7b2-4f36-4f1e-92a9-fc8aa7915d1c',
+      projectId: '84bec026-9bfb-4ff8-9ce2-eb8f8be30e45',
     },
   },
-  owner: 'hiuraaa',
+  owner: 'xena444',
 });
