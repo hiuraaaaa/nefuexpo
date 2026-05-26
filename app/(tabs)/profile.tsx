@@ -159,9 +159,16 @@ export default function ProfileScreen() {
   const loadAllUsers = async () => {
     setAdminLoading(true);
     try {
-      const snap = await firestore().collection('users').orderBy('lastLoginAt', 'desc').get();
-      setAllUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    } catch {}
+      // Tanpa orderBy biar ga crash kalau ada doc lama yg ga punya field lastLoginAt
+      const snap = await firestore().collection('users').get();
+      const users = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      // Sort di client
+      users.sort((a: any, b: any) => (b.lastLoginAt ?? 0) - (a.lastLoginAt ?? 0));
+      setAllUsers(users);
+    } catch (e) {
+      console.error('[Admin] loadAllUsers error:', e);
+      Alert.alert('Error', 'Gagal memuat data user: ' + String(e));
+    }
     setAdminLoading(false);
   };
 
