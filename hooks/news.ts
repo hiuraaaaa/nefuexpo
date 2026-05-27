@@ -51,6 +51,9 @@ const parseRSS = (xml: string): NewsItem[] => {
   const items: NewsItem[] = [];
   const itemMatches = xml.match(/<item>([\s\S]*?)<\/item>/g) ?? [];
 
+  console.log(`[NEWS] Total items ditemukan: ${itemMatches.length}`);
+  console.log(`[NEWS] XML snippet: ${xml.slice(0, 300)}`);
+
   itemMatches.forEach((block, index) => {
     const get = (tag: string) => {
       const m = block.match(new RegExp(`<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tag}>|<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`));
@@ -65,6 +68,8 @@ const parseRSS = (xml: string): NewsItem[] => {
     // Ambil dari <media:thumbnail url="..."> — ini yang MAL pakai
     const mediaThumbnail = block.match(/<media:thumbnail[^>]+url="([^"]+)"/i);
     const imageUrl: string | null = mediaThumbnail ? mediaThumbnail[1] : null;
+
+    console.log(`[NEWS] item ${index} | image: ${imageUrl} | title: ${title.slice(0, 40)}`);
 
     const author = get('dc:creator') || get('author') || 'MAL';
 
@@ -88,20 +93,29 @@ const parseRSS = (xml: string): NewsItem[] => {
 };
 
 export const fetchAnimeNews = async (_page = 1): Promise<NewsResponse> => {
-  const res = await fetch(MAL_RSS, {
-    headers: { 'Accept': 'application/rss+xml, application/xml, text/xml' },
-  });
-  if (!res.ok) throw new Error(`RSS error: ${res.status}`);
-  const xml = await res.text();
-  const data = parseRSS(xml);
+  try {
+    console.log('[NEWS] Fetching RSS...');
+    const res = await fetch(MAL_RSS, {
+      headers: { 'Accept': 'application/rss+xml, application/xml, text/xml' },
+    });
+    console.log(`[NEWS] Response status: ${res.status}`);
+    if (!res.ok) throw new Error(`RSS error: ${res.status}`);
+    const xml = await res.text();
+    console.log(`[NEWS] XML length: ${xml.length}`);
+    const data = parseRSS(xml);
+    console.log(`[NEWS] Parsed ${data.length} items`);
 
-  return {
-    data,
-    pagination: {
-      last_visible_page: 1,
-      has_next_page: false,
-      current_page: 1,
-      items: { count: data.length, total: data.length, per_page: data.length },
-    },
-  };
+    return {
+      data,
+      pagination: {
+        last_visible_page: 1,
+        has_next_page: false,
+        current_page: 1,
+        items: { count: data.length, total: data.length, per_page: data.length },
+      },
+    };
+  } catch (e: any) {
+    console.error(`[NEWS] Error: ${e.message}`);
+    throw e;
+  }
 };
