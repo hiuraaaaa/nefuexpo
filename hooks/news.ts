@@ -38,7 +38,6 @@ export const formatNewsDate = (iso: string): string => {
   } catch { return iso; }
 };
 
-// Decode HTML entities
 const decodeEntities = (str: string): string =>
   str
     .replace(/&#039;/g, "'")
@@ -63,17 +62,9 @@ const parseRSS = (xml: string): NewsItem[] => {
     const date    = get('pubDate');
     const excerpt = decodeEntities(get('description').replace(/<[^>]+>/g, '').trim().slice(0, 200));
 
-    // Coba ambil image dari dalam <description> CDATA (MAL taruh <img> di sana)
-    const desc = get('description');
-    let imageUrl: string | null = null;
-    const imgInDesc = desc.match(/<img[^>]+src="([^"]+)"/i);
-    if (imgInDesc) imageUrl = imgInDesc[1];
-
-    // Fallback: enclosure tag
-    if (!imageUrl) {
-      const enclosure = block.match(/url="([^"]+\.(jpg|jpeg|png|webp)[^"]*)"/i);
-      if (enclosure) imageUrl = enclosure[1];
-    }
+    // Ambil dari <media:thumbnail url="..."> — ini yang MAL pakai
+    const mediaThumbnail = block.match(/<media:thumbnail[^>]+url="([^"]+)"/i);
+    const imageUrl: string | null = mediaThumbnail ? mediaThumbnail[1] : null;
 
     const author = get('dc:creator') || get('author') || 'MAL';
 
