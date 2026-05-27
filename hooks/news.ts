@@ -1,7 +1,8 @@
 // hooks/news.ts
-// Fetch anime news dari Jikan (MyAnimeList unofficial API) — gratis, no key
+// Fetch anime news dari MyAnimeList RSS feed — gratis, no key, no rate limit
 
-const JIKAN_BASE = 'https://api.jikan.moe/v4';
+const MAL_RSS = 'https://myanimelist.net/rss/news.xml';
+// Proxy buat bypass CORS di mobile (react-native fetch langsung ke RSS harusnya ok)
 
 export interface NewsItem {
   mal_id: number;
@@ -51,39 +52,74 @@ export const formatNewsDate = (iso: string): string => {
   }
 };
 
-// Fetch latest anime news — pakai /articles endpoint Jikan v4 yang valid
-// Jikan v4 docs: GET /articles pake type=anime
-export const fetchAnimeNews = async (page = 1): Promise<NewsResponse> => {
-  // /articles?topic=anime adalah endpoint yang valid di Jikan v4
-  const res = await fetch(`${JIKAN_BASE}/articles?topic=anime&page=${page}`);
-  if (!res.ok) throw new Error(`Jikan error: ${res.status}`);
-  const json = await res.json();
+// Parse XML RSS feed jadi array NewsItem
+const parseRSS = (xml: string): NewsItem[] => {
+  const items: NewsItem[] = [];
 
-  // /articles return format berbeda dari /news, normalize ke NewsItem
-  const data: NewsItem[] = (json.data ?? []).map((item: any) => ({
-    mal_id:          item.mal_id ?? item.entry?.[0]?.mal_id ?? Math.random(),
-    url:             item.url ?? '',
-    title:           item.title ?? '',
-    date:            item.date ?? item.published_at ?? new Date().toISOString(),
-    author_username: item.author_username ?? item.authors?.[0] ?? 'MAL',
-    author_url:      item.author_url ?? '',
-    forum_url:       item.forum_url ?? '',
-    images: {
-      jpg: {
-        image_url: item.images?.jpg?.image_url ?? item.entry?.[0]?.images?.jpg?.image_url ?? null,
-      },
-    },
-    comments: item.comments ?? 0,
-    excerpt:  item.excerpt ?? item.intro ?? '',
-  }));
+  // Extract semua <item> block
+  const itemMatches = xml.match(/<item>([\s\S]*?)<\/item>/g) ?? [];
+
+  itemMatches.forEach((block, index) => {
+    const get = (tag: string) => {
+      const m = block.match(new RegExp(`<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tag}>|<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`));
+      return m ? (m[1] ?? m[2] ?? '').trim() : '';
+    };
+
+    const title   = get('title');
+    const url     = get('link') || get('guid');
+    const date    = get('pubDate');
+    const excerpt = get('description').replace(/<[^>]+>/g, '').slice(0, 200);
+
+    // Ambil image dari <enclosure> atau <media:content> atau <image> di dalam description
+    let imageUrl: string | null = null;
+    const enclosure = block.match(/url="([^"]+\.(jpg|jpeg|png|webp)[^"]*)"/i);
+    if (enclosure) imageUrl = enclosure[1];
+    if (!imageUrl) {
+      const imgTag = block.match(/<img[^>]+src="([^"]+)"/i);
+      if (imgTag) imageUrl = imgTag[1];
+    }
+
+    // Extract author dari <dc:creator> atau <author>
+    const author = get('dc:creator') || get('author') || 'MAL';
+
+    // Unique id dari url
+    const malId = index + 1;
+
+    if (title && url) {
+      items.push({
+        mal_id:          malId,
+        url,
+        title,
+        date:            date ? new Date(date).toISOString() : new Date().toISOString(),
+        author_username: author,
+        author_url:      `https://myanimelist.net/profile/${author}`,
+        forum_url:       url,
+        images:          { jpg: { image_url: imageUrl } },
+        comments:        0,
+        excerpt,
+      });
+    }
+  });
+
+  return items;
+};
+
+// RSS feed MAL hanya punya 1 page, pagination dummy
+export const fetchAnimeNews = async (_page = 1): Promise<NewsResponse> => {
+  const res = await fetch(MAL_RSS, {
+    headers: { 'Accept': 'application/rss+xml, application/xml, text/xml' },
+  });
+  if (!res.ok) throw new Error(`RSS error: ${res.status}`);
+  const xml = await res.text();
+  const data = parseRSS(xml);
 
   return {
     data,
-    pagination: json.pagination ?? {
+    pagination: {
       last_visible_page: 1,
-      has_next_page: false,
-      current_page: page,
-      items: { count: data.length, total: data.length, per_page: 20 },
+      has_next_page:     false,
+      current_page:      1,
+      items: { count: data.length, total: data.length, per_page: data.length },
     },
   };
 };
