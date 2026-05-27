@@ -14,26 +14,26 @@ const TAB_HEIGHT  = 64;
 const BUBBLE_SIZE = 58;
 
 const TABS = [
-  { name: 'index',    label: 'Home',     iconActive: 'home',        iconInactive: 'home-outline' },
-  { name: 'explore',  label: 'Explore',  iconActive: 'compass',     iconInactive: 'compass-outline' },
-  { name: 'ongoing',  label: 'Ongoing',  iconActive: 'play-circle', iconInactive: 'play-circle-outline' },
-  { name: 'schedule', label: 'Schedule', iconActive: 'calendar',    iconInactive: 'calendar-outline' },
-  { name: 'profile',  label: 'Profile',  iconActive: 'person',      iconInactive: 'person-outline' },
+  { name: 'index',    label: 'Home',     iconActive: 'home',          iconInactive: 'home-outline' },
+  { name: 'explore',  label: 'Explore',  iconActive: 'compass',       iconInactive: 'compass-outline' },
+  { name: 'news',     label: 'News',     iconActive: 'newspaper',     iconInactive: 'newspaper-outline',  badge: 'NEW' },
+  { name: 'schedule', label: 'Schedule', iconActive: 'calendar',      iconInactive: 'calendar-outline' },
+  { name: 'profile',  label: 'Profile',  iconActive: 'person',        iconInactive: 'person-outline' },
 ] as const;
 
 // ── Tab Icon ───────────────────────────────────────────────────────────────────
-function TabIcon({ focused, label, iconActive, iconInactive }: {
+function TabIcon({ focused, label, iconActive, iconInactive, badge }: {
   focused: boolean;
   label: string;
   iconActive: string;
   iconInactive: string;
+  badge?: string;
 }) {
   const theme = useTheme();
 
-  // ✅ reanimated — UI thread, ga blocking JS
-  const scale     = useSharedValue(focused ? 1 : 0.85);
+  const scale      = useSharedValue(focused ? 1 : 0.85);
   const translateY = useSharedValue(focused ? 0 : 4);
-  const opacity   = useSharedValue(focused ? 1 : 0.6);
+  const opacity    = useSharedValue(focused ? 1 : 0.6);
 
   useEffect(() => {
     scale.value      = withSpring(focused ? 1 : 0.85,  { damping: 14, stiffness: 120 });
@@ -49,22 +49,22 @@ function TabIcon({ focused, label, iconActive, iconInactive }: {
   if (focused) {
     return (
       <Animated.View style={[styles.activeBubbleWrapper, animStyle]}>
-        {/* ✅ Bubble pake BlurView + glow border */}
         <View style={[styles.activeBubble, {
           shadowColor: theme.accent,
           borderColor: `${theme.accent}60`,
         }]}>
-          <BlurView
-            intensity={40}
-            tint="dark"
-            style={StyleSheet.absoluteFill}
-          />
-          {/* Accent overlay biar warna tetap keliatan */}
+          <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
           <View style={[
             StyleSheet.absoluteFill,
             { backgroundColor: `${theme.accent}30`, borderRadius: BUBBLE_SIZE / 2 },
           ]} />
           <Ionicons name={iconActive as any} size={26} color={theme.accent} />
+          {/* Badge saat aktif */}
+          {badge && (
+            <View style={[styles.badge, { backgroundColor: theme.accent }]}>
+              <Text style={styles.badgeText}>{badge}</Text>
+            </View>
+          )}
         </View>
         <Text style={[styles.activeLabel, { color: theme.accent }]}>
           {label.toUpperCase()}
@@ -75,7 +75,15 @@ function TabIcon({ focused, label, iconActive, iconInactive }: {
 
   return (
     <Animated.View style={[styles.inactiveWrapper, animStyle]}>
-      <Ionicons name={iconInactive as any} size={24} color={theme.subtext} />
+      <View>
+        <Ionicons name={iconInactive as any} size={24} color={theme.subtext} />
+        {/* Badge saat tidak aktif */}
+        {badge && (
+          <View style={[styles.badge, { backgroundColor: theme.accent }]}>
+            <Text style={styles.badgeText}>{badge}</Text>
+          </View>
+        )}
+      </View>
     </Animated.View>
   );
 }
@@ -85,13 +93,7 @@ function TabBarBackground() {
   const theme = useTheme();
   return (
     <View style={StyleSheet.absoluteFill}>
-      {/* ✅ BlurView buat glassmorphism */}
-      <BlurView
-        intensity={60}
-        tint="dark"
-        style={StyleSheet.absoluteFill}
-      />
-      {/* Border top tipis */}
+      <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFill} />
       <View style={[
         StyleSheet.absoluteFill,
         {
@@ -116,7 +118,6 @@ export default function TabLayout() {
         sceneStyle: { backgroundColor: theme.bg },
         animation: 'fade',
         tabBarStyle: {
-          // ✅ transparent biar BlurView keliatan
           backgroundColor: 'transparent',
           borderTopWidth: 0,
           height: TAB_HEIGHT + insets.bottom,
@@ -142,13 +143,16 @@ export default function TabLayout() {
                 label={tab.label}
                 iconActive={tab.iconActive}
                 iconInactive={tab.iconInactive}
+                badge={(tab as any).badge}
               />
             ),
           }}
         />
       ))}
 
-      <Tabs.Screen name="history" options={{ href: null }} />
+      {/* Disembunyikan dari tab bar */}
+      <Tabs.Screen name="ongoing"  options={{ href: null }} />
+      <Tabs.Screen name="history"  options={{ href: null }} />
     </Tabs>
   );
 }
@@ -167,7 +171,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
     borderWidth: 1,
-    // glow
     shadowOpacity: 0.5,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 4 },
@@ -183,5 +186,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingTop: 8,
+  },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -8,
+    borderRadius: 6,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+  },
+  badgeText: {
+    fontSize: 7,
+    fontWeight: '900',
+    color: '#000',
+    letterSpacing: 0.3,
   },
 });
