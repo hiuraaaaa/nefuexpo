@@ -20,7 +20,6 @@ const H_PAD = 12;
 const GAP = 8;
 const CARD_WIDTH = (width - H_PAD * 2 - GAP * (NUM_COLUMNS - 1)) / NUM_COLUMNS;
 
-// ── Card Item ─────────────────────────────────────────────────────────────────
 const AnimeGridCard = React.memo(({ item, index, onPress, theme }: {
   item: Anime; index: number; onPress: () => void; theme: any;
 }) => (
@@ -63,7 +62,6 @@ const AnimeGridCard = React.memo(({ item, index, onPress, theme }: {
   </Animated.View>
 ));
 
-// ── Load More Footer ──────────────────────────────────────────────────────────
 const LoadMoreFooter = ({ loading, onLoadMore, hasMore, theme }: {
   loading: boolean; onLoadMore: () => void; hasMore: boolean; theme: any;
 }) => {
@@ -74,7 +72,6 @@ const LoadMoreFooter = ({ loading, onLoadMore, hasMore, theme }: {
       </Text>
     </View>
   );
-
   return (
     <TouchableOpacity
       onPress={onLoadMore}
@@ -99,7 +96,6 @@ const LoadMoreFooter = ({ loading, onLoadMore, hasMore, theme }: {
   );
 };
 
-// ── Main ──────────────────────────────────────────────────────────────────────
 export default function ExploreScreen() {
   const params = useLocalSearchParams<{ q?: string }>();
   const router = useRouter();
@@ -119,14 +115,12 @@ export default function ExploreScreen() {
     api.genre().then(r => setGenres(r.data || [])).catch(() => {});
   }, []);
 
-  // Reset saat query atau genre berubah
   useEffect(() => {
     setPage(0);
     setResults([]);
     setHasMore(true);
   }, [query, selectedGenres]);
 
-  // Fetch utama
   useEffect(() => {
     if (isFetching.current) return;
     let mounted = true;
@@ -138,16 +132,17 @@ export default function ExploreScreen() {
 
       try {
         let res;
-        if (query)                          res = await api.search(query, page);
+        if (query)                          res = await api.searchLocal(query);
         else if (selectedGenres.length > 0) res = await api.genreFilter(selectedGenres, page);
-        else                                res = await api.popular(page);
+        else                                res = await api.animeList(page);
 
         const newData: Anime[] = res.data || [];
         if (mounted) {
           if (page === 0) setResults(newData);
           else setResults(prev => [...prev, ...newData]);
-          // Kalau data yang balik < 12, anggap udah habis
-          setHasMore(newData.length >= 12);
+          // Search local return semua sekaligus, ga perlu load more
+          if (query) setHasMore(false);
+          else setHasMore(newData.length >= 12);
         }
       } catch {
         if (mounted) {
@@ -199,14 +194,12 @@ export default function ExploreScreen() {
     );
   }, [theme, router]);
 
-  // Pad row terakhir biar rata
   const paddedResults = results.length % NUM_COLUMNS === 0
     ? results
     : [...results, ...Array(NUM_COLUMNS - (results.length % NUM_COLUMNS)).fill(null)];
 
   const ListHeader = (
     <View>
-      {/* Genre chips */}
       {!query && genres.length > 0 && (
         <Animated.View entering={FadeIn.duration(300)}>
           <ScrollView
@@ -214,7 +207,6 @@ export default function ExploreScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingBottom: 12 }}
           >
-            {/* All pill */}
             <TouchableOpacity
               onPress={() => { Haptics.selectionAsync(); setSelectedGenres([]); }}
               style={{
@@ -227,11 +219,8 @@ export default function ExploreScreen() {
               <Text style={{
                 color: selectedGenres.length === 0 ? theme.bg : theme.subtext,
                 fontSize: 11, fontWeight: '800',
-              }}>
-                Semua
-              </Text>
+              }}>Semua</Text>
             </TouchableOpacity>
-
             {genres.map(g => {
               const active = selectedGenres.includes(g.id);
               return (
@@ -247,9 +236,7 @@ export default function ExploreScreen() {
                   <Text style={{
                     color: active ? theme.bg : theme.subtext,
                     fontSize: 11, fontWeight: '800',
-                  }}>
-                    {g.name}
-                  </Text>
+                  }}>{g.name}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -257,32 +244,24 @@ export default function ExploreScreen() {
         </Animated.View>
       )}
 
-      {/* Query label */}
       {query.length > 0 && (
         <View style={{ paddingHorizontal: 16, marginBottom: 14 }}>
           <Text style={{
             color: theme.subtext, fontSize: 10, fontWeight: '700',
             letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 2,
-          }}>
-            Hasil untuk
-          </Text>
+          }}>Hasil untuk</Text>
           <Text style={{
             color: theme.accent, fontSize: 22, fontWeight: '900', letterSpacing: -0.5,
-          }} numberOfLines={1}>
-            "{query}"
-          </Text>
+          }} numberOfLines={1}>"{query}"</Text>
         </View>
       )}
 
-      {/* Section label kalau default */}
       {!query && selectedGenres.length === 0 && (
         <View style={{ paddingHorizontal: 16, marginBottom: 10 }}>
           <Text style={{
             color: theme.subtext, fontSize: 10, fontWeight: '800',
             letterSpacing: 1.5, textTransform: 'uppercase',
-          }}>
-            Anime Populer
-          </Text>
+          }}>Semua Anime</Text>
         </View>
       )}
     </View>
@@ -290,15 +269,12 @@ export default function ExploreScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }} edges={['top']}>
-
-      {/* Header */}
       <View style={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12 }}>
         <Text style={{ color: theme.text, fontWeight: '900', fontSize: 28, letterSpacing: -0.5 }}>
           Explore
         </Text>
       </View>
 
-      {/* Search bar */}
       <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
         <View style={{
           flexDirection: 'row', alignItems: 'center',
@@ -308,10 +284,7 @@ export default function ExploreScreen() {
         }}>
           <Ionicons name="search-outline" size={18} color={theme.accent} />
           <TextInput
-            style={{
-              flex: 1, color: theme.text, fontWeight: '600',
-              fontSize: 14, paddingVertical: 0,
-            }}
+            style={{ flex: 1, color: theme.text, fontWeight: '600', fontSize: 14, paddingVertical: 0 }}
             placeholder="Cari anime..."
             placeholderTextColor={theme.subtext}
             value={query}
@@ -328,7 +301,6 @@ export default function ExploreScreen() {
         </View>
       </View>
 
-      {/* Content */}
       {isLoading ? (
         <FlatList
           data={[...Array(12)]}
@@ -346,9 +318,7 @@ export default function ExploreScreen() {
           <Text style={{
             color: theme.subtext, fontWeight: '700', fontSize: 13,
             textTransform: 'uppercase', letterSpacing: 2,
-          }}>
-            Tidak ditemukan
-          </Text>
+          }}>Tidak ditemukan</Text>
           {query.length > 0 && (
             <TouchableOpacity
               onPress={clearQuery}
@@ -386,7 +356,6 @@ export default function ExploreScreen() {
           }
         />
       )}
-
     </SafeAreaView>
   );
 }
