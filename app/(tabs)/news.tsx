@@ -2,29 +2,94 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
-  StyleSheet, RefreshControl, Linking, Image,
-  ActivityIndicator, TextInput,
+  StyleSheet, RefreshControl, Image,
+  ActivityIndicator, TextInput, Modal,
+  SafeAreaView as RNSafeAreaView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import { WebView } from 'react-native-webview';
 import { useTheme } from '@/hooks/theme';
 import { fetchAnimeNews, formatNewsDate, NewsItem } from '@/hooks/news';
 
 const PLACEHOLDER_IMG = 'https://raw.githubusercontent.com/alip-jmbd/alipp/main/icon-rbg.png';
 
-// ── News Card ──────────────────────────────────────────────────────────────────
-function NewsCard({ item, index, theme }: { item: NewsItem; index: number; theme: any }) {
-  const imageUrl = item.images?.jpg?.image_url ?? PLACEHOLDER_IMG;
+// ── In-App Browser Modal ───────────────────────────────────────────────────────
+function NewsWebModal({
+  url, title, visible, onClose, theme,
+}: {
+  url: string;
+  title: string;
+  visible: boolean;
+  onClose: () => void;
+  theme: any;
+}) {
+  const [loading, setLoading] = useState(true);
 
-  const handlePress = () => {
-    Linking.openURL(item.url).catch(() => {});
-  };
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
+      <RNSafeAreaView style={{ flex: 1, backgroundColor: theme.bg }}>
+        {/* Header */}
+        <View style={[modalStyles.header, { borderBottomColor: theme.border }]}>
+          <TouchableOpacity onPress={onClose} style={modalStyles.closeBtn}>
+            <Ionicons name="close" size={22} color={theme.text} />
+          </TouchableOpacity>
+          <Text
+            style={[modalStyles.headerTitle, { color: theme.text }]}
+            numberOfLines={1}
+          >
+            {title}
+          </Text>
+          <View style={{ width: 36 }} />
+        </View>
+
+        {/* WebView */}
+        {visible && (
+          <WebView
+            source={{ uri: url }}
+            style={{ flex: 1, backgroundColor: theme.bg }}
+            onLoadStart={() => setLoading(true)}
+            onLoadEnd={() => setLoading(false)}
+            javaScriptEnabled
+            domStorageEnabled
+          />
+        )}
+
+        {/* Loading overlay */}
+        {loading && (
+          <View style={[modalStyles.loadingOverlay, { backgroundColor: theme.bg }]}>
+            <ActivityIndicator size="large" color={theme.accent} />
+            <Text style={[modalStyles.loadingText, { color: theme.subtext }]}>
+              Memuat artikel...
+            </Text>
+          </View>
+        )}
+      </RNSafeAreaView>
+    </Modal>
+  );
+}
+
+// ── News Card ──────────────────────────────────────────────────────────────────
+function NewsCard({
+  item, index, theme, onPress,
+}: {
+  item: NewsItem;
+  index: number;
+  theme: any;
+  onPress: (item: NewsItem) => void;
+}) {
+  const imageUrl = item.images?.jpg?.image_url ?? PLACEHOLDER_IMG;
 
   return (
     <Animated.View entering={FadeInDown.delay(index * 60).springify()}>
       <TouchableOpacity
-        onPress={handlePress}
+        onPress={() => onPress(item)}
         activeOpacity={0.75}
         style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}
       >
@@ -124,6 +189,10 @@ export default function NewsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
 
+  // State modal
+  const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
+
   const loadNews = useCallback(async (p = 1, append = false) => {
     try {
       setError(null);
@@ -137,13 +206,11 @@ export default function NewsScreen() {
     }
   }, []);
 
-  // Initial load
   useEffect(() => {
     setLoading(true);
     loadNews(1).finally(() => setLoading(false));
   }, []);
 
-  // Filter by search
   useEffect(() => {
     if (!search.trim()) {
       setFiltered(news);
@@ -168,6 +235,16 @@ export default function NewsScreen() {
     await loadNews(page + 1, true);
     setLoadingMore(false);
   }, [loadingMore, hasMore, page, search, loadNews]);
+
+  const handleCardPress = useCallback((item: NewsItem) => {
+    setSelectedNews(item);
+    setModalVisible(true);
+  }, []);
+
+  const handleModalClose = useCallback(() => {
+    setModalVisible(false);
+    setSelectedNews(null);
+  }, []);
 
   // ── Render States ─────────────────────────────────────────────────────────────
 
@@ -209,7 +286,12 @@ export default function NewsScreen() {
         data={filtered}
         keyExtractor={item => String(item.mal_id)}
         renderItem={({ item, index }) => (
-          <NewsCard item={item} index={index} theme={theme} />
+          <NewsCard
+            item={item}
+            index={index}
+            theme={theme}
+            onPress={handleCardPress}
+          />
         )}
         ListHeaderComponent={
           <NewsHeader theme={theme} search={search} onSearch={setSearch} />
@@ -242,6 +324,17 @@ export default function NewsScreen() {
         }
         showsVerticalScrollIndicator={false}
       />
+
+      {/* In-App Browser */}
+      {selectedNews && (
+        <NewsWebModal
+          url={selectedNews.url}
+          title={selectedNews.title}
+          visible={modalVisible}
+          onClose={handleModalClose}
+          theme={theme}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -343,3 +436,39 @@ const styles = StyleSheet.create({
   retryText: { fontWeight: '800', fontSize: 13 },
 });
 
+const modalStyles = StyleSheet.create({
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+  },
+  closeBtn: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 18,
+  },
+  headerTitle: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginHorizontal: 8,
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 60,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 13,
+  },
+});
