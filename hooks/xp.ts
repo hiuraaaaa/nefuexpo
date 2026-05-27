@@ -119,9 +119,9 @@ export const xpStorage = {
       const streak      = isNewDay ? data.streak + 1 : data.streak;
       const streakBonus = isNewDay ? 10 : 0;
 
-      // Daily cap 500 XP — _todayXP sekarang persisten via Firestore
+      // Daily cap 50 XP — max 5 episode per hari
       const todayXP = isNewDay ? 0 : (data._todayXP ?? 0);
-      const capped  = Math.min(amount, Math.max(0, 500 - todayXP));
+      const capped  = Math.min(amount, Math.max(0, 50 - todayXP));
       const newXp   = data.xp + capped + streakBonus;
       const { current } = getLevelData(newXp);
 
