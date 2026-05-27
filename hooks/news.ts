@@ -51,10 +51,39 @@ export const formatNewsDate = (iso: string): string => {
   }
 };
 
-// Fetch latest anime news (page 1 by default)
+// Fetch latest anime news — pakai /articles endpoint Jikan v4 yang valid
+// Jikan v4 docs: GET /articles pake type=anime
 export const fetchAnimeNews = async (page = 1): Promise<NewsResponse> => {
-  const res = await fetch(`${JIKAN_BASE}/news/anime?page=${page}`);
+  // /articles?topic=anime adalah endpoint yang valid di Jikan v4
+  const res = await fetch(`${JIKAN_BASE}/articles?topic=anime&page=${page}`);
   if (!res.ok) throw new Error(`Jikan error: ${res.status}`);
-  return res.json();
-};
+  const json = await res.json();
 
+  // /articles return format berbeda dari /news, normalize ke NewsItem
+  const data: NewsItem[] = (json.data ?? []).map((item: any) => ({
+    mal_id:          item.mal_id ?? item.entry?.[0]?.mal_id ?? Math.random(),
+    url:             item.url ?? '',
+    title:           item.title ?? '',
+    date:            item.date ?? item.published_at ?? new Date().toISOString(),
+    author_username: item.author_username ?? item.authors?.[0] ?? 'MAL',
+    author_url:      item.author_url ?? '',
+    forum_url:       item.forum_url ?? '',
+    images: {
+      jpg: {
+        image_url: item.images?.jpg?.image_url ?? item.entry?.[0]?.images?.jpg?.image_url ?? null,
+      },
+    },
+    comments: item.comments ?? 0,
+    excerpt:  item.excerpt ?? item.intro ?? '',
+  }));
+
+  return {
+    data,
+    pagination: json.pagination ?? {
+      last_visible_page: 1,
+      has_next_page: false,
+      current_page: page,
+      items: { count: data.length, total: data.length, per_page: 20 },
+    },
+  };
+};
