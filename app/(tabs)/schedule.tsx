@@ -221,7 +221,7 @@ export default function ScheduleScreen() {
 
       {/* Header */}
       <View style={s.header}>
-        <Text style={[s.title, { color: theme.text }]}>Jadwal</Text>
+        <Text style={[s.title, { color: theme.text }]}>SCHEDULE</Text>
         <Text style={[s.subtitle, { color: theme.subtext }]}>
           Anime yang tayang minggu ini
         </Text>
