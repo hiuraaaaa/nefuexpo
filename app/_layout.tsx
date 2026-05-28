@@ -76,7 +76,7 @@ function AppLayout() {
           options={{ animation: 'slide_from_bottom' }}
         />
       </Stack>
-      <DebugOverlay />
+      {__DEV__ && <DebugOverlay />}
     </>
   );
 }
