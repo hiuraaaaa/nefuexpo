@@ -32,10 +32,8 @@ import { getCurrentUser } from '@/hooks/auth';
 const { width } = Dimensions.get('window');
 const PIP_KEY  = 'nefusoft_pip';
 
-const EP_COLS    = 6;
-const EP_GAP     = 6;
-const EP_PADDING = 16;
-const SEEK_SEC   = 10;
+const SEEK_SEC     = 10;
+const EP_PAGE_SIZE = 100; // episode per halaman
 
 type ServerGroup = { [quality: string]: Server[] };
 
@@ -156,35 +154,74 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-// ── Episode Button ─────────────────────────────────────────────────────────────
-// ✅ size prop dari parent — fixed number biar beneran square
-const EpisodeButton = React.memo(({ item, isActive, isWatched, progress, onPress, size }: {
+// ── Episode Row Item (list style) ──────────────────────────────────────────────
+const EpisodeButton = React.memo(({ item, isActive, isWatched, progress, onPress }: {
   item: Episode;
   isActive: boolean;
   isWatched: boolean;
   progress: number;
   onPress: () => void;
-  size: number;
 }) => (
   <TouchableOpacity
     onPress={onPress}
+    activeOpacity={0.75}
     style={{
-      width: size,
-      height: size,
-      borderRadius: 6,
+      flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
-      overflow: 'hidden',
-      backgroundColor: isActive ? COLORS.gold : COLORS.bg,
+      paddingHorizontal: 14,
+      paddingVertical: 13,
+      borderRadius: 10,
+      marginBottom: 6,
+      backgroundColor: isActive ? `${COLORS.gold}18` : 'transparent',
       borderWidth: 1,
-      borderColor: isActive ? COLORS.gold : isWatched ? `${COLORS.gold}40` : 'rgba(255,255,255,0.05)',
+      borderColor: isActive ? COLORS.gold : isWatched ? `${COLORS.gold}30` : 'rgba(255,255,255,0.06)',
+      overflow: 'hidden',
     }}
   >
+    {/* Garis kiri aktif */}
+    {isActive && (
+      <View style={{
+        position: 'absolute', left: 0, top: 0, bottom: 0,
+        width: 3, backgroundColor: COLORS.gold, borderRadius: 999,
+      }} />
+    )}
+
+    {/* Nomor episode */}
+    <Text style={{
+      width: 32,
+      fontSize: 14,
+      fontWeight: '900',
+      color: isActive ? COLORS.gold : isWatched ? `${COLORS.gold}99` : 'rgba(255,255,255,0.35)',
+      marginRight: 10,
+    }}>
+      {item.index}
+    </Text>
+
+    {/* Label */}
+    <Text
+      style={{
+        flex: 1,
+        fontSize: 13,
+        fontWeight: isActive ? '800' : '600',
+        color: isActive ? '#fff' : isWatched ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.7)',
+      }}
+      numberOfLines={1}
+    >
+      {item.title || `Episode ${item.index}`}
+    </Text>
+
+    {/* Status icon kanan */}
+    {isActive ? (
+      <Ionicons name="play-circle" size={18} color={COLORS.gold} />
+    ) : isWatched && progress === 0 ? (
+      <Ionicons name="checkmark-circle" size={16} color={`${COLORS.gold}80`} />
+    ) : null}
+
     {/* Progress bar bawah */}
     {!isActive && progress > 0 && (
       <View style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0, height: 3,
-        backgroundColor: 'rgba(255,255,255,0.08)',
+        position: 'absolute', bottom: 0, left: 0, right: 0, height: 2,
+        backgroundColor: 'rgba(255,255,255,0.06)',
       }}>
         <View style={{
           width: `${progress * 100}%`,
@@ -194,20 +231,6 @@ const EpisodeButton = React.memo(({ item, isActive, isWatched, progress, onPress
         }} />
       </View>
     )}
-    {/* Dot kecil kalau udah selesai */}
-    {!isActive && isWatched && progress === 0 && (
-      <View style={{
-        position: 'absolute', top: 3, right: 3,
-        width: 6, height: 6, borderRadius: 3,
-        backgroundColor: COLORS.gold,
-      }} />
-    )}
-    <Text style={{
-      fontSize: 11, fontWeight: '900',
-      color: isActive ? '#000' : isWatched ? `${COLORS.gold}cc` : 'rgba(255,255,255,0.5)',
-    }}>
-      {item.index}
-    </Text>
   </TouchableOpacity>
 ));
 
@@ -219,9 +242,7 @@ export default function WatchScreen() {
   const insets   = useSafeAreaInsets();
   const videoRef = useRef<Video>(null);
 
-  // ✅ Dynamic EP_SIZE berdasarkan screen width — selalu square
   const { width: screenWidth } = useWindowDimensions();
-  const EP_SIZE = Math.floor((screenWidth - EP_PADDING * 2 - EP_GAP * (EP_COLS - 1)) / EP_COLS);
 
   const animeId = decodeAnimeId(slug ?? '');
 
@@ -229,6 +250,7 @@ export default function WatchScreen() {
   const [episodes, setEpisodes]                 = useState<Episode[]>([]);
   const [filteredEps, setFilteredEps]           = useState<Episode[]>([]);
   const [epSearch, setEpSearch]                 = useState('');
+  const [epPage, setEpPage]                     = useState(0);
   const [currentEpId, setCurrentEpId]           = useState<string | null>(null);
   const [serverGroup, setServerGroup]           = useState<ServerGroup>({});
   const [selectedQuality, setSelectedQuality]   = useState<string>('');
@@ -260,6 +282,7 @@ export default function WatchScreen() {
   const lastTapRight   = useRef(0);
   const controlsTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSaveTime   = useRef(0);
+  const xpAwardedEps   = useRef<Set<string>>(new Set());
 
   const controlsOpacity = useSharedValue(1);
   const controlsStyle   = useAnimatedStyle(() => ({ opacity: controlsOpacity.value }));
@@ -300,7 +323,6 @@ export default function WatchScreen() {
     const load = async () => {
       setIsLoading(true);
       try {
-        // Bug 1 fix: fetch detail dulu, jangan tunggu popular sebelum render
         const detailRes = await api.detail(animeId);
         if (detailRes.status && detailRes.data) {
           setAnime(detailRes.data);
@@ -326,7 +348,6 @@ export default function WatchScreen() {
           if (target) setCurrentEpId(target.id);
         }
         setIsLoading(false);
-        // Fetch popular di background, ga blok skeleton
         api.popular().then(recRes => {
           setRecommendations((recRes.data || []).slice(0, 5));
         }).catch(() => {});
@@ -336,7 +357,6 @@ export default function WatchScreen() {
     };
     load();
 
-    // Bug 2 fix: retry otomatis kalau koneksi balik dan data belum ada
     const unsubNet = NetInfo.addEventListener(state => {
       if (state.isConnected && !anime) load();
     });
@@ -390,7 +410,7 @@ export default function WatchScreen() {
   useEffect(() => {
     if (!anime || !currentEpId) return;
     const ep = episodes.find(e => e.id === currentEpId);
-    if (ep) { historyStorage.add(anime, ep.index); xpStorage.add(10); }
+    if (ep) { historyStorage.add(anime, ep.index); }
   }, [currentEpId, anime]);
 
   useEffect(() => {
@@ -409,21 +429,17 @@ export default function WatchScreen() {
   const availableQualities = Object.keys(serverGroup).filter(q => serverGroup[q]?.length > 0);
 
   const changeEpisode = useCallback((ep: Episode) => {
-    // Bug 4 fix: reset search biar episode aktif pasti keliatan di grid
     setEpSearch('');
-    setFilteredEps(prev => {
-      // Kalau episodes belum di-reset (filter aktif), kembalikan full list dulu
-      return prev;
-    });
     setCurrentEpId(ep.id);
   }, []);
 
-  // Bug 4 fix: saat currentEpId berubah, pastiin filteredEps ga filter out episode tsb
+  // Auto-jump ke halaman yang berisi episode aktif
   useEffect(() => {
     if (!currentEpId) return;
     setEpSearch('');
-    // Reset ke full list biar episode aktif pasti keliatan
     setFilteredEps(episodes);
+    const idx = episodes.findIndex(e => e.id === currentEpId);
+    if (idx >= 0) setEpPage(Math.floor(idx / EP_PAGE_SIZE));
   }, [currentEpId, episodes]);
 
   const handlePrev = useCallback(() => {
@@ -524,6 +540,11 @@ export default function WatchScreen() {
           if (prog > 0.9) {
             setWatchedEps(prev => new Set([...prev, currentEpId]));
             setEpProgress(prev => { const n = { ...prev }; delete n[currentEpId]; return n; });
+          }
+          // XP hanya sekali per episode, setelah nonton 70%+
+          if (prog >= 0.7 && !xpAwardedEps.current.has(currentEpId)) {
+            xpAwardedEps.current.add(currentEpId);
+            xpStorage.add(10);
           }
         }
       }
@@ -763,70 +784,96 @@ export default function WatchScreen() {
           </TouchableOpacity>
 
           {/* ── Daftar Episode ── */}
-          <View style={{ marginHorizontal: 16, backgroundColor: COLORS.card, borderRadius: 12,
-            borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
-            padding: EP_PADDING, marginBottom: 16 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center',
-              justifyContent: 'space-between', marginBottom: 12 }}>
-              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13,
-                textTransform: 'uppercase', letterSpacing: 1 }}>Daftar Episode</Text>
-              <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: '700' }}>
-                {episodes.length} eps
-              </Text>
-            </View>
+          {(() => {
+            const isSearching = epSearch.trim().length > 0;
+            const totalPages  = Math.ceil(episodes.length / EP_PAGE_SIZE);
+            const pageEps     = isSearching
+              ? filteredEps
+              : episodes.slice(epPage * EP_PAGE_SIZE, (epPage + 1) * EP_PAGE_SIZE);
 
-            {episodes.length > 5 && (
-              <View style={{ flexDirection: 'row', alignItems: 'center',
-                backgroundColor: COLORS.bg, borderRadius: 8, paddingHorizontal: 10,
-                paddingVertical: 7, borderWidth: 1,
-                borderColor: 'rgba(255,255,255,0.07)', marginBottom: 12, gap: 8 }}>
-                <Ionicons name="search-outline" size={14} color="rgba(255,255,255,0.3)" />
-                <TextInput value={epSearch} onChangeText={setEpSearch}
-                  placeholder="Cari episode..." placeholderTextColor="rgba(255,255,255,0.25)"
-                  keyboardType="numeric"
-                  style={{ flex: 1, color: '#fff', fontSize: 13, fontWeight: '600', paddingVertical: 0 }} />
-                {epSearch.length > 0 && (
-                  <TouchableOpacity onPress={() => setEpSearch('')}>
-                    <Ionicons name="close-circle" size={14} color="rgba(255,255,255,0.3)" />
-                  </TouchableOpacity>
+            return (
+              <View style={{ marginHorizontal: 16, backgroundColor: COLORS.card, borderRadius: 12,
+                borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+                padding: 16, marginBottom: 16 }}>
+
+                {/* Header */}
+                <View style={{ flexDirection: 'row', alignItems: 'center',
+                  justifyContent: 'space-between', marginBottom: 12 }}>
+                  <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13,
+                    textTransform: 'uppercase', letterSpacing: 1 }}>Daftar Episode</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: '700' }}>
+                    {episodes.length} eps
+                  </Text>
+                </View>
+
+                {/* Search */}
+                {episodes.length > 5 && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center',
+                    backgroundColor: COLORS.bg, borderRadius: 8, paddingHorizontal: 10,
+                    paddingVertical: 7, borderWidth: 1,
+                    borderColor: 'rgba(255,255,255,0.07)', marginBottom: 12, gap: 8 }}>
+                    <Ionicons name="search-outline" size={14} color="rgba(255,255,255,0.3)" />
+                    <TextInput value={epSearch} onChangeText={t => { setEpSearch(t); setEpPage(0); }}
+                      placeholder="Cari episode..." placeholderTextColor="rgba(255,255,255,0.25)"
+                      keyboardType="numeric"
+                      style={{ flex: 1, color: '#fff', fontSize: 13, fontWeight: '600', paddingVertical: 0 }} />
+                    {epSearch.length > 0 && (
+                      <TouchableOpacity onPress={() => setEpSearch('')}>
+                        <Ionicons name="close-circle" size={14} color="rgba(255,255,255,0.3)" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 )}
-              </View>
-            )}
 
-            {/* ✅ Episode grid — fixed number size, selalu kotak */}
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: EP_GAP }}>
-              {filteredEps.length === 0 ? (
-                <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12,
-                  fontWeight: '600', paddingVertical: 8 }}>Episode tidak ditemukan</Text>
-              ) : filteredEps.map(item => (
-                <EpisodeButton
-                  key={item.id}
-                  item={item}
-                  size={EP_SIZE}
-                  isActive={currentEpId === item.id}
-                  isWatched={watchedEps.has(item.id)}
-                  progress={epProgress[item.id] ?? 0}
-                  onPress={() => { Haptics.selectionAsync(); changeEpisode(item); }}
-                />
-              ))}
-            </View>
+                {/* Pagination tabs — hanya tampil kalau > 100 eps dan tidak sedang search */}
+                {!isSearching && totalPages > 1 && (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                    style={{ marginBottom: 12 }}
+                    contentContainerStyle={{ gap: 6, paddingRight: 4 }}>
+                    {Array.from({ length: totalPages }, (_, i) => {
+                      const from = i * EP_PAGE_SIZE + 1;
+                      const to   = Math.min((i + 1) * EP_PAGE_SIZE, episodes.length);
+                      const isActive = epPage === i;
+                      return (
+                        <TouchableOpacity key={i}
+                          onPress={() => { Haptics.selectionAsync(); setEpPage(i); }}
+                          style={{
+                            paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8,
+                            backgroundColor: isActive ? COLORS.gold : COLORS.bg,
+                            borderWidth: 1,
+                            borderColor: isActive ? COLORS.gold : 'rgba(255,255,255,0.1)',
+                          }}>
+                          <Text style={{
+                            fontSize: 11, fontWeight: '800',
+                            color: isActive ? '#000' : 'rgba(255,255,255,0.5)',
+                          }}>
+                            {from}–{to}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                )}
 
-            {/* Legend */}
-            <View style={{ flexDirection: 'row', gap: 16, marginTop: 12 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.gold }} />
-                <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 9, fontWeight: '600' }}>Sedang ditonton</Text>
+                {/* Episode list */}
+                <View>
+                  {pageEps.length === 0 ? (
+                    <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12,
+                      fontWeight: '600', paddingVertical: 8 }}>Episode tidak ditemukan</Text>
+                  ) : pageEps.map(item => (
+                    <EpisodeButton
+                      key={item.id}
+                      item={item}
+                      isActive={currentEpId === item.id}
+                      isWatched={watchedEps.has(item.id)}
+                      progress={epProgress[item.id] ?? 0}
+                      onPress={() => { Haptics.selectionAsync(); changeEpisode(item); }}
+                    />
+                  ))}
+                </View>
               </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                <View style={{ width: 8, height: 3, borderRadius: 2, backgroundColor: COLORS.gold }} />
-                <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 9, fontWeight: '600' }}>Progress</Text>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: COLORS.gold }} />
-                <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 9, fontWeight: '600' }}>Selesai</Text>
-              </View>
-            </View>
-          </View>
+            );
+          })()}
 
           {/* ── Info Anime ── */}
           {anime && (
