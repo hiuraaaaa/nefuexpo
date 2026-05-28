@@ -3,19 +3,12 @@ import { View, Text, TouchableOpacity, Dimensions, StatusBar } from 'react-nativ
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
 import FastImage from 'react-native-fast-image';
 import * as Haptics from 'expo-haptics';
 import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withSpring,
-  withRepeat,
-  withSequence,
-  cancelAnimation,
-  runOnJS,
-  Easing,
+  useSharedValue, useAnimatedStyle,
+  withTiming, withSpring, withRepeat, withSequence,
+  cancelAnimation, runOnJS, Easing,
 } from 'react-native-reanimated';
 import { COLORS, LOGO_URL } from '@/constants';
 import { api } from '@/hooks/api';
@@ -23,51 +16,39 @@ import { Anime } from '@/types';
 
 const { width, height } = Dimensions.get('window');
 
-const NUM_COLS    = 4;
-const CARD_GAP    = 6;
-const CARD_W      = (width * 1.3) / NUM_COLS - CARD_GAP;
-const CARD_H      = CARD_W * 1.45;
-const STEP        = CARD_H + CARD_GAP;
-const GRID_H      = height * 0.68;
+const NUM_COLS     = 4;
+const CARD_GAP     = 6;
+const CARD_W       = (width * 1.3) / NUM_COLS - CARD_GAP;
+const CARD_H       = CARD_W * 1.45;
+const STEP         = CARD_H + CARD_GAP;
+const GRID_H       = height * 0.68;
 const REPEAT_COUNT = 4;
 
 const COL_OFFSETS   = [0, -(STEP * 0.6), -(STEP * 0.2), -(STEP * 0.8)] as const;
 const COL_DURATIONS = [3800, 4400, 3400, 4800] as const;
 
 const CARD_STYLE = {
-  width: CARD_W,
-  height: CARD_H,
-  borderRadius: 8,
-  overflow: 'hidden' as const,
+  width: CARD_W, height: CARD_H,
+  borderRadius: 8, overflow: 'hidden' as const,
   backgroundColor: COLORS.card,
 };
 
-const IMAGE_STYLE = { width: '100%' as const, height: '100%' as const };
-
-// ─── Poster Card ──────────────────────────────────────────────────────────────
-
-const PosterCard = React.memo(({ item, index }: { item: Anime; index: number }) => (
+const PosterCard = React.memo(({ item }: { item: Anime }) => (
   <View style={CARD_STYLE}>
     {item.image_poster ? (
       <FastImage
         source={{ uri: item.image_poster, priority: FastImage.priority.low }}
-        style={IMAGE_STYLE}
+        style={{ width: '100%', height: '100%' }}
         resizeMode={FastImage.resizeMode.cover}
       />
     ) : null}
   </View>
 ));
 
-// ─── Poster Column ────────────────────────────────────────────────────────────
-
 const PosterColumn = React.memo(({ items, offsetY, duration }: {
-  items: Anime[];
-  offsetY: number;
-  duration: number;
+  items: Anime[]; offsetY: number; duration: number;
 }) => {
   const translateY = useSharedValue(offsetY);
-
-  // Repeat items sekali di memo, bukan tiap render
   const repeated = useMemo(
     () => Array.from({ length: REPEAT_COUNT }, () => items).flat(),
     [items]
@@ -81,8 +62,7 @@ const PosterColumn = React.memo(({ items, offsetY, duration }: {
         withTiming(offsetY - STEP, { duration, easing: Easing.linear }),
         withTiming(offsetY, { duration: 0 }),
       ),
-      -1,
-      false,
+      -1, false,
     );
     return () => cancelAnimation(translateY);
   }, [items.length]);
@@ -93,24 +73,19 @@ const PosterColumn = React.memo(({ items, offsetY, duration }: {
 
   return (
     <Animated.View style={[{ width: CARD_W, gap: CARD_GAP }, animStyle]}>
-      {repeated.map((a, i) => (
-        <PosterCard key={`${a.id}-${i}`} item={a} index={i} />
-      ))}
+      {repeated.map((a, i) => <PosterCard key={`${a.id}-${i}`} item={a} />)}
     </Animated.View>
   );
 });
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
-
 export default function WelcomeScreen() {
-  const router  = useRouter();
+  const router = useRouter();
   const [posters, setPosters] = useState<Anime[]>([]);
 
-  const opacity    = useSharedValue(0);
-  const translateY = useSharedValue(20);
+  const opacity        = useSharedValue(0);
+  const translateY     = useSharedValue(24);
   const overlayOpacity = useSharedValue(0);
 
-  // Split kolom di memo, recompute hanya jika posters berubah
   const cols = useMemo(
     () => [0, 1, 2, 3].map(i => posters.filter((_, idx) => idx % 4 === i)),
     [posters]
@@ -119,8 +94,8 @@ export default function WelcomeScreen() {
   useEffect(() => {
     api.ongoing().then(r => {
       setPosters(r.data?.slice(0, 32) || []);
-      opacity.value    = withTiming(1, { duration: 600 });
-      translateY.value = withSpring(0, { damping: 18, stiffness: 120 });
+      opacity.value    = withTiming(1, { duration: 700 });
+      translateY.value = withSpring(0, { damping: 16, stiffness: 100 });
     }).catch(() => {
       opacity.value = withTiming(1, { duration: 400 });
     });
@@ -131,9 +106,7 @@ export default function WelcomeScreen() {
     transform: [{ translateY: translateY.value }],
   }));
 
-  const overlayStyle = useAnimatedStyle(() => ({
-    opacity: overlayOpacity.value,
-  }));
+  const overlayStyle = useAnimatedStyle(() => ({ opacity: overlayOpacity.value }));
 
   const goMain    = useCallback(() => router.replace('/(tabs)'), [router]);
   const goExplore = useCallback(() => router.push('/(tabs)/explore'), [router]);
@@ -171,7 +144,7 @@ export default function WelcomeScreen() {
         </View>
       </View>
 
-      {/* Gradient fade bawah */}
+      {/* Gradient fade */}
       <LinearGradient
         colors={['transparent', 'rgba(8,8,10,0.5)', 'rgba(8,8,10,0.92)', '#08080a']}
         locations={[0, 0.35, 0.6, 0.8]}
@@ -181,7 +154,7 @@ export default function WelcomeScreen() {
         }}
       />
 
-      {/* Logo */}
+      {/* Logo top left */}
       <SafeAreaView style={{ position: 'absolute', top: 0, left: 0, right: 0 }}>
         <View style={{ paddingHorizontal: 24, paddingTop: 8 }}>
           <FastImage
@@ -193,37 +166,52 @@ export default function WelcomeScreen() {
       </SafeAreaView>
 
       {/* Bottom content */}
-      <Animated.View style={[{
-        position: 'absolute', bottom: 0, left: 0, right: 0,
-      }, contentStyle]}>
+      <Animated.View style={[{ position: 'absolute', bottom: 0, left: 0, right: 0 }, contentStyle]}>
         <SafeAreaView edges={['bottom']}>
-          <View style={{ paddingHorizontal: 24, paddingBottom: 32 }}>
+          <View style={{ paddingHorizontal: 28, paddingBottom: 36 }}>
 
-            {/* Icon */}
-            <View style={{
-              width: 48, height: 48, borderRadius: 10,
-              backgroundColor: COLORS.gold,
-              alignItems: 'center', justifyContent: 'center',
-              marginBottom: 18,
-              shadowColor: COLORS.gold, shadowOpacity: 0.4,
-              shadowRadius: 14, elevation: 8,
-            }}>
-              <Ionicons name="play-forward" size={22} color="#000" />
+            {/* App icon — logo di kiri bawah */}
+            <View style={{ marginBottom: 20 }}>
+              <FastImage
+                source={{ uri: LOGO_URL, priority: FastImage.priority.high }}
+                style={{
+                  width: 56, height: 56, borderRadius: 14,
+                  shadowColor: COLORS.gold, shadowOpacity: 0.3,
+                  shadowRadius: 14,
+                }}
+                resizeMode={FastImage.resizeMode.contain}
+              />
             </View>
 
             {/* Headline */}
             <Text style={{
-              color: '#fff', fontSize: 30, fontWeight: '900',
-              letterSpacing: -0.5, lineHeight: 36, marginBottom: 10,
+              color: '#fff',
+              fontSize: 36,
+              fontWeight: '900',
+              letterSpacing: -1,
+              lineHeight: 42,
+              marginBottom: 6,
             }}>
-              Tonton Anime{'\n'}
-              <Text style={{ color: COLORS.gold }}>Favorit Kamu</Text>
+              Tonton Anime
+            </Text>
+            <Text style={{
+              color: COLORS.gold,
+              fontSize: 36,
+              fontWeight: '900',
+              letterSpacing: -1,
+              lineHeight: 42,
+              marginBottom: 14,
+            }}>
+              Favorit Kamu
             </Text>
 
             {/* Subtitle */}
             <Text style={{
-              color: 'rgba(255,255,255,0.4)', fontSize: 13,
-              lineHeight: 20, marginBottom: 28,
+              color: 'rgba(255,255,255,0.38)',
+              fontSize: 13,
+              lineHeight: 21,
+              marginBottom: 32,
+              fontWeight: '500',
             }}>
               Ribuan judul anime subtitle Indonesia.{'\n'}Gratis, tanpa iklan, kualitas hingga 1080p.
             </Text>
@@ -234,13 +222,13 @@ export default function WelcomeScreen() {
               activeOpacity={0.85}
               style={{
                 backgroundColor: COLORS.gold,
-                paddingVertical: 14, borderRadius: 10,
-                alignItems: 'center', marginBottom: 8,
-                shadowColor: COLORS.gold, shadowOpacity: 0.3,
-                shadowRadius: 12, elevation: 6,
+                paddingVertical: 16, borderRadius: 14,
+                alignItems: 'center', marginBottom: 10,
+                shadowColor: COLORS.gold, shadowOpacity: 0.35,
+                shadowRadius: 16, elevation: 8,
               }}
             >
-              <Text style={{ color: '#000', fontWeight: '900', fontSize: 15, letterSpacing: 0.3 }}>
+              <Text style={{ color: '#000', fontWeight: '900', fontSize: 15, letterSpacing: 0.2 }}>
                 Mulai Nonton
               </Text>
             </TouchableOpacity>
@@ -250,13 +238,13 @@ export default function WelcomeScreen() {
               onPress={() => navigateTo('explore')}
               activeOpacity={0.85}
               style={{
-                paddingVertical: 14, borderRadius: 10,
+                paddingVertical: 16, borderRadius: 14,
                 alignItems: 'center',
                 backgroundColor: 'rgba(255,255,255,0.05)',
-                borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
+                borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
               }}
             >
-              <Text style={{ color: 'rgba(255,255,255,0.5)', fontWeight: '700', fontSize: 15 }}>
+              <Text style={{ color: 'rgba(255,255,255,0.45)', fontWeight: '700', fontSize: 15 }}>
                 Jelajahi Anime
               </Text>
             </TouchableOpacity>
