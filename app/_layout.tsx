@@ -4,7 +4,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useEffect, useState } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
-import { useTheme } from '@/hooks/theme';
+import { loadSavedTheme, useTheme } from '@/hooks/theme';
 import { isAdmin, onAuthStateChanged } from '@/hooks/auth';
 import DebugOverlay from '@/components/DebugOverlay';
 import MaintenancePage from '@/components/MaintenancePage';
@@ -26,7 +26,10 @@ function AppLayout() {
   const [adminUser, setAdminUser]     = useState(false);
   const [appReady, setAppReady]       = useState(false);
 
-  // ✅ loadSavedTheme dihapus — theme.ts udah sync otomatis saat module load
+  // ✅ Load saved theme — dikembalikan biar ga FC
+  useEffect(() => {
+    loadSavedTheme();
+  }, []);
 
   // Track auth state
   useEffect(() => {
@@ -54,7 +57,7 @@ function AppLayout() {
     return unsub;
   }, [adminUser]);
 
-  // ✅ Hide splash dengan fade setelah theme ready
+  // ✅ Hide splash setelah theme ready
   useEffect(() => {
     if (!appReady) {
       setAppReady(true);
@@ -80,7 +83,6 @@ function AppLayout() {
       <Stack screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: theme.bg },
-        // ✅ Animasi fade biar transisi splash → app lebih smooth
         animation: 'fade',
       }}>
         <Stack.Screen name="index" />
