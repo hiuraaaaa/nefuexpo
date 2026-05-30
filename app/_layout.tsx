@@ -3,12 +3,16 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useEffect, useState } from 'react';
-import { loadSavedTheme, useTheme } from '@/hooks/theme';
+import * as SplashScreen from 'expo-splash-screen';
+import { useTheme } from '@/hooks/theme';
 import { isAdmin, onAuthStateChanged } from '@/hooks/auth';
 import DebugOverlay from '@/components/DebugOverlay';
 import MaintenancePage from '@/components/MaintenancePage';
 import firestore from '@react-native-firebase/firestore';
 import '../global.css';
+
+// ✅ Tahan splash sampai app beneran siap
+SplashScreen.preventAutoHideAsync();
 
 interface MaintenanceData {
   isActive: boolean;
@@ -20,12 +24,11 @@ function AppLayout() {
   const theme = useTheme();
   const [maintenance, setMaintenance] = useState<MaintenanceData | null>(null);
   const [adminUser, setAdminUser]     = useState(false);
+  const [appReady, setAppReady]       = useState(false);
 
-  useEffect(() => {
-    loadSavedTheme();
-  }, []);
+  // ✅ loadSavedTheme dihapus — theme.ts udah sync otomatis saat module load
 
-  // Track auth state buat tau admin atau bukan
+  // Track auth state
   useEffect(() => {
     const unsub = onAuthStateChanged(() => {
       setAdminUser(isAdmin());
@@ -46,13 +49,19 @@ function AppLayout() {
           setMaintenance(null);
         }
       }, () => {
-        // Kalau gagal fetch, jangan blok app
         setMaintenance(null);
       });
     return unsub;
   }, [adminUser]);
 
-  // Kalau maintenance aktif dan bukan admin → tampil maintenance page
+  // ✅ Hide splash dengan fade setelah theme ready
+  useEffect(() => {
+    if (!appReady) {
+      setAppReady(true);
+      SplashScreen.hideAsync();
+    }
+  }, [theme]);
+
   if (maintenance) {
     return (
       <>
@@ -68,9 +77,14 @@ function AppLayout() {
   return (
     <>
       <StatusBar style={theme.id === 'pure-white' ? 'dark' : 'light'} backgroundColor={theme.bg} />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.bg } }}>
+      <Stack screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: theme.bg },
+        // ✅ Animasi fade biar transisi splash → app lebih smooth
+        animation: 'fade',
+      }}>
         <Stack.Screen name="index" />
-        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
         <Stack.Screen
           name="watch/[slug]"
           options={{ animation: 'slide_from_bottom' }}
