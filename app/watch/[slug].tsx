@@ -13,7 +13,7 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Slider from '@react-native-community/slider';
-import FastImage from 'react-native-fast-image';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   useSharedValue, useAnimatedStyle,
@@ -882,19 +882,19 @@ export default function WatchScreen() {
               borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' }}>
 
               <View style={{ height: 200, alignItems: 'center', justifyContent: 'flex-end' }}>
-                <FastImage
-                  source={{ uri: anime.image_cover || anime.image_poster, priority: FastImage.priority.normal }}
+                <Image
+                  source={{ uri: anime.image_cover || anime.image_poster, priority: "normal" }}
                   style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.25 }}
-                  resizeMode={FastImage.resizeMode.cover}
+                  contentFit="cover"
                 />
                 <LinearGradient
                   colors={['transparent', COLORS.card]}
                   style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '60%' }}
                 />
-                <FastImage
-                  source={{ uri: anime.image_poster, priority: FastImage.priority.high }}
+                <Image
+                  source={{ uri: anime.image_poster, priority: "high" }}
                   style={{ width: 110, aspectRatio: 3/4.2, borderRadius: 10 }}
-                  resizeMode={FastImage.resizeMode.cover}
+                  contentFit="cover"
                 />
               </View>
 
@@ -996,9 +996,9 @@ export default function WatchScreen() {
                     marginBottom: 10, backgroundColor: COLORS.card, borderRadius: 10,
                     padding: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' }}
                   activeOpacity={0.8}>
-                  <FastImage source={{ uri: a.image_poster, priority: FastImage.priority.low }}
+                  <Image source={{ uri: a.image_poster, priority: "low" }}
                     style={{ width: 44, aspectRatio: 3/4.2, borderRadius: 6 }}
-                    resizeMode={FastImage.resizeMode.cover} />
+                    contentFit="cover" />
                   <View style={{ flex: 1 }}>
                     <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}
                       numberOfLines={1}>{a.title}</Text>
