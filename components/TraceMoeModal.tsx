@@ -8,7 +8,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
-import FastImage from 'react-native-fast-image';
+import { Image } from 'expo-image';
 import Animated, { FadeIn, FadeInDown, useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/hooks/theme';
@@ -43,10 +43,10 @@ const ResultCard = React.memo(({ result, index, onPress, theme }: {
         style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}
       >
         {/* Preview thumbnail dari trace.moe */}
-        <FastImage
+        <Image
           source={{ uri: result.image }}
           style={styles.cardThumb}
-          resizeMode={FastImage.resizeMode.cover}
+          contentFit="cover"
         />
 
         <View style={{ flex: 1, gap: 4 }}>
@@ -224,10 +224,10 @@ export default function TraceMoeModal({ visible, onClose }: Props) {
 
             {/* Preview kalau ada */}
             {previewUri && (
-              <FastImage
+              <Image
                 source={{ uri: previewUri }}
                 style={styles.preview}
-                resizeMode={FastImage.resizeMode.contain}
+                contentFit="contain"
               />
             )}
 
@@ -265,10 +265,10 @@ export default function TraceMoeModal({ visible, onClose }: Props) {
         {phase === 'searching' && (
           <Animated.View entering={FadeIn.duration(150)} style={styles.centeredFlex}>
             {previewUri && (
-              <FastImage
+              <Image
                 source={{ uri: previewUri }}
                 style={styles.preview}
-                resizeMode={FastImage.resizeMode.contain}
+                contentFit="contain"
               />
             )}
             <ActivityIndicator color={theme.accent} size="large" style={{ marginTop: 24 }} />
@@ -291,10 +291,10 @@ export default function TraceMoeModal({ visible, onClose }: Props) {
             showsVerticalScrollIndicator={false}
           >
             {previewUri && (
-              <FastImage
+              <Image
                 source={{ uri: previewUri }}
                 style={[styles.preview, { marginBottom: 12 }]}
-                resizeMode={FastImage.resizeMode.contain}
+                contentFit="contain"
               />
             )}
             <Text style={[styles.resultsLabel, { color: theme.subtext }]}>
