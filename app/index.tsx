@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, Dimensions, StatusBar } from 'react-nativ
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import FastImage from 'react-native-fast-image';
+import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import Animated, {
   useSharedValue, useAnimatedStyle,
@@ -36,10 +36,10 @@ const CARD_STYLE = {
 const PosterCard = React.memo(({ item }: { item: Anime }) => (
   <View style={CARD_STYLE}>
     {item.image_poster ? (
-      <FastImage
-        source={{ uri: item.image_poster, priority: FastImage.priority.low }}
+      <Image
+        source={{ uri: item.image_poster, priority: "low" }}
         style={{ width: '100%', height: '100%' }}
-        resizeMode={FastImage.resizeMode.cover}
+        contentFit="cover"
       />
     ) : null}
   </View>
@@ -157,10 +157,10 @@ export default function WelcomeScreen() {
       {/* Logo top left */}
       <SafeAreaView style={{ position: 'absolute', top: 0, left: 0, right: 0 }}>
         <View style={{ paddingHorizontal: 24, paddingTop: 8 }}>
-          <FastImage
-            source={{ uri: LOGO_URL, priority: FastImage.priority.high }}
+          <Image
+            source={{ uri: LOGO_URL, priority: "high" }}
             style={{ width: 36, height: 36 }}
-            resizeMode={FastImage.resizeMode.contain}
+            contentFit="contain"
           />
         </View>
       </SafeAreaView>
@@ -172,14 +172,14 @@ export default function WelcomeScreen() {
 
             {/* App icon — logo di kiri bawah */}
             <View style={{ marginBottom: 20 }}>
-              <FastImage
-                source={{ uri: LOGO_URL, priority: FastImage.priority.high }}
+              <Image
+                source={{ uri: LOGO_URL, priority: "high" }}
                 style={{
                   width: 56, height: 56, borderRadius: 14,
                   shadowColor: COLORS.gold, shadowOpacity: 0.3,
                   shadowRadius: 14,
                 }}
-                resizeMode={FastImage.resizeMode.contain}
+                contentFit="contain"
               />
             </View>
 
