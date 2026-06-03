@@ -9,7 +9,7 @@ import { ScheduleCardSkeleton } from '@/components/Skeleton';
 import { useTheme } from '@/hooks/theme';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import FastImage from 'react-native-fast-image';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -127,10 +127,10 @@ const ScheduleCard = React.memo(({ anime, index, onPress, theme }: ScheduleCardP
         style={[s.card, { backgroundColor: theme.card, borderColor: theme.border }]}
       >
         <View style={s.row}>
-          <FastImage
-            source={{ uri: anime.image_poster, priority: FastImage.priority.normal }}
+          <Image
+            source={{ uri: anime.image_poster, priority: "normal" }}
             style={s.poster}
-            resizeMode={FastImage.resizeMode.cover}
+            contentFit="cover"
           />
           <LinearGradient
             colors={[theme.card + '00', theme.card]}
