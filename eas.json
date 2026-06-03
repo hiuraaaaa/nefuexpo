@@ -21,6 +21,16 @@
         "buildType": "app-bundle"
       },
       "channel": "production"
+    },
+    "tv": {
+      "android": {
+        "buildType": "apk"
+      },
+      "distribution": "internal",
+      "channel": "preview",
+      "env": {
+        "EXPO_TV": "1"
+      }
     }
   },
   "submit": {
