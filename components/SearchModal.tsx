@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import FastImage from 'react-native-fast-image';
+import { Image } from 'expo-image';
 import Animated, {
   useSharedValue, useAnimatedStyle,
   withTiming, withSpring, FadeIn,
@@ -48,11 +48,11 @@ const ResultItem = React.memo(({ item, query, onPress }: {
   return (
     <TouchableOpacity onPress={onPress} onPressIn={onPressIn} onPressOut={onPressOut} activeOpacity={1}>
       <Animated.View style={[styles.resultItem, animStyle]}>
-        {/* ✅ FastImage — konsisten sama screen lain, lebih cepat */}
-        <FastImage
-          source={{ uri: item.image_poster, priority: FastImage.priority.normal }}
+        {/* ✅ expo-image — lebih cepat, support caching */}
+        <Image
+          source={{ uri: item.image_poster, priority: "normal" }}
           style={styles.resultThumb}
-          resizeMode={FastImage.resizeMode.cover}
+          contentFit="cover"
         />
         <View style={{ flex: 1 }}>
           <Text style={styles.resultTitle} numberOfLines={2}>
