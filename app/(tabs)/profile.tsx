@@ -4,7 +4,7 @@ import {
   Alert, Modal, TextInput, FlatList, Dimensions,
   Linking,
 } from 'react-native';
-import FastImage from 'react-native-fast-image';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -644,7 +644,7 @@ export default function ProfileScreen() {
             <Animated.View entering={FadeInDown.delay(0).springify()} style={{ marginHorizontal: 16, marginBottom: 8, borderRadius: 16, overflow: 'hidden', backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border }}>
               <LinearGradient colors={[theme.accentDim, 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16 }}>
-                <FastImage source={{ uri: user.photoURL ?? `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName ?? 'User')}` }} style={{ width: 58, height: 58, borderRadius: 29, borderWidth: 2, borderColor: theme.accent }} />
+                <Image source={{ uri: user.photoURL ?? `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName ?? 'User')}` }} style={{ width: 58, height: 58, borderRadius: 29, borderWidth: 2, borderColor: theme.accent }} />
                 <View style={{ flex: 1, gap: 3 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <Text style={{ color: theme.text, fontSize: 15, fontWeight: '800' }} numberOfLines={1}>{user.displayName}</Text>
@@ -688,7 +688,7 @@ export default function ProfileScreen() {
                   {favorites.slice(0, 5).map((a, i) => (
                     <TouchableOpacity key={`fav-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: i < Math.min(favorites.length, 5) - 1 ? 1 : 0, borderBottomColor: theme.border }}
                       onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(`/watch/${a.id}`); }}>
-                      <FastImage source={{ uri: a.image_poster, priority: FastImage.priority.normal }} style={{ width: 38, aspectRatio: 3 / 4.5, borderRadius: 6 }} resizeMode={FastImage.resizeMode.cover} />
+                      <Image source={{ uri: a.image_poster, priority: "normal" }} style={{ width: 38, aspectRatio: 3 / 4.5, borderRadius: 6 }} contentFit="cover" />
                       <View style={{ flex: 1 }}>
                         <Text style={{ color: theme.text, fontSize: 12, fontWeight: '600' }} numberOfLines={1}>{a.title}</Text>
                         <Text style={{ color: theme.subtext, fontSize: 10, marginTop: 2 }}>{a.type} • {a.status}</Text>
@@ -708,7 +708,7 @@ export default function ProfileScreen() {
                   {history.map((h, i) => (
                     <TouchableOpacity key={`hist-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: i < history.length - 1 ? 1 : 0, borderBottomColor: theme.border }}
                       onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(`/watch/${h.anime.id}`); }}>
-                      <FastImage source={{ uri: h.anime.image_poster, priority: FastImage.priority.low }} style={{ width: 38, aspectRatio: 3 / 4.5, borderRadius: 6 }} resizeMode={FastImage.resizeMode.cover} />
+                      <Image source={{ uri: h.anime.image_poster, priority: "low" }} style={{ width: 38, aspectRatio: 3 / 4.5, borderRadius: 6 }} contentFit="cover" />
                       <View style={{ flex: 1 }}>
                         <Text style={{ color: theme.text, fontSize: 12, fontWeight: '600' }} numberOfLines={1}>{h.anime.title}</Text>
                         <Text style={{ color: theme.subtext, fontSize: 10, marginTop: 2 }}>Episode {h.episodeIndex}</Text>
@@ -847,7 +847,7 @@ export default function ProfileScreen() {
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: theme.card, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: theme.border }}
                   onPress={() => { Haptics.selectionAsync(); setSelectedUser(item); setXpInput(String(item.xp ?? 0)); setShowUserModal(true); }}
                 >
-                  <FastImage source={{ uri: item.photoURL ?? `https://ui-avatars.com/api/?name=${encodeURIComponent(item.displayName ?? 'User')}` }} style={{ width: 40, height: 40, borderRadius: 20 }} />
+                  <Image source={{ uri: item.photoURL ?? `https://ui-avatars.com/api/?name=${encodeURIComponent(item.displayName ?? 'User')}` }} style={{ width: 40, height: 40, borderRadius: 20 }} />
                   <View style={{ flex: 1 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13 }} numberOfLines={1}>{item.displayName}</Text>
