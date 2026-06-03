@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import FastImage from 'react-native-fast-image';
+import { Image } from 'expo-image';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -48,14 +48,14 @@ export default function AnimeCard({ anime, onPress, width }: Props) {
     >
       {/* Poster */}
       <View style={styles.posterWrapper}>
-        <FastImage
+        <Image
           source={{
             uri: anime.image_poster,
-            priority: FastImage.priority.normal,
-            cache: FastImage.cacheControl.immutable,
+            priority: "normal",
+            cachePolicy: "memory-disk",
           }}
           style={StyleSheet.absoluteFillObject}
-          resizeMode={FastImage.resizeMode.cover}
+          contentFit="cover"
         />
 
         <LinearGradient
