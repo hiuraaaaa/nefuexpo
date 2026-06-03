@@ -3,7 +3,7 @@ import {
   View, Text, TouchableOpacity, ScrollView,
   Dimensions, RefreshControl, Share, Linking,
 } from 'react-native';
-import FastImage from 'react-native-fast-image';
+import { Image } from 'expo-image';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
@@ -141,7 +141,7 @@ function MovieRankItem({ anime, index, onPress, theme }: {
           borderColor: index < 3 ? theme.accentDim : theme.border,
         }}
       >
-        <FastImage source={{ uri: anime.image_cover || anime.image_poster, priority: FastImage.priority.normal }} style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '55%', opacity: 0.6 }} resizeMode={FastImage.resizeMode.cover} />
+        <Image source={{ uri: anime.image_cover || anime.image_poster, priority: "normal" }} style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '55%', opacity: 0.6 }} contentFit="cover" />
         <LinearGradient colors={[theme.card, theme.card, 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '75%' }} />
         <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 16, zIndex: 1, backgroundColor: index < 3 ? theme.accent : theme.border, borderWidth: index < 3 ? 0 : 1, borderColor: theme.border }}>
           <Text style={{ fontWeight: '900', fontSize: 14, color: index < 3 ? '#000' : theme.subtext }}>{index + 1}</Text>
@@ -265,7 +265,7 @@ export default function HomeScreen() {
         {/* Hero Carousel */}
         <View style={{ width, height: width * 0.7, backgroundColor: theme.card }}>
           <View style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 30, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10 }}>
-            <FastImage source={{ uri: LOGO_URL, priority: FastImage.priority.high }} style={{ width: 40, height: 40 }} resizeMode={FastImage.resizeMode.contain} />
+            <Image source={{ uri: LOGO_URL, priority: "high" }} style={{ width: 40, height: 40 }} contentFit="contain" />
             <TouchableOpacity onPress={() => { Haptics.selectionAsync(); setSearchOpen(true); }} style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}>
               <View style={{ width: 13, height: 13, borderRadius: 6.5, borderWidth: 2, borderColor: 'rgba(255,255,255,0.8)' }} />
             </TouchableOpacity>
@@ -276,10 +276,10 @@ export default function HomeScreen() {
               <ScrollView ref={heroRef} horizontal pagingEnabled scrollEnabled={false} showsHorizontalScrollIndicator={false} style={{ width, height: '100%' }}>
                 {carouselItems.map((a, i) => (
                   <TouchableOpacity key={i} activeOpacity={0.9} onPress={() => goToAnime(a)} style={{ width, height: width * 0.7 }}>
-                    <FastImage source={{ uri: a.image_cover || a.image_poster, priority: FastImage.priority.high }} style={{ width: '100%', height: '100%', opacity: 0.6 }} resizeMode={FastImage.resizeMode.cover} />
+                    <Image source={{ uri: a.image_cover || a.image_poster, priority: "high" }} style={{ width: '100%', height: '100%', opacity: 0.6 }} contentFit="cover" />
                     <LinearGradient colors={['transparent', `${theme.bg}99`, `${theme.bg}f5`]} locations={[0.2, 0.55, 1]} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '80%' }} />
                     <View style={{ position: 'absolute', bottom: 24, left: 24, right: 24, flexDirection: 'row', alignItems: 'flex-end', gap: 16 }}>
-                      <FastImage source={{ uri: a.image_poster, priority: FastImage.priority.high }} style={{ width: 80, aspectRatio: 3 / 4.2, borderRadius: 8 }} resizeMode={FastImage.resizeMode.cover} />
+                      <Image source={{ uri: a.image_poster, priority: "high" }} style={{ width: 80, aspectRatio: 3 / 4.2, borderRadius: 8 }} contentFit="cover" />
                       <View style={{ flex: 1, marginBottom: 4 }}>
                         <Text style={{ color: theme.text, fontWeight: '900', fontSize: 18, lineHeight: 22, marginBottom: 4 }} numberOfLines={2}>{a.title}</Text>
                         <Text style={{ color: theme.subtext, fontSize: 10, lineHeight: 14, marginBottom: 8 }} numberOfLines={2}>{a.synopsis}</Text>
@@ -317,7 +317,7 @@ export default function HomeScreen() {
 
         {/* Share Banner */}
         <View style={{ marginHorizontal: 16, marginTop: 16, borderRadius: 16, overflow: 'hidden', backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border }}>
-          <FastImage source={{ uri: 'https://raw.githubusercontent.com/alip-jmbd/alipp/main/bc.jpg' }} style={{ position: 'absolute', width: '100%', height: '100%', opacity: 0.15 }} resizeMode={FastImage.resizeMode.cover} />
+          <Image source={{ uri: 'https://raw.githubusercontent.com/alip-jmbd/alipp/main/bc.jpg' }} style={{ position: 'absolute', width: '100%', height: '100%', opacity: 0.15 }} contentFit="cover" />
           <LinearGradient colors={[theme.accentDim, 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
           <View style={{ padding: 18 }}>
             <Text style={{ color: theme.text, fontWeight: '900', fontSize: 13, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 3 }}>Sebarkan Keseruan Ini!</Text>
