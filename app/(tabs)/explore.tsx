@@ -12,7 +12,7 @@ import { CardSkeleton } from '@/components/Skeleton';
 import { useTheme } from '@/hooks/theme';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import FastImage from 'react-native-fast-image';
+import { Image } from 'expo-image';
 
 const { width } = Dimensions.get('window');
 const NUM_COLUMNS = 3;
@@ -36,10 +36,10 @@ const AnimeGridCard = React.memo(({ item, index, onPress, theme }: {
         borderWidth: 1, borderColor: theme.border,
       }}
     >
-      <FastImage
-        source={{ uri: item.image_poster, priority: FastImage.priority.normal }}
+      <Image
+        source={{ uri: item.image_poster, priority: "normal" }}
         style={{ width: '100%', aspectRatio: 2 / 3 }}
-        resizeMode={FastImage.resizeMode.cover}
+        contentFit="cover"
       />
       <View style={{ padding: 7 }}>
         <Text style={{ color: theme.text, fontSize: 10, fontWeight: '700', lineHeight: 14 }}
