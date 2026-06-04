@@ -7,7 +7,6 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "channel": "development",
       "android": {
         "image": "latest"
       },
@@ -21,7 +20,6 @@
         "image": "latest"
       },
       "distribution": "internal",
-      "channel": "preview",
       "env": {
         "EXPO_USE_PRECOMPILED_MODULES": "1"
       }
@@ -31,7 +29,6 @@
         "buildType": "app-bundle",
         "image": "latest"
       },
-      "channel": "production",
       "env": {
         "EXPO_USE_PRECOMPILED_MODULES": "1"
       }
@@ -42,7 +39,6 @@
         "image": "latest"
       },
       "distribution": "internal",
-      "channel": "preview",
       "env": {
         "EXPO_TV": "1",
         "EXPO_USE_PRECOMPILED_MODULES": "1"
