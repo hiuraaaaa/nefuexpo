@@ -24,21 +24,22 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     jsEngine: 'hermes',
     enableProguardInReleaseBuilds: true,
     enableShrinkResourcesInReleaseBuilds: true,
-    // Android TV — targetSdk 35 sudah default di SDK 56
     targetSdkVersion: 35,
   },
-  // Android TV experimental
-  // Buat asset tv-banner.png ukuran 320x180px dan taruh di ./assets/
   androidTVBanner: './assets/tv-banner.png',
   plugins: [
     'expo-router',
+    ['expo-build-properties', {
+      android: {
+        kotlinVersion: '2.1.20'
+      }
+    }],
     ['expo-av', { microphonePermission: false }],
     'expo-screen-orientation',
     '@react-native-firebase/app',
     '@react-native-firebase/auth',
     '@react-native-google-signin/google-signin',
     ['expo-font', { fonts: [] }],
-    // withAndroidSdk35 dihapus — SDK 56 sudah targetSdk 35 by default
   ],
   scheme: 'nefusoft',
   updates: {
@@ -49,8 +50,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   experiments: {
     typedRoutes: true,
-    // React Compiler — optional, aktifkan kalau mau
-    // reactCompiler: true,
   },
   extra: {
     eas: {
