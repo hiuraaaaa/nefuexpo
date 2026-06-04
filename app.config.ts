@@ -42,12 +42,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ['expo-font', { fonts: [] }],
   ],
   scheme: 'nefusoft',
-  updates: {
-    url: 'https://u.expo.dev/6e2fd9c8-8a82-474e-b71d-0428d2ce108b',
-  },
-  runtimeVersion: {
-    policy: 'appVersion',
-  },
   experiments: {
     typedRoutes: true,
   },
