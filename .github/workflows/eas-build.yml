@@ -34,24 +34,31 @@ jobs:
 
       - uses: android-actions/setup-android@v3
 
-      - run: npm install -g eas-cli
       - run: npm install --legacy-peer-deps
 
-      - name: Fake expo-doctor agar tidak block build
-        run: |
-          mkdir -p node_modules/.bin
-          printf '#!/bin/sh\nexit 0\n' > node_modules/.bin/expo-doctor
-          chmod +x node_modules/.bin/expo-doctor
-
-      - name: EAS Build (local)
-        run: eas build -p android --profile preview --non-interactive --local
+      - name: Prebuild Android
+        run: npx expo prebuild --platform android --clean
         env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           EXPO_USE_PRECOMPILED_MODULES: "1"
+
+      - name: Downgrade Gradle wrapper ke 8.13
+        run: |
+          sed -i 's|distributionUrl=.*|distributionUrl=https\\://services.gradle.org/distributions/gradle-8.13-bin.zip|' android/gradle/wrapper/gradle-wrapper.properties
+          cat android/gradle/wrapper/gradle-wrapper.properties
+
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
+      - name: Build APK
+        run: |
+          cd android
+          ./gradlew assembleRelease --no-daemon \
+            -Pkotlin.version=2.1.20 \
+            -Pandroid.suppressUnsupportedCompileSdk=35
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: nefusoft-preview.apk
-          path: "*.apk"
+          path: android/app/build/outputs/apk/release/*.apk
           retention-days: 7
