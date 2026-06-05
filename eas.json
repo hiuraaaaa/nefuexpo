@@ -8,7 +8,7 @@
       "developmentClient": true,
       "distribution": "internal",
       "android": {
-        "image": "latest"
+        "image": "sdk-56"
       },
       "env": {
         "EXPO_USE_PRECOMPILED_MODULES": "1"
@@ -17,7 +17,7 @@
     "preview": {
       "android": {
         "buildType": "apk",
-        "image": "latest"
+        "image": "sdk-56"
       },
       "distribution": "internal",
       "env": {
@@ -27,7 +27,7 @@
     "production": {
       "android": {
         "buildType": "app-bundle",
-        "image": "latest"
+        "image": "sdk-56"
       },
       "env": {
         "EXPO_USE_PRECOMPILED_MODULES": "1"
@@ -36,7 +36,7 @@
     "tv": {
       "android": {
         "buildType": "apk",
-        "image": "latest"
+        "image": "sdk-56"
       },
       "distribution": "internal",
       "env": {
