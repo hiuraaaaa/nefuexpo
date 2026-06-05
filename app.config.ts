@@ -28,6 +28,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   androidTVBanner: './assets/tv-banner.png',
   plugins: [
+    './plugins/withKotlinFix', 
     'expo-router',
     ['expo-build-properties', {
       android: {
