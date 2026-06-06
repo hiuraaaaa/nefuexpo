@@ -25,13 +25,15 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     enableProguardInReleaseBuilds: true,
     enableShrinkResourcesInReleaseBuilds: true,
     targetSdkVersion: 35,
+    newArchEnabled: false,
   },
   androidTVBanner: './assets/tv-banner.png',
   plugins: [
     'expo-router',
     ['expo-build-properties', {
       android: {
-        kotlinVersion: '2.1.20'
+        kotlinVersion: '2.1.20',
+        newArchEnabled: false,
       }
     }],
     ['expo-av', { microphonePermission: false }],
