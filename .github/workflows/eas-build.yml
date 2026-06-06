@@ -41,18 +41,6 @@ jobs:
         env:
           EXPO_USE_PRECOMPILED_MODULES: "1"
 
-      - name: Fix Kotlin version
-        run: |
-          sed -i 's/kotlinVersion = .*/kotlinVersion = "2.1.20"/' android/build.gradle
-          echo "" >> android/build.gradle
-
-      - name: Disable New Architecture
-        run: |
-          sed -i '/newArchEnabled/d' android/gradle.properties
-          echo "" >> android/gradle.properties
-          echo "newArchEnabled=false" >> android/gradle.properties
-          cat android/gradle.properties
-
       - name: Downgrade Gradle wrapper ke 8.13
         run: |
           sed -i 's|distributionUrl=.*|distributionUrl=https\\://services.gradle.org/distributions/gradle-8.13-bin.zip|' android/gradle/wrapper/gradle-wrapper.properties
