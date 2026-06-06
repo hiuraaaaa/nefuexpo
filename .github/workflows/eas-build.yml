@@ -54,7 +54,8 @@ jobs:
           cd android
           ./gradlew assembleRelease --no-daemon \
             -Pkotlin.version=2.1.20 \
-            -Pandroid.suppressUnsupportedCompileSdk=35
+            -Pandroid.suppressUnsupportedCompileSdk=35 \
+            -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
