@@ -1,8 +1,8 @@
-import { MMKV } from 'react-native-mmkv';
+import { createMMKV } from 'react-native-mmkv';
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
 
-const storage = new MMKV({ id: 'nefusoft-xp' });
+const storage = createMMKV({ id: 'nefusoft-xp' });
 const XP_KEY  = 'nefusoft_xp';
 
 export interface XPData {
@@ -65,7 +65,6 @@ const syncToFirestore = async (data: XPData): Promise<void> => {
   try {
     const user = auth().currentUser;
     if (!user) return;
-    // ✅ _todayXP ikut di-sync — biar daily cap ga ke-reset pas logout/login
     await firestore().collection('users').doc(user.uid).update({
       xp:            data.xp,
       level:         data.level,
@@ -88,7 +87,6 @@ const getFromFirestore = async (): Promise<XPData | null> => {
       level:         d.level         ?? 1,
       streak:        d.streak        ?? 0,
       lastWatchDate: d.lastWatchDate ?? '',
-      // ✅ _todayXP diambil dari Firestore juga
       _todayXP:      d._todayXP      ?? 0,
     };
   } catch {
@@ -110,16 +108,13 @@ export const xpStorage = {
 
   add: async (amount: number): Promise<XPData> => {
     try {
-      const data  = await xpStorage.get();
+      const data     = await xpStorage.get();
       const today    = new Date().toDateString();
       const isNewDay = data.lastWatchDate !== today;
 
-      // ✅ streak hanya naik kalau user beneran nonton (ada episode yang di-add)
-      // bukan sekedar buka app
       const streak      = isNewDay ? data.streak + 1 : data.streak;
       const streakBonus = isNewDay ? 10 : 0;
 
-      // Daily cap 50 XP — max 5 episode per hari
       const todayXP = isNewDay ? 0 : (data._todayXP ?? 0);
       const capped  = Math.min(amount, Math.max(0, 50 - todayXP));
       const newXp   = data.xp + capped + streakBonus;
@@ -133,8 +128,8 @@ export const xpStorage = {
         _todayXP:      isNewDay ? capped : todayXP + capped,
       };
 
-      setLocal(updated);        // instant lokal
-      syncToFirestore(updated); // background, ga di-await
+      setLocal(updated);
+      syncToFirestore(updated);
       return updated;
     } catch {
       return getLocal();
@@ -153,3 +148,6 @@ export const xpStorage = {
     } catch {}
   },
 };
+
+
+

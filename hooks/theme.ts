@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { MMKV } from 'react-native-mmkv';
+import { createMMKV } from 'react-native-mmkv';
 import { THEMES, Theme } from '@/constants';
 
-const storage   = new MMKV({ id: 'nefusoft-theme' });
+const storage   = createMMKV({ id: 'nefusoft-theme' });
 const THEME_KEY = 'nefusoft_theme';
 
 let globalTheme: Theme              = THEMES[0];
@@ -13,7 +13,7 @@ const notifyListeners = (t: Theme) => listeners.forEach(fn => fn(t));
 export const setGlobalTheme = (themeId: string): void => {
   const theme = THEMES.find(t => t.id === themeId) ?? THEMES[0];
   globalTheme = theme;
-  storage.set(THEME_KEY, themeId); // synchronous — ga perlu await
+  storage.set(THEME_KEY, themeId);
   notifyListeners(theme);
 };
 
@@ -41,3 +41,6 @@ export const useTheme = (): Theme => {
 
   return theme;
 };
+
+
+

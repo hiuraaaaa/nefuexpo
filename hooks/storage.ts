@@ -1,10 +1,10 @@
-import { MMKV } from 'react-native-mmkv';
+import { createMMKV } from 'react-native-mmkv';
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
 import { Anime, HistoryItem } from '@/types';
 
 // ─── MMKV instance ────────────────────────────────────────────────────────────
-const storage = new MMKV({ id: 'nefusoft-storage' });
+const storage = createMMKV({ id: 'nefusoft-storage' });
 
 const HISTORY_KEY        = 'nefusoft_history';
 const AUTONEXT_KEY       = 'nefusoft_autonext';
@@ -89,11 +89,6 @@ export const clearSearchHistory = (): void => {
 export type ProgressData = { position: number; duration: number };
 
 export const progressStorage = {
-  /**
-   * Return { position, duration } atau null kalau belum ada data.
-   * Backward-compat: kalau key lama masih berupa number (getNumber),
-   * kita skip dan return null supaya nggak crash.
-   */
   get: (epId: string): ProgressData | null => {
     try {
       const key = `${PROGRESS_PREFIX}${sanitizeDocId(epId)}`;
@@ -111,10 +106,8 @@ export const progressStorage = {
     try {
       const key = `${PROGRESS_PREFIX}${sanitizeDocId(epId)}`;
       if (duration > 0 && position > 5 && position < duration - 30) {
-        // Simpan sebagai JSON string supaya bisa store duration juga
         storage.set(key, JSON.stringify({ position, duration }));
       } else if (duration > 0 && position >= duration - 30) {
-        // Episode selesai → hapus supaya nggak resume dari sini
         storage.delete(key);
       }
     } catch {}
@@ -180,3 +173,6 @@ export const favoritStorage = {
     else { await favoritStorage.add(anime); return true; }
   },
 };
+
+
+
