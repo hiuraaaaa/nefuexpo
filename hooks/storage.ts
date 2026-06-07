@@ -1,10 +1,10 @@
-import { MMKV } from 'react-native-mmkv';
+import { createMMKV } from 'react-native-mmkv';
 import { Anime, HistoryItem } from '@/types';
 
 // ─── Storage instances ────────────────────────────────────────────────────────
 // Pisah instance biar ga ada key collision & bisa clear per-domain
-export const storageMain     = new MMKV({ id: 'nefusoft-main' });
-export const storageProgress = new MMKV({ id: 'nefusoft-progress' });
+export const storageMain     = createMMKV({ id: 'nefusoft-main' });
+export const storageProgress = createMMKV({ id: 'nefusoft-progress' });
 
 // ─── Keys ─────────────────────────────────────────────────────────────────────
 const HISTORY_KEY        = 'history';
