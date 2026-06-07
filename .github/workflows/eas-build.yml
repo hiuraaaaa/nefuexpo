@@ -41,9 +41,9 @@ jobs:
 
       - name: Force expo-av source build
         run: |
-          find node_modules/expo-av/android -name "*.aar" -delete
-          echo "AAR files removed"
-          ls node_modules/expo-av/android/
+          find node_modules/expo-av/local-maven-repo -name "*.aar" -delete
+          echo "AAR removed:"
+          find node_modules/expo-av/local-maven-repo -type f
 
       - name: Downgrade Gradle wrapper ke 8.13
         run: |
@@ -63,7 +63,7 @@ jobs:
           cd android
           ./gradlew assembleDebug --no-daemon \
             -PbundleInDebug=true \
-            -Pkotlin.version=2.0.21 \
+            -Pkotlin.version=2.1.20 \
             -Pandroid.suppressUnsupportedCompileSdk=35 \
             -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g"
 
