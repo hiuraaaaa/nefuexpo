@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Video, ResizeMode, AVPlaybackStatus, Audio } from 'expo-av';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import * as Haptics from 'expo-haptics';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
@@ -19,7 +19,6 @@ import Animated, {
   useSharedValue, useAnimatedStyle,
   withTiming, FadeIn, FadeOut,
 } from 'react-native-reanimated';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS } from '@/constants';
 import { api, getAnimeSlug, decodeAnimeId, formatTime } from '@/hooks/api';
 import { historyStorage, progressStorage, favoritStorage } from '@/hooks/storage';
@@ -33,7 +32,7 @@ const { width } = Dimensions.get('window');
 const PIP_KEY  = 'nefusoft_pip';
 
 const SEEK_SEC     = 10;
-const EP_PAGE_SIZE = 100; // episode per halaman
+const EP_PAGE_SIZE = 100;
 
 type ServerGroup = { [quality: string]: Server[] };
 
@@ -154,7 +153,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-// ── Episode Row Item (list style) ──────────────────────────────────────────────
+// ── Episode Button ─────────────────────────────────────────────────────────────
 const EpisodeButton = React.memo(({ item, isActive, isWatched, progress, onPress }: {
   item: Episode;
   isActive: boolean;
@@ -178,56 +177,39 @@ const EpisodeButton = React.memo(({ item, isActive, isWatched, progress, onPress
       overflow: 'hidden',
     }}
   >
-    {/* Garis kiri aktif */}
     {isActive && (
       <View style={{
         position: 'absolute', left: 0, top: 0, bottom: 0,
         width: 3, backgroundColor: COLORS.gold, borderRadius: 999,
       }} />
     )}
-
-    {/* Nomor episode */}
     <Text style={{
-      width: 32,
-      fontSize: 14,
-      fontWeight: '900',
+      width: 32, fontSize: 14, fontWeight: '900',
       color: isActive ? COLORS.gold : isWatched ? `${COLORS.gold}99` : 'rgba(255,255,255,0.35)',
       marginRight: 10,
     }}>
       {item.index}
     </Text>
-
-    {/* Label */}
-    <Text
-      style={{
-        flex: 1,
-        fontSize: 13,
-        fontWeight: isActive ? '800' : '600',
-        color: isActive ? '#fff' : isWatched ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.7)',
-      }}
-      numberOfLines={1}
-    >
+    <Text style={{
+      flex: 1, fontSize: 13,
+      fontWeight: isActive ? '800' : '600',
+      color: isActive ? '#fff' : isWatched ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.7)',
+    }} numberOfLines={1}>
       {item.title || `Episode ${item.index}`}
     </Text>
-
-    {/* Status icon kanan */}
     {isActive ? (
       <Ionicons name="play-circle" size={18} color={COLORS.gold} />
     ) : isWatched && progress === 0 ? (
       <Ionicons name="checkmark-circle" size={16} color={`${COLORS.gold}80`} />
     ) : null}
-
-    {/* Progress bar bawah */}
     {!isActive && progress > 0 && (
       <View style={{
         position: 'absolute', bottom: 0, left: 0, right: 0, height: 2,
         backgroundColor: 'rgba(255,255,255,0.06)',
       }}>
         <View style={{
-          width: `${progress * 100}%`,
-          height: '100%',
-          backgroundColor: COLORS.gold,
-          borderRadius: 999,
+          width: `${progress * 100}%`, height: '100%',
+          backgroundColor: COLORS.gold, borderRadius: 999,
         }} />
       </View>
     )}
@@ -240,10 +222,8 @@ export default function WatchScreen() {
   const epParam  = useLocalSearchParams<{ ep?: string }>().ep;
   const router   = useRouter();
   const insets   = useSafeAreaInsets();
-  const videoRef = useRef<Video>(null);
 
   const { width: screenWidth } = useWindowDimensions();
-
   const animeId = decodeAnimeId(slug ?? '');
 
   const [anime, setAnime]                       = useState<AnimeDetail | null>(null);
@@ -287,6 +267,58 @@ export default function WatchScreen() {
   const controlsOpacity = useSharedValue(1);
   const controlsStyle   = useAnimatedStyle(() => ({ opacity: controlsOpacity.value }));
 
+  // ── expo-video player ──────────────────────────────────────────────────────
+  const player = useVideoPlayer(
+    selectedServer?.link ? { uri: selectedServer.link } : null,
+    p => { p.pause(); }
+  );
+
+  // Sync player state ke React state
+  useEffect(() => {
+    if (!player) return;
+    const statusSub = player.addListener('statusChange', ({ status }) => {
+      setIsBuffering(status === 'loading');
+    });
+    const playingSub = player.addListener('playingChange', ({ isPlaying: playing }) => {
+      setIsPlaying(playing);
+    });
+    const timeSub = player.addListener('timeUpdate', ({ currentTime, bufferedPosition }) => {
+      setPosition(currentTime);
+      setDuration(player.duration ?? 0);
+
+      if (currentEpId) {
+        const now = Date.now();
+        if (now - lastSaveTime.current > 5000) {
+          lastSaveTime.current = now;
+          const dur = player.duration ?? 0;
+          progressStorage.save(currentEpId, currentTime, dur);
+          if (dur > 0) {
+            const prog = currentTime / dur;
+            setEpProgress(prev => ({ ...prev, [currentEpId]: prog }));
+            if (prog > 0.9) {
+              setWatchedEps(prev => new Set([...prev, currentEpId]));
+              setEpProgress(prev => { const n = { ...prev }; delete n[currentEpId]; return n; });
+            }
+            if (prog >= 0.7 && !xpAwardedEps.current.has(currentEpId)) {
+              xpAwardedEps.current.add(currentEpId);
+              xpStorage.add(10);
+            }
+          }
+        }
+      }
+    });
+    const endSub = player.addListener('playToEnd', () => {
+      if (autoNext) handleNext();
+    });
+
+    return () => {
+      statusSub.remove();
+      playingSub.remove();
+      timeSub.remove();
+      endSub.remove();
+    };
+  }, [player, currentEpId, autoNext]);
+
   useEffect(() => {
     controlsOpacity.value = withTiming(showControls ? 1 : 0, { duration: 250 });
   }, [showControls]);
@@ -295,19 +327,6 @@ export default function WatchScreen() {
     if (isPlaying) activateKeepAwakeAsync();
     else deactivateKeepAwake();
   }, [isPlaying]);
-
-  useEffect(() => {
-    AsyncStorage.getItem(PIP_KEY).then(v => {
-      Audio.setAudioModeAsync({
-        staysActiveInBackground: v === 'true',
-        shouldDuckAndroid: false,
-        playThroughEarpieceAndroid: false,
-        allowsRecordingIOS: false,
-        interruptionModeIOS: 0,
-        interruptionModeAndroid: 1,
-      }).catch(() => {});
-    });
-  }, []);
 
   useEffect(() => {
     return () => {
@@ -395,9 +414,12 @@ export default function WatchScreen() {
           if (bestQ && group[bestQ]?.length > 0) {
             setSelectedQuality(bestQ);
             setSelectedServer(group[bestQ][0]);
+            // Restore progress setelah player ready
             const saved = progressStorage.get(currentEpId);
             if (saved && saved > 5) {
-              setTimeout(() => videoRef.current?.setPositionAsync(saved * 1000), 800);
+              setTimeout(() => {
+                if (player) player.seekBy(saved - (player.currentTime ?? 0));
+              }, 800);
             }
           }
         }
@@ -433,7 +455,6 @@ export default function WatchScreen() {
     setCurrentEpId(ep.id);
   }, []);
 
-  // Auto-jump ke halaman yang berisi episode aktif
   useEffect(() => {
     if (!currentEpId) return;
     setEpSearch('');
@@ -455,14 +476,17 @@ export default function WatchScreen() {
     setSelectedQuality(quality);
     setSelectedServer(server);
     setShowServerModal(false);
-    setTimeout(() => videoRef.current?.setPositionAsync(cur * 1000), 300);
-  }, [position]);
+    setTimeout(() => {
+      if (player) player.seekBy(cur - (player.currentTime ?? 0));
+    }, 300);
+  }, [position, player]);
 
   const togglePlayPause = useCallback(() => {
-    if (isPlaying) videoRef.current?.pauseAsync();
-    else videoRef.current?.playAsync();
+    if (!player) return;
+    if (isPlaying) player.pause();
+    else player.play();
     resetControlsTimer();
-  }, [isPlaying, resetControlsTimer]);
+  }, [isPlaying, player, resetControlsTimer]);
 
   const toggleFullscreen = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -497,7 +521,7 @@ export default function WatchScreen() {
   const handleTapLeft = useCallback(() => {
     const now = Date.now();
     if (now - lastTapLeft.current < 300) {
-      videoRef.current?.setPositionAsync(Math.max(0, position - SEEK_SEC) * 1000);
+      if (player) player.seekBy(-SEEK_SEC);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       setSeekLeft(true);
       if (seekLeftTimer.current) clearTimeout(seekLeftTimer.current);
@@ -505,12 +529,12 @@ export default function WatchScreen() {
       resetControlsTimer();
     } else { resetControlsTimer(); }
     lastTapLeft.current = now;
-  }, [position, resetControlsTimer]);
+  }, [player, resetControlsTimer]);
 
   const handleTapRight = useCallback(() => {
     const now = Date.now();
     if (now - lastTapRight.current < 300) {
-      videoRef.current?.setPositionAsync(Math.min(duration, position + SEEK_SEC) * 1000);
+      if (player) player.seekBy(SEEK_SEC);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       setSeekRight(true);
       if (seekRightTimer.current) clearTimeout(seekRightTimer.current);
@@ -518,38 +542,7 @@ export default function WatchScreen() {
       resetControlsTimer();
     } else { resetControlsTimer(); }
     lastTapRight.current = now;
-  }, [position, duration, resetControlsTimer]);
-
-  const handlePlaybackStatus = useCallback((status: AVPlaybackStatus) => {
-    if (!status.isLoaded) return;
-    setIsPlaying(status.isPlaying);
-    setPosition(status.positionMillis / 1000);
-    setDuration((status.durationMillis || 0) / 1000);
-    setIsBuffering(status.isBuffering);
-    if (status.didJustFinish && autoNext) handleNext();
-    if (status.isPlaying && currentEpId) {
-      const now = Date.now();
-      if (now - lastSaveTime.current > 5000) {
-        lastSaveTime.current = now;
-        const pos = status.positionMillis / 1000;
-        const dur = (status.durationMillis || 0) / 1000;
-        progressStorage.save(currentEpId, pos, dur);
-        if (dur > 0) {
-          const prog = pos / dur;
-          setEpProgress(prev => ({ ...prev, [currentEpId]: prog }));
-          if (prog > 0.9) {
-            setWatchedEps(prev => new Set([...prev, currentEpId]));
-            setEpProgress(prev => { const n = { ...prev }; delete n[currentEpId]; return n; });
-          }
-          // XP hanya sekali per episode, setelah nonton 70%+
-          if (prog >= 0.7 && !xpAwardedEps.current.has(currentEpId)) {
-            xpAwardedEps.current.add(currentEpId);
-            xpStorage.add(10);
-          }
-        }
-      }
-    }
-  }, [autoNext, currentEpId, handleNext]);
+  }, [player, resetControlsTimer]);
 
   const videoHeight = isFullscreen ? Dimensions.get('window').height : width * (9 / 16);
 
@@ -608,10 +601,12 @@ export default function WatchScreen() {
         marginTop: isFullscreen ? 0 : insets.top }}>
 
         {selectedServer && !isEpLoading ? (
-          <Video ref={videoRef} source={{ uri: selectedServer.link }}
+          <VideoView
+            player={player}
             style={{ width: '100%', height: '100%' }}
-            resizeMode={ResizeMode.CONTAIN} useNativeControls={false}
-            shouldPlay={false} onPlaybackStatusUpdate={handlePlaybackStatus} />
+            contentFit="contain"
+            nativeControls={false}
+          />
         ) : (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
             <ActivityIndicator color={COLORS.gold} size="large" />
@@ -710,7 +705,7 @@ export default function WatchScreen() {
                 maximumTrackTintColor="rgba(255,255,255,0.25)"
                 thumbTintColor={COLORS.gold}
                 onSlidingComplete={val => {
-                  videoRef.current?.setPositionAsync(val * 1000);
+                  if (player) player.seekBy(val - (player.currentTime ?? 0));
                   resetControlsTimer();
                 }}
               />
@@ -795,8 +790,6 @@ export default function WatchScreen() {
               <View style={{ marginHorizontal: 16, backgroundColor: COLORS.card, borderRadius: 12,
                 borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
                 padding: 16, marginBottom: 16 }}>
-
-                {/* Header */}
                 <View style={{ flexDirection: 'row', alignItems: 'center',
                   justifyContent: 'space-between', marginBottom: 12 }}>
                   <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13,
@@ -806,7 +799,6 @@ export default function WatchScreen() {
                   </Text>
                 </View>
 
-                {/* Search */}
                 {episodes.length > 5 && (
                   <View style={{ flexDirection: 'row', alignItems: 'center',
                     backgroundColor: COLORS.bg, borderRadius: 8, paddingHorizontal: 10,
@@ -825,7 +817,6 @@ export default function WatchScreen() {
                   </View>
                 )}
 
-                {/* Pagination tabs — hanya tampil kalau > 100 eps dan tidak sedang search */}
                 {!isSearching && totalPages > 1 && (
                   <ScrollView horizontal showsHorizontalScrollIndicator={false}
                     style={{ marginBottom: 12 }}
@@ -855,7 +846,6 @@ export default function WatchScreen() {
                   </ScrollView>
                 )}
 
-                {/* Episode list */}
                 <View>
                   {pageEps.length === 0 ? (
                     <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12,
@@ -880,7 +870,6 @@ export default function WatchScreen() {
             <View style={{ marginHorizontal: 16, marginBottom: 16, borderRadius: 16,
               overflow: 'hidden', backgroundColor: COLORS.card,
               borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' }}>
-
               <View style={{ height: 200, alignItems: 'center', justifyContent: 'flex-end' }}>
                 <Image
                   source={{ uri: anime.image_cover || anime.image_poster, priority: "normal" }}
@@ -897,13 +886,11 @@ export default function WatchScreen() {
                   contentFit="cover"
                 />
               </View>
-
               <View style={{ padding: 16 }}>
                 <Text style={{ color: '#fff', fontWeight: '900', fontSize: 18,
                   textAlign: 'center', marginBottom: 12, lineHeight: 24 }}>
                   {anime.title}
                 </Text>
-
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap',
                   justifyContent: 'center', gap: 8, marginBottom: 16 }}>
                   {anime.type ? (
@@ -929,7 +916,6 @@ export default function WatchScreen() {
                     </View>
                   ) : null}
                 </View>
-
                 {anime.synopsis ? (
                   <View style={{ marginBottom: 16 }}>
                     <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12,
@@ -948,7 +934,6 @@ export default function WatchScreen() {
                     )}
                   </View>
                 ) : null}
-
                 <View style={{ borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)' }}>
                   {anime.studio ? <InfoRow label="Studio" value={anime.studio} /> : null}
                   {anime.year   ? <InfoRow label="Tahun"  value={anime.year}   /> : null}
