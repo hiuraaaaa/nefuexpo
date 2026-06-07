@@ -39,6 +39,12 @@ jobs:
       - name: Prebuild Android
         run: npx expo prebuild --platform android --clean
 
+      - name: Force expo-av source build
+        run: |
+          find node_modules/expo-av/android -name "*.aar" -delete
+          echo "AAR files removed"
+          ls node_modules/expo-av/android/
+
       - name: Downgrade Gradle wrapper ke 8.13
         run: |
           sed -i 's|distributionUrl=.*|distributionUrl=https\\://services.gradle.org/distributions/gradle-8.13-bin.zip|' android/gradle/wrapper/gradle-wrapper.properties
@@ -46,11 +52,6 @@ jobs:
 
       - name: Make gradlew executable
         run: chmod +x android/gradlew
-
-      - name: Check expo-modules-core version
-        run: |
-          cd android
-          ./gradlew app:dependencies --configuration debugRuntimeClasspath --no-daemon | grep -E "expo-modules-core|expo-av" | head -30
 
       - name: Build APK
         run: |
