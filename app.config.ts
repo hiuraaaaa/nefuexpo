@@ -16,7 +16,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   android: {
     adaptiveIcon: {
       foregroundImage: './assets/icon.png',
-      backgroundColor: '#0a0a0c',
+      backgroundColor: '#F4CB7A',
     },
     package: 'com.nefusoft.anime',
     googleServicesFile: './google-services.json',
