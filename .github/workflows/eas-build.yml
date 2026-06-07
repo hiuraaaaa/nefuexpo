@@ -38,8 +38,6 @@ jobs:
 
       - name: Prebuild Android
         run: npx expo prebuild --platform android --clean
-        env:
-          EXPO_USE_PRECOMPILED_MODULES: "1"
 
       - name: Downgrade Gradle wrapper ke 8.13
         run: |
@@ -57,7 +55,7 @@ jobs:
             -Pkotlin.version=2.1.20 \
             -Pandroid.suppressUnsupportedCompileSdk=35 \
             -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g"
-            
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
