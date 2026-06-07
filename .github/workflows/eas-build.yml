@@ -53,6 +53,11 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
+      - name: Check expo-modules-core version
+        run: |
+          cd android
+          ./gradlew app:dependencies --configuration debugRuntimeClasspath --no-daemon | grep -E "expo-modules-core|expo-av" | head -30
+
       - name: Build APK
         run: |
           cd android
