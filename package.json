@@ -3,13 +3,14 @@
   "version": "1.0.0",
   "main": "expo-router/entry",
   "scripts": {
-    "start": "npx expo start",
-    "android": "npx expo run:android",
-    "ios": "npx expo run:ios",
-    "tv": "npx expo run:android --variant tvRelease",
-    "build:android": "eas build --platform android",
-    "build:tv": "eas build --platform android --profile tv"
-  },
+  "start": "npx expo start",
+  "android": "npx expo run:android",
+  "ios": "npx expo run:ios",
+  "tv": "npx expo run:android --variant tvRelease",
+  "build:android": "eas build --platform android",
+  "build:tv": "eas build --platform android --profile tv",
+  "postinstall": "find node_modules/expo-av/local-maven-repo -name '*.aar' -delete"
+},
   "dependencies": {
     "@expo/vector-icons": "^14.0.4",
     "@gorhom/bottom-sheet": "^5.2.14",
