@@ -2,7 +2,8 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Component, ReactNode } from 'react';
+import { View, Text, ScrollView } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { loadSavedTheme, useTheme } from '@/hooks/theme';
 import { isAdmin, onAuthStateChanged } from '@/hooks/auth';
@@ -11,53 +12,68 @@ import MaintenancePage from '@/components/MaintenancePage';
 import firestore from '@react-native-firebase/firestore';
 import '../global.css';
 
-// ✅ Tahan splash sampai app beneran siap
 SplashScreen.preventAutoHideAsync();
 
+// ─── Error Boundary ───────────────────────────────────────────────────────────
+class RootErrorBoundary extends Component<
+  { children: ReactNode },
+  { error: string | null }
+> {
+  state = { error: null };
+  static getDerivedStateFromError(e: Error) {
+    return { error: e.message + '\n\n' + e.stack };
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <ScrollView style={{ flex: 1, backgroundColor: '#000' }}
+          contentContainerStyle={{ padding: 20, paddingTop: 60 }}>
+          <Text style={{ color: '#e63946', fontSize: 14, fontWeight: '900', marginBottom: 8 }}>
+            🔴 JS CRASH
+          </Text>
+          <Text style={{ color: '#fff', fontSize: 11, fontFamily: 'monospace', lineHeight: 18 }}>
+            {this.state.error}
+          </Text>
+        </ScrollView>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 interface MaintenanceData {
   isActive: boolean;
   message?: string;
   estimasi?: string;
 }
 
+// ─── AppLayout ────────────────────────────────────────────────────────────────
 function AppLayout() {
   const theme = useTheme();
   const [maintenance, setMaintenance] = useState<MaintenanceData | null>(null);
   const [adminUser, setAdminUser]     = useState(false);
   const [appReady, setAppReady]       = useState(false);
 
-  // ✅ Load saved theme — dikembalikan biar ga FC
-  useEffect(() => {
-    loadSavedTheme();
-  }, []);
+  useEffect(() => { loadSavedTheme(); }, []);
 
-  // Track auth state
   useEffect(() => {
-    const unsub = onAuthStateChanged(() => {
-      setAdminUser(isAdmin());
-    });
+    const unsub = onAuthStateChanged(() => { setAdminUser(isAdmin()); });
     return unsub;
   }, []);
 
-  // Realtime listener maintenance
   useEffect(() => {
     const unsub = firestore()
       .collection('config')
       .doc('maintenance')
       .onSnapshot(snap => {
         const data = snap.data() as MaintenanceData | undefined;
-        if (data?.isActive && !adminUser) {
-          setMaintenance(data);
-        } else {
-          setMaintenance(null);
-        }
-      }, () => {
-        setMaintenance(null);
-      });
+        if (data?.isActive && !adminUser) setMaintenance(data);
+        else setMaintenance(null);
+      }, () => { setMaintenance(null); });
     return unsub;
   }, [adminUser]);
 
-  // ✅ Hide splash setelah theme ready
   useEffect(() => {
     if (!appReady) {
       setAppReady(true);
@@ -69,10 +85,7 @@ function AppLayout() {
     return (
       <>
         <StatusBar style={theme.id === 'pure-white' ? 'dark' : 'light'} backgroundColor={theme.bg} />
-        <MaintenancePage
-          message={maintenance.message}
-          estimasi={maintenance.estimasi}
-        />
+        <MaintenancePage message={maintenance.message} estimasi={maintenance.estimasi} />
       </>
     );
   }
@@ -87,22 +100,22 @@ function AppLayout() {
       }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
-        <Stack.Screen
-          name="watch/[slug]"
-          options={{ animation: 'slide_from_bottom' }}
-        />
+        <Stack.Screen name="watch/[slug]" options={{ animation: 'slide_from_bottom' }} />
       </Stack>
       {__DEV__ && <DebugOverlay />}
     </>
   );
 }
 
+// ─── Root ─────────────────────────────────────────────────────────────────────
 export default function RootLayout() {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <AppLayout />
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <RootErrorBoundary>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          <AppLayout />
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </RootErrorBoundary>
   );
 }
