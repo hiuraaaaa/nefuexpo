@@ -29,7 +29,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { getCurrentUser } from '@/hooks/auth';
 
 const { width } = Dimensions.get('window');
-const PIP_KEY  = 'nefusoft_pip';
 
 const SEEK_SEC     = 10;
 const EP_PAGE_SIZE = 100;
@@ -165,12 +164,9 @@ const EpisodeButton = React.memo(({ item, isActive, isWatched, progress, onPress
     onPress={onPress}
     activeOpacity={0.75}
     style={{
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 14,
-      paddingVertical: 13,
-      borderRadius: 10,
-      marginBottom: 6,
+      flexDirection: 'row', alignItems: 'center',
+      paddingHorizontal: 14, paddingVertical: 13,
+      borderRadius: 10, marginBottom: 6,
       backgroundColor: isActive ? `${COLORS.gold}18` : 'transparent',
       borderWidth: 1,
       borderColor: isActive ? COLORS.gold : isWatched ? `${COLORS.gold}30` : 'rgba(255,255,255,0.06)',
@@ -239,7 +235,9 @@ export default function WatchScreen() {
   const [isLoading, setIsLoading]               = useState(true);
   const [isEpLoading, setIsEpLoading]           = useState(false);
   const [isFullscreen, setIsFullscreen]         = useState(false);
-  const [autoNext, setAutoNext]                 = useState(false);
+  const [autoNext, setAutoNext]                 = useState(
+    () => historyStorage.getAutoNext() // sync — langsung baca saat init
+  );
   const [showControls, setShowControls]         = useState(true);
   const [showServerModal, setShowServerModal]   = useState(false);
   const [isFavorited, setIsFavorited]           = useState(false);
@@ -273,16 +271,16 @@ export default function WatchScreen() {
     p => { p.pause(); }
   );
 
-  // Sync player state ke React state
+  // ── Sync player state ke React state ──────────────────────────────────────
   useEffect(() => {
     if (!player) return;
-    const statusSub = player.addListener('statusChange', ({ status }) => {
+    const statusSub  = player.addListener('statusChange', ({ status }) => {
       setIsBuffering(status === 'loading');
     });
     const playingSub = player.addListener('playingChange', ({ isPlaying: playing }) => {
       setIsPlaying(playing);
     });
-    const timeSub = player.addListener('timeUpdate', ({ currentTime, bufferedPosition }) => {
+    const timeSub    = player.addListener('timeUpdate', ({ currentTime }) => {
       setPosition(currentTime);
       setDuration(player.duration ?? 0);
 
@@ -291,6 +289,7 @@ export default function WatchScreen() {
         if (now - lastSaveTime.current > 5000) {
           lastSaveTime.current = now;
           const dur = player.duration ?? 0;
+          // MMKV sync — tidak perlu await
           progressStorage.save(currentEpId, currentTime, dur);
           if (dur > 0) {
             const prog = currentTime / dur;
@@ -337,6 +336,7 @@ export default function WatchScreen() {
     };
   }, []);
 
+  // ── Load anime detail ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!animeId) return;
     const load = async () => {
@@ -349,13 +349,18 @@ export default function WatchScreen() {
           setEpisodes(eps);
           setFilteredEps(eps);
 
+          // MMKV sync — baca progress semua episode sekaligus
           const progressMap: Record<string, number> = {};
           const watched = new Set<string>();
           for (const ep of eps) {
             const saved = progressStorage.get(ep.id);
-            if (saved > 0) {
-              progressMap[ep.id] = saved;
-              watched.add(ep.id);
+            if (saved && saved.position > 0) {
+              const ratio = saved.duration > 0 ? saved.position / saved.duration : 0;
+              if (ratio > 0.9) {
+                watched.add(ep.id);
+              } else {
+                progressMap[ep.id] = ratio;
+              }
             }
           }
           setEpProgress(progressMap);
@@ -370,7 +375,7 @@ export default function WatchScreen() {
         api.popular().then(recRes => {
           setRecommendations((recRes.data || []).slice(0, 5));
         }).catch(() => {});
-      } catch (e) {
+      } catch {
         setIsLoading(false);
       }
     };
@@ -389,6 +394,7 @@ export default function WatchScreen() {
     ));
   }, [epSearch, episodes]);
 
+  // ── Load episode servers ───────────────────────────────────────────────────
   useEffect(() => {
     if (!currentEpId) return;
     const load = async () => {
@@ -414,11 +420,11 @@ export default function WatchScreen() {
           if (bestQ && group[bestQ]?.length > 0) {
             setSelectedQuality(bestQ);
             setSelectedServer(group[bestQ][0]);
-            // Restore progress setelah player ready
+            // Restore progress — MMKV sync
             const saved = progressStorage.get(currentEpId);
-            if (saved && saved > 5) {
+            if (saved && saved.position > 5) {
               setTimeout(() => {
-                if (player) player.seekBy(saved - (player.currentTime ?? 0));
+                if (player) player.seekBy(saved.position - (player.currentTime ?? 0));
               }, 800);
             }
           }
@@ -429,16 +435,27 @@ export default function WatchScreen() {
     load();
   }, [currentEpId]);
 
+  // ── History — MMKV sync, tidak perlu await ────────────────────────────────
   useEffect(() => {
     if (!anime || !currentEpId) return;
     const ep = episodes.find(e => e.id === currentEpId);
-    if (ep) { historyStorage.add(anime, ep.index); }
+    if (ep) historyStorage.add(anime, ep.index);
   }, [currentEpId, anime]);
 
+  // ── Favorit — MMKV sync ───────────────────────────────────────────────────
   useEffect(() => {
     if (!anime) return;
-    favoritStorage.isFavorited(anime.id).then(setIsFavorited);
+    setIsFavorited(favoritStorage.isFavorited(anime.id));
   }, [anime]);
+
+  // ── AutoNext — persist ke MMKV saat toggle ────────────────────────────────
+  const toggleAutoNext = useCallback(() => {
+    setAutoNext(prev => {
+      const next = !prev;
+      historyStorage.setAutoNext(next);
+      return next;
+    });
+  }, []);
 
   const resetControlsTimer = useCallback(() => {
     setShowControls(true);
@@ -510,11 +527,12 @@ export default function WatchScreen() {
     } catch {}
   }, [anime]);
 
-  const handleBookmark = useCallback(async () => {
+  const handleBookmark = useCallback(() => {
     if (!getCurrentUser()) { Alert.alert('Login Dulu', 'Login untuk menyimpan favorit'); return; }
     if (!anime) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const result = await favoritStorage.toggle(anime as any);
+    // MMKV sync — tidak perlu await
+    const result = favoritStorage.toggle(anime as any);
     setIsFavorited(result);
   }, [anime]);
 
@@ -546,7 +564,13 @@ export default function WatchScreen() {
 
   const videoHeight = isFullscreen ? Dimensions.get('window').height : width * (9 / 16);
 
-  if (isLoading) return <View style={{ flex: 1, backgroundColor: COLORS.bg }}><WatchSkeleton /></View>;
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
+        <WatchSkeleton />
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
@@ -558,10 +582,12 @@ export default function WatchScreen() {
         <TouchableOpacity style={{ flex: 1 }} activeOpacity={1}
           onPress={() => setShowServerModal(false)}>
           <BlurView intensity={30} tint="dark" style={{ flex: 1 }}>
-            <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0,
+            <View style={{
+              position: 'absolute', bottom: 0, left: 0, right: 0,
               backgroundColor: `${COLORS.card}f0`, borderTopLeftRadius: 20,
               borderTopRightRadius: 20, padding: 20, paddingBottom: 40,
-              borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }}>
+              borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+            }}>
               <View style={{ width: 40, height: 4, backgroundColor: 'rgba(255,255,255,0.15)',
                 borderRadius: 2, alignSelf: 'center', marginBottom: 16 }} />
               <Text style={{ color: '#fff', fontWeight: '900', fontSize: 14, marginBottom: 16,
@@ -577,12 +603,13 @@ export default function WatchScreen() {
                       return (
                         <TouchableOpacity key={s.id}
                           onPress={() => { Haptics.selectionAsync(); selectQualityAndServer(quality, s); }}
-                          style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8,
+                          style={{
+                            paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8,
                             backgroundColor: isActive ? COLORS.gold : 'rgba(255,255,255,0.07)',
                             borderWidth: 1,
-                            borderColor: isActive ? COLORS.gold : 'rgba(255,255,255,0.1)' }}>
-                          <Text style={{ color: isActive ? '#000' : '#fff',
-                            fontWeight: '900', fontSize: 12 }}>
+                            borderColor: isActive ? COLORS.gold : 'rgba(255,255,255,0.1)',
+                          }}>
+                          <Text style={{ color: isActive ? '#000' : '#fff', fontWeight: '900', fontSize: 12 }}>
                             Server {idx + 1}
                           </Text>
                         </TouchableOpacity>
@@ -630,7 +657,7 @@ export default function WatchScreen() {
         <TouchableOpacity activeOpacity={1} onPress={handleTapRight}
           style={{ position: 'absolute', top: 0, right: 0, width: '40%', bottom: 0 }} />
 
-        <SeekToast direction="left" visible={seekLeft} />
+        <SeekToast direction="left"  visible={seekLeft}  />
         <SeekToast direction="right" visible={seekRight} />
 
         {selectedServer && !isEpLoading && (
@@ -646,13 +673,16 @@ export default function WatchScreen() {
               style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 90 }}
               pointerEvents="none" />
 
+            {/* Top bar */}
             <View style={{ position: 'absolute', top: 0, left: 0, right: 0,
               flexDirection: 'row', alignItems: 'center',
               paddingHorizontal: 12, paddingTop: 12, gap: 10 }}>
               <TouchableOpacity
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  if (isFullscreen) toggleFullscreen(); else if (router.canGoBack()) router.back(); else router.replace('/(tabs)');
+                  if (isFullscreen) toggleFullscreen();
+                  else if (router.canGoBack()) router.back();
+                  else router.replace('/(tabs)');
                 }}
                 style={{ width: 36, height: 36, borderRadius: 18,
                   backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' }}>
@@ -668,11 +698,11 @@ export default function WatchScreen() {
               <TouchableOpacity onPress={handleBookmark}
                 style={{ width: 36, height: 36, borderRadius: 18,
                   backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name={isFavorited ? 'bookmark' : 'bookmark-outline'}
-                  size={18} color={COLORS.gold} />
+                <Ionicons name={isFavorited ? 'bookmark' : 'bookmark-outline'} size={18} color={COLORS.gold} />
               </TouchableOpacity>
             </View>
 
+            {/* Center controls */}
             <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
               alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 36 }}
               pointerEvents="box-none">
@@ -697,6 +727,7 @@ export default function WatchScreen() {
               </TouchableOpacity>
             </View>
 
+            {/* Bottom controls */}
             <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0,
               paddingHorizontal: 12, paddingBottom: 10 }}>
               <Slider style={{ width: '100%', height: 20 }}
@@ -744,6 +775,7 @@ export default function WatchScreen() {
       {!isFullscreen && (
         <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
 
+          {/* Prev / Next buttons */}
           <View style={{ flexDirection: 'row', gap: 12, padding: 16 }}>
             <TouchableOpacity
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); handlePrev(); }}
@@ -763,7 +795,9 @@ export default function WatchScreen() {
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity onPress={() => { Haptics.selectionAsync(); setAutoNext(p => !p); }}
+          {/* AutoNext toggle */}
+          <TouchableOpacity
+            onPress={() => { Haptics.selectionAsync(); toggleAutoNext(); }}
             style={{ marginHorizontal: 16, marginBottom: 16, paddingVertical: 14,
               borderRadius: 10, borderWidth: 1,
               borderColor: autoNext ? `${COLORS.gold}60` : 'rgba(255,255,255,0.1)',
@@ -805,10 +839,14 @@ export default function WatchScreen() {
                     paddingVertical: 7, borderWidth: 1,
                     borderColor: 'rgba(255,255,255,0.07)', marginBottom: 12, gap: 8 }}>
                     <Ionicons name="search-outline" size={14} color="rgba(255,255,255,0.3)" />
-                    <TextInput value={epSearch} onChangeText={t => { setEpSearch(t); setEpPage(0); }}
-                      placeholder="Cari episode..." placeholderTextColor="rgba(255,255,255,0.25)"
+                    <TextInput
+                      value={epSearch}
+                      onChangeText={t => { setEpSearch(t); setEpPage(0); }}
+                      placeholder="Cari episode..."
+                      placeholderTextColor="rgba(255,255,255,0.25)"
                       keyboardType="numeric"
-                      style={{ flex: 1, color: '#fff', fontSize: 13, fontWeight: '600', paddingVertical: 0 }} />
+                      style={{ flex: 1, color: '#fff', fontSize: 13, fontWeight: '600', paddingVertical: 0 }}
+                    />
                     {epSearch.length > 0 && (
                       <TouchableOpacity onPress={() => setEpSearch('')}>
                         <Ionicons name="close-circle" size={14} color="rgba(255,255,255,0.3)" />
@@ -834,10 +872,8 @@ export default function WatchScreen() {
                             borderWidth: 1,
                             borderColor: isActive ? COLORS.gold : 'rgba(255,255,255,0.1)',
                           }}>
-                          <Text style={{
-                            fontSize: 11, fontWeight: '800',
-                            color: isActive ? '#000' : 'rgba(255,255,255,0.5)',
-                          }}>
+                          <Text style={{ fontSize: 11, fontWeight: '800',
+                            color: isActive ? '#000' : 'rgba(255,255,255,0.5)' }}>
                             {from}–{to}
                           </Text>
                         </TouchableOpacity>
@@ -872,7 +908,7 @@ export default function WatchScreen() {
               borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' }}>
               <View style={{ height: 200, alignItems: 'center', justifyContent: 'flex-end' }}>
                 <Image
-                  source={{ uri: anime.image_cover || anime.image_poster, priority: "normal" }}
+                  source={{ uri: anime.image_cover || anime.image_poster, priority: 'normal' }}
                   style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.25 }}
                   contentFit="cover"
                 />
@@ -881,8 +917,8 @@ export default function WatchScreen() {
                   style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '60%' }}
                 />
                 <Image
-                  source={{ uri: anime.image_poster, priority: "high" }}
-                  style={{ width: 110, aspectRatio: 3/4.2, borderRadius: 10 }}
+                  source={{ uri: anime.image_poster, priority: 'high' }}
+                  style={{ width: 110, aspectRatio: 3 / 4.2, borderRadius: 10 }}
                   contentFit="cover"
                 />
               </View>
@@ -903,16 +939,18 @@ export default function WatchScreen() {
                     <View style={{ backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 10,
                       paddingVertical: 4, borderRadius: 6, borderWidth: 1,
                       borderColor: 'rgba(255,255,255,0.15)' }}>
-                      <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 11,
-                        fontWeight: '700' }}>{anime.status}</Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: '700' }}>
+                        {anime.status}
+                      </Text>
                     </View>
                   ) : null}
                   {anime.aired_start ? (
                     <View style={{ backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 10,
                       paddingVertical: 4, borderRadius: 6, borderWidth: 1,
                       borderColor: 'rgba(255,255,255,0.15)' }}>
-                      <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 11,
-                        fontWeight: '700' }}>{anime.aired_start}</Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: '700' }}>
+                        {anime.aired_start}
+                      </Text>
                     </View>
                   ) : null}
                 </View>
@@ -960,6 +998,7 @@ export default function WatchScreen() {
             </View>
           )}
 
+          {/* Share */}
           <TouchableOpacity onPress={handleShare}
             style={{ marginHorizontal: 16, marginBottom: 16, paddingVertical: 14,
               borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
@@ -970,6 +1009,7 @@ export default function WatchScreen() {
             </Text>
           </TouchableOpacity>
 
+          {/* Rekomendasi */}
           {recommendations.length > 0 && (
             <View style={{ marginHorizontal: 16 }}>
               <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13, marginBottom: 12,
@@ -981,8 +1021,8 @@ export default function WatchScreen() {
                     marginBottom: 10, backgroundColor: COLORS.card, borderRadius: 10,
                     padding: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' }}
                   activeOpacity={0.8}>
-                  <Image source={{ uri: a.image_poster, priority: "low" }}
-                    style={{ width: 44, aspectRatio: 3/4.2, borderRadius: 6 }}
+                  <Image source={{ uri: a.image_poster, priority: 'low' }}
+                    style={{ width: 44, aspectRatio: 3 / 4.2, borderRadius: 6 }}
                     contentFit="cover" />
                   <View style={{ flex: 1 }}>
                     <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}
