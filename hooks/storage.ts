@@ -1,134 +1,129 @@
-import { createMMKV } from 'react-native-mmkv';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Anime, HistoryItem } from '@/types';
 
-// ─── Storage instances ────────────────────────────────────────────────────────
-// Pisah instance biar ga ada key collision & bisa clear per-domain
-export const storageMain     = createMMKV({ id: 'nefusoft-main' });
-export const storageProgress = createMMKV({ id: 'nefusoft-progress' });
-
-// ─── Keys ─────────────────────────────────────────────────────────────────────
-const HISTORY_KEY        = 'history';
-const AUTONEXT_KEY       = 'autonext';
-const SEARCH_HISTORY_KEY = 'search_history';
-const FAVORIT_KEY        = 'favorit';
+const HISTORY_KEY        = 'nefusoft_history';
+const AUTONEXT_KEY       = 'nefusoft_autonext';
+const SEARCH_HISTORY_KEY = 'nefusoft_search_history';
+const PROGRESS_PREFIX    = 'nefusoft_progress_';
+const FAVORIT_KEY        = 'nefusoft_favorit';
 const MAX_HISTORY        = 50;
 const MAX_SEARCH_HISTORY = 10;
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-const getJSON = <T>(storage: MMKV, key: string, fallback: T): T => {
+const getJSON = async <T>(key: string, fallback: T): Promise<T> => {
   try {
-    const raw = storage.getString(key);
+    const raw = await AsyncStorage.getItem(key);
     return raw ? JSON.parse(raw) : fallback;
   } catch { return fallback; }
 };
 
-const setJSON = (storage: MMKV, key: string, value: unknown): void => {
-  try { storage.set(key, JSON.stringify(value)); } catch {}
+const setJSON = async (key: string, value: any): Promise<void> => {
+  try { await AsyncStorage.setItem(key, JSON.stringify(value)); } catch {}
 };
 
-const sanitizeKey = (id: string): string =>
+const sanitizeDocId = (id: string): string =>
   id.replace(/\//g, '_').replace(/\./g, '_').replace(/\s+/g, '_')
     .replace(/[^\w-]/g, '').slice(0, 500) || 'unknown';
 
-// ─── History ──────────────────────────────────────────────────────────────────
 export const historyStorage = {
-  getAll: (): HistoryItem[] =>
-    getJSON<HistoryItem[]>(storageMain, HISTORY_KEY, []),
+  getAll: async (): Promise<HistoryItem[]> => getJSON<HistoryItem[]>(HISTORY_KEY, []),
 
-  add: (anime: Anime, episodeIndex: number): void => {
-    const history = historyStorage.getAll();
+  add: async (anime: Anime, episodeIndex: number): Promise<void> => {
+    const history = await historyStorage.getAll();
     const filtered = history.filter(h => h.anime.id !== anime.id);
     const updated: HistoryItem[] = [
       { anime, episodeIndex, timestamp: Date.now() },
       ...filtered,
     ].slice(0, MAX_HISTORY);
-    setJSON(storageMain, HISTORY_KEY, updated);
+    await setJSON(HISTORY_KEY, updated);
   },
 
-  clear: (): void => {
-    storageMain.delete(HISTORY_KEY);
+  clear: async (): Promise<void> => {
+    await AsyncStorage.removeItem(HISTORY_KEY);
   },
 
-  getAutoNext: (): boolean =>
-    storageMain.getBoolean(AUTONEXT_KEY) ?? false,
+  getAutoNext: async (): Promise<boolean> => {
+    try {
+      const val = await AsyncStorage.getItem(AUTONEXT_KEY);
+      return val === 'true';
+    } catch { return false; }
+  },
 
-  setAutoNext: (val: boolean): void => {
-    storageMain.set(AUTONEXT_KEY, val);
+  setAutoNext: async (val: boolean): Promise<void> => {
+    try { await AsyncStorage.setItem(AUTONEXT_KEY, String(val)); } catch {}
   },
 };
 
-// ─── Search history ───────────────────────────────────────────────────────────
-export const getSearchHistory = (): string[] =>
-  getJSON<string[]>(storageMain, SEARCH_HISTORY_KEY, []);
+export const getSearchHistory = async (): Promise<string[]> =>
+  getJSON<string[]>(SEARCH_HISTORY_KEY, []);
 
-export const addSearchHistory = (term: string): void => {
+export const addSearchHistory = async (term: string): Promise<void> => {
   if (!term?.trim()) return;
-  const prev = getSearchHistory();
+  const prev = await getSearchHistory();
   const filtered = prev.filter(t => t.toLowerCase() !== term.toLowerCase());
   const updated = [term.trim(), ...filtered].slice(0, MAX_SEARCH_HISTORY);
-  setJSON(storageMain, SEARCH_HISTORY_KEY, updated);
+  await setJSON(SEARCH_HISTORY_KEY, updated);
 };
 
-export const clearSearchHistory = (): void => {
-  storageMain.delete(SEARCH_HISTORY_KEY);
+export const clearSearchHistory = async (): Promise<void> => {
+  await AsyncStorage.removeItem(SEARCH_HISTORY_KEY);
 };
 
-// ─── Progress ─────────────────────────────────────────────────────────────────
-// Synchronous — aman dipanggil dari onProgress tiap detik tanpa await
 export type ProgressData = { position: number; duration: number };
 
 export const progressStorage = {
-  get: (epId: string): ProgressData | null => {
+  get: async (epId: string): Promise<ProgressData | null> => {
     try {
-      const raw = storageProgress.getString(sanitizeKey(epId));
+      const key = `${PROGRESS_PREFIX}${sanitizeDocId(epId)}`;
+      const raw = await AsyncStorage.getItem(key);
       if (!raw) return null;
       const parsed = JSON.parse(raw) as ProgressData;
-      return typeof parsed.position === 'number' ? parsed : null;
+      if (typeof parsed.position !== 'number') return null;
+      return parsed;
     } catch { return null; }
   },
 
-  save: (epId: string, position: number, duration: number): void => {
+  save: async (epId: string, position: number, duration: number): Promise<void> => {
     try {
-      const key = sanitizeKey(epId);
+      const key = `${PROGRESS_PREFIX}${sanitizeDocId(epId)}`;
       if (duration > 0 && position > 5 && position < duration - 30) {
-        storageProgress.set(key, JSON.stringify({ position, duration }));
+        await AsyncStorage.setItem(key, JSON.stringify({ position, duration }));
       } else if (duration > 0 && position >= duration - 30) {
-        storageProgress.delete(key);
+        await AsyncStorage.removeItem(key);
       }
     } catch {}
   },
 
-  clear: (epId: string): void => {
-    try { storageProgress.delete(sanitizeKey(epId)); } catch {}
+  clear: async (epId: string): Promise<void> => {
+    try { await AsyncStorage.removeItem(`${PROGRESS_PREFIX}${sanitizeDocId(epId)}`); } catch {}
   },
 };
 
-// ─── Favorit ──────────────────────────────────────────────────────────────────
 export const favoritStorage = {
-  getAll: (): Anime[] =>
-    getJSON<Anime[]>(storageMain, FAVORIT_KEY, []),
+  getAll: async (): Promise<Anime[]> => getJSON<Anime[]>(FAVORIT_KEY, []),
 
-  isFavorited: (animeId: string): boolean =>
-    favoritStorage.getAll().some(a => a.id === animeId),
+  isFavorited: async (animeId: string): Promise<boolean> => {
+    const list = await favoritStorage.getAll();
+    return list.some(a => a.id === animeId);
+  },
 
-  toggle: (anime: Anime): boolean => {
-    const list = favoritStorage.getAll();
+  toggle: async (anime: Anime): Promise<boolean> => {
+    const list = await favoritStorage.getAll();
     const exists = list.some(a => a.id === anime.id);
     if (exists) {
-      setJSON(storageMain, FAVORIT_KEY, list.filter(a => a.id !== anime.id));
+      await setJSON(FAVORIT_KEY, list.filter(a => a.id !== anime.id));
       return false;
     } else {
-      setJSON(storageMain, FAVORIT_KEY, [anime, ...list]);
+      await setJSON(FAVORIT_KEY, [anime, ...list]);
       return true;
     }
   },
 
-  remove: (animeId: string): void => {
-    const list = favoritStorage.getAll();
-    setJSON(storageMain, FAVORIT_KEY, list.filter(a => a.id !== animeId));
+  remove: async (animeId: string): Promise<void> => {
+    const list = await favoritStorage.getAll();
+    await setJSON(FAVORIT_KEY, list.filter(a => a.id !== animeId));
   },
 
-  clear: (): void => {
-    storageMain.delete(FAVORIT_KEY);
+  clear: async (): Promise<void> => {
+    await AsyncStorage.removeItem(FAVORIT_KEY);
   },
 };
