@@ -1,12 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import firestore from '@react-native-firebase/firestore';
-import auth from '@react-native-firebase/auth';
 import { Anime, HistoryItem } from '@/types';
 
 const HISTORY_KEY        = 'nefusoft_history';
 const AUTONEXT_KEY       = 'nefusoft_autonext';
 const SEARCH_HISTORY_KEY = 'nefusoft_search_history';
 const PROGRESS_PREFIX    = 'nefusoft_progress_';
+const FAVORIT_KEY        = 'nefusoft_favorit';
 const MAX_HISTORY        = 50;
 const MAX_SEARCH_HISTORY = 10;
 
@@ -96,5 +95,35 @@ export const progressStorage = {
 
   clear: async (epId: string): Promise<void> => {
     try { await AsyncStorage.removeItem(`${PROGRESS_PREFIX}${sanitizeDocId(epId)}`); } catch {}
+  },
+};
+
+export const favoritStorage = {
+  getAll: async (): Promise<Anime[]> => getJSON<Anime[]>(FAVORIT_KEY, []),
+
+  isFavorited: async (animeId: string): Promise<boolean> => {
+    const list = await favoritStorage.getAll();
+    return list.some(a => a.id === animeId);
+  },
+
+  toggle: async (anime: Anime): Promise<boolean> => {
+    const list = await favoritStorage.getAll();
+    const exists = list.some(a => a.id === anime.id);
+    if (exists) {
+      await setJSON(FAVORIT_KEY, list.filter(a => a.id !== anime.id));
+      return false;
+    } else {
+      await setJSON(FAVORIT_KEY, [anime, ...list]);
+      return true;
+    }
+  },
+
+  remove: async (animeId: string): Promise<void> => {
+    const list = await favoritStorage.getAll();
+    await setJSON(FAVORIT_KEY, list.filter(a => a.id !== animeId));
+  },
+
+  clear: async (): Promise<void> => {
+    await AsyncStorage.removeItem(FAVORIT_KEY);
   },
 };
