@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
-import { createMMKV } from 'react-native-mmkv';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { THEMES, Theme } from '@/constants';
 
-const storage   = createMMKV({ id: 'nefusoft-theme' });
 const THEME_KEY = 'nefusoft_theme';
 
-let globalTheme: Theme              = THEMES[0];
+let globalTheme: Theme = THEMES[0];
 let listeners: ((t: Theme) => void)[] = [];
 
 const notifyListeners = (t: Theme) => listeners.forEach(fn => fn(t));
@@ -13,19 +12,18 @@ const notifyListeners = (t: Theme) => listeners.forEach(fn => fn(t));
 export const setGlobalTheme = (themeId: string): void => {
   const theme = THEMES.find(t => t.id === themeId) ?? THEMES[0];
   globalTheme = theme;
-  storage.set(THEME_KEY, themeId);
+  AsyncStorage.setItem(THEME_KEY, themeId).catch(() => {});
   notifyListeners(theme);
 };
 
 export const loadSavedTheme = (): void => {
-  try {
-    const saved = storage.getString(THEME_KEY);
+  AsyncStorage.getItem(THEME_KEY).then(saved => {
     if (saved) {
       const theme = THEMES.find(t => t.id === saved) ?? THEMES[0];
       globalTheme = theme;
       notifyListeners(theme);
     }
-  } catch {}
+  }).catch(() => {});
 };
 
 export const useTheme = (): Theme => {
@@ -41,6 +39,3 @@ export const useTheme = (): Theme => {
 
   return theme;
 };
-
-
-
