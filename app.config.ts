@@ -34,7 +34,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         kotlinVersion: '2.1.20'
       }
     }],
-    ['expo-av', { microphonePermission: false }],
+    'expo-video',
     'expo-screen-orientation',
     '@react-native-firebase/app',
     '@react-native-firebase/auth',
