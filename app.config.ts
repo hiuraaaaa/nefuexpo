@@ -13,6 +13,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     resizeMode: 'contain',
     backgroundColor: '#0a0a0c',
   },
+  updates: {
+    url: 'https://u.expo.dev/6e2fd9c8-8a82-474e-b71d-0428d2ce108b',
+  },
+  runtimeVersion: {
+    policy: 'appVersion',
+  },
   android: {
     adaptiveIcon: {
       foregroundImage: './assets/icon.png',
@@ -31,7 +37,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-router',
     ['expo-build-properties', {
       android: {
-        kotlinVersion: '2.1.20'
+        kotlinVersion: '2.1.20',
+        newArchEnabled: true,
       }
     }],
     'expo-video',
