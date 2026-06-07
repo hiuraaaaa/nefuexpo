@@ -63,7 +63,7 @@ jobs:
           cd android
           ./gradlew assembleDebug --no-daemon \
             -PbundleInDebug=true \
-            -Pkotlin.version=2.1.20 \
+            -Pkotlin.version=2.0.21 \
             -Pandroid.suppressUnsupportedCompileSdk=35 \
             -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g"
 
