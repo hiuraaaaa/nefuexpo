@@ -52,7 +52,7 @@ export default function AnimeCard({ anime, onPress, width }: Props) {
   onLayout={(e) => console.log('[LAYOUT]', e.nativeEvent.layout)}
 >
         <Image
-  source={{ uri: 'https://cdn.myanimelist.net/images/anime/1394/145458l.jpg' }}
+  source={{ uri: anime.image_poster }}
   style={{ width: '100%', height: '100%' }}
   contentFit="cover"
 />
