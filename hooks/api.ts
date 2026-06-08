@@ -8,7 +8,7 @@ const PAGE_SIZE = 24;
 
 const HEADERS = (isFlutter = false, isPost = false) => ({
   'accept':                    'application/json',
-  'accept-encoding':           'gzip',
+//  'accept-encoding':           'gzip',
   'host':                      'apps.animekita.org',
   'access-control-allow-origin': '*',
   'user-agent':                isFlutter ? 'Flutter/2.5.3' : 'Dart/3.9 (dart:io)',
