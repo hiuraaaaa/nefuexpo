@@ -8,7 +8,6 @@ const PAGE_SIZE = 24;
 
 const HEADERS = (isFlutter = false, isPost = false) => ({
   'accept':                    'application/json',
-//  'accept-encoding':           'gzip',
   'host':                      'apps.animekita.org',
   'access-control-allow-origin': '*',
   'user-agent':                isFlutter ? 'Flutter/2.5.3' : 'Dart/3.9 (dart:io)',
@@ -50,11 +49,12 @@ const safeGet = async <T>(path: string, params?: Record<string, any>): Promise<T
     if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, String(v)));
     const res = await fetch(url.toString(), { headers: HEADERS() });
     const text = await res.text();
-    if (!text || !text.trim().startsWith('{') && !text.trim().startsWith('[')) {
-      console.warn(`[API] safeGet non-JSON response: ${path} →`, text.substring(0, 100));
+    const trimmed = text.trim();
+    if (!trimmed || (!trimmed.startsWith('{') && !trimmed.startsWith('['))) {
+      console.warn(`[API] safeGet non-JSON: ${path} →`, trimmed.substring(0, 80));
       return null;
     }
-    return JSON.parse(text);
+    return JSON.parse(trimmed);
   } catch (e: any) {
     console.warn(`[API] safeGet failed: ${path} —`, e?.message);
     return null;
@@ -69,11 +69,12 @@ const safePost = async <T>(path: string, body: object | string, flutter = false)
       body:    typeof body === 'string' ? body : JSON.stringify(body),
     });
     const text = await res.text();
-    if (!text || !text.trim().startsWith('{') && !text.trim().startsWith('[')) {
-      console.warn(`[API] safePost non-JSON response: ${path} →`, text.substring(0, 100));
+    const trimmed = text.trim();
+    if (!trimmed || (!trimmed.startsWith('{') && !trimmed.startsWith('['))) {
+      console.warn(`[API] safePost non-JSON: ${path} →`, trimmed.substring(0, 80));
       return null;
     }
-    return JSON.parse(text);
+    return JSON.parse(trimmed);
   } catch (e: any) {
     console.warn(`[API] safePost failed: ${path} —`, e?.message);
     return null;
@@ -82,17 +83,24 @@ const safePost = async <T>(path: string, body: object | string, flutter = false)
 
 // ─── Mappers ──────────────────────────────────────────────────────────────────
 
+function normalizeImageUrl(url: string): string {
+  if (!url) return '';
+  // Strip i0/i1/i2.wp.com proxy → langsung ke domain asli
+  // https://i0.wp.com/cdn.myanimelist.net/... → https://cdn.myanimelist.net/...
+  const wpMatch = url.match(/https?:\/\/i\d\.wp\.com\/(.+)/);
+  if (wpMatch) return 'https://' + wpMatch[1];
+  return url;
+}
+
 function mapAnime(raw: any): Anime {
-  const cover = raw.cover ?? '';
-  if (!cover) console.warn('[NOCOVER]', raw.judul ?? raw.title);
-  else console.log('[COVER]', cover.substring(0, 60));
+  const cover = normalizeImageUrl(raw.cover ?? '');
   const slug = (raw.url ?? raw.link ?? '').replace(/\/+$/, '');
   const id = slug || String(raw.id ?? '');
   return {
     id,
     title:        raw.judul ?? raw.anime_name ?? raw.title ?? '',
-    image_poster: raw.cover ?? '',
-    image_cover:  raw.cover ?? '',
+    image_poster: cover,
+    image_cover:  cover,
     synopsis:     raw.sinopsis ?? raw.synopsis ?? '',
     type:         raw.type ?? '',
     status:       raw.status ?? 'ONGOING',
@@ -109,11 +117,12 @@ function mapAnime(raw: any): Anime {
 }
 
 function mapAnimeDetail(raw: any): AnimeDetail {
+  const cover = normalizeImageUrl(raw.cover ?? '');
   const base: Anime = {
     id:           (raw.series_id ?? raw.url ?? '').replace(/\/+$/, ''),
     title:        raw.judul ?? '',
-    image_poster: raw.cover ?? '',
-    image_cover:  raw.cover ?? '',
+    image_poster: cover,
+    image_cover:  cover,
     synopsis:     raw.sinopsis ?? '',
     type:         raw.type ?? '',
     status:       raw.status ?? '',
@@ -144,8 +153,8 @@ function mapSchedule(raw: any[]): ScheduleDay {
     days[key] = (item.animeList ?? []).map((a: any) => ({
       id:           (a.link ?? a.url ?? '').replace(/\/+$/, ''),
       title:        a.anime_name ?? a.judul ?? '',
-      image_poster: a.cover ?? '',
-      image_cover:  a.cover ?? '',
+      image_poster: normalizeImageUrl(a.cover ?? ''),
+      image_cover:  normalizeImageUrl(a.cover ?? ''),
       synopsis:     '',
       type:         '',
       status:       'ONGOING',
@@ -166,7 +175,6 @@ function mapSchedule(raw: any[]): ScheduleDay {
 const fetchOngoing = async (page = 0): Promise<ApiResponse<Anime[]>> => {
   const json = await safeGet<any>('/baruupload.php', { page: page + 1 });
   const list: any[] = Array.isArray(json) ? json : (json?.data ?? []);
-  console.log('[ONGOING] sample item:', JSON.stringify(list[0])); // ←
   return { status: true, data: list.map(mapAnime) };
 };
 
@@ -277,11 +285,10 @@ const fetchGenreFilter = async (_ids: string[], _page = 0): Promise<ApiResponse<
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
-const EMPTY_LIST: ApiResponse<Anime[]>    = { status: false, data: [] };
+const EMPTY_LIST: ApiResponse<Anime[]>      = { status: false, data: [] };
 const EMPTY_SCHED: ApiResponse<ScheduleDay> = { status: false, data: {} };
 
 export const api = {
-  // Home — parallel fetch, kalau salah satu gagal sisanya tetap jalan
   home: async (): Promise<[ApiResponse<Anime[]>, ApiResponse<Anime[]>, ApiResponse<Anime[]>, ApiResponse<Anime[]>, ApiResponse<ScheduleDay>]> => {
     const results = await Promise.allSettled([
       fetchRekomendasi(),   // [0] hero carousel
@@ -290,9 +297,7 @@ export const api = {
       fetchMovie(),         // [3] movies
       fetchSchedule(),      // [4] jadwal
     ]);
-
     const [rekom, ong, comp, mov, sched] = results;
-
     return [
       rekom.status === 'fulfilled' ? rekom.value : EMPTY_LIST,
       ong.status   === 'fulfilled' ? ong.value   : EMPTY_LIST,
