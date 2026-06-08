@@ -55,6 +55,7 @@ export default function AnimeCard({ anime, onPress, width }: Props) {
             cachePolicy: "memory-disk",
             headers: { Referer: 'https://myanimelist.net' },
           }}
+          onError={(e) => console.warn('[IMG ERROR]', anime.image_poster, e.error)}
           style={StyleSheet.absoluteFillObject}
           contentFit="cover"
         />
