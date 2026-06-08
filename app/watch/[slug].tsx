@@ -22,7 +22,7 @@ import Animated, {
 import { useBatteryLevel, useBatteryState, BatteryState } from 'expo-battery';
 import { COLORS } from '@/constants';
 import { api, getAnimeSlug, decodeAnimeId, formatTime } from '@/hooks/api';
-import { historyStorage, progressStorage, favoritStorage } from '@/hooks/storage';
+import { historyStorage, progressStorage, favoritStorage, storageMain } from '@/hooks/storage';
 import { xpStorage } from '@/hooks/xp';
 import { AnimeDetail, Episode, Server, Anime } from '@/types';
 import { WatchSkeleton } from '@/components/Skeleton';
@@ -682,7 +682,7 @@ export default function WatchScreen() {
             contentFit="contain"
             nativeControls={false}
             allowsFullscreen
-            allowsPictureInPicture
+            allowsPictureInPicture={storageMain.getBoolean('nefusoft_pip') ?? false}
             startsPictureInPictureAutomatically={false}
           />
         ) : (
