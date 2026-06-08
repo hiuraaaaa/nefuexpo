@@ -23,7 +23,8 @@ import { HistoryItem, Anime } from '@/types';
 import firestore from '@react-native-firebase/firestore';
 
 const { width } = Dimensions.get('window');
-const PIP_KEY = 'nefusoft_pip';
+const PIP_KEY  = 'nefusoft_pip';
+const INFO_KEY = 'nefusoft_info';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -459,8 +460,9 @@ export default function ProfileScreen() {
   const [history, setHistory]     = useState<HistoryItem[]>([]);
   const [favorites, setFavorites] = useState<Anime[]>([]);
 
-  // PiP — MMKV sync, init langsung
-  const [pip, setPip] = useState(() => storageMain.getBoolean(PIP_KEY) ?? false);
+  // PiP & Info — MMKV sync, init langsung
+  const [pip, setPip]   = useState(() => storageMain.getBoolean(PIP_KEY)  ?? false);
+  const [info, setInfo] = useState(() => storageMain.getBoolean(INFO_KEY) ?? false);
 
   const [loading, setLoading]   = useState(false);
   const [admin, setAdmin]       = useState(false);
@@ -520,11 +522,18 @@ export default function ProfileScreen() {
     ]);
   };
 
-  // PiP toggle — MMKV sync, tidak perlu async
+  // PiP toggle
   const togglePip = useCallback((val: boolean) => {
     Haptics.selectionAsync();
     setPip(val);
     storageMain.set(PIP_KEY, val);
+  }, []);
+
+  // Info (jam & baterai) toggle
+  const toggleInfo = useCallback((val: boolean) => {
+    Haptics.selectionAsync();
+    setInfo(val);
+    storageMain.set(INFO_KEY, val);
   }, []);
 
   const loadAllUsers = async () => {
@@ -669,11 +678,18 @@ export default function ProfileScreen() {
                   subtitle={`Sekarang: ${THEMES.find(t => t.id === theme.id)?.name ?? 'Gold'}`}
                   onPress={() => { Haptics.selectionAsync(); setShowTheme(true); }} />
                 <SettingRow icon="tv-outline" label="Picture in Picture"
-                  subtitle="Video tetap jalan saat minimize" last
+                  subtitle="Video tetap jalan saat minimize"
                   right={
                     <Switch value={pip} onValueChange={togglePip}
                       trackColor={{ false: theme.border, true: theme.accent }}
                       thumbColor={pip ? theme.bg : theme.subtext} />
+                  } />
+                <SettingRow icon="information-circle-outline" label="Info di Video"
+                  subtitle="Tampilkan jam & baterai saat nonton" last
+                  right={
+                    <Switch value={info} onValueChange={toggleInfo}
+                      trackColor={{ false: theme.border, true: theme.accent }}
+                      thumbColor={info ? theme.bg : theme.subtext} />
                   } />
               </Card>
             </Animated.View>
