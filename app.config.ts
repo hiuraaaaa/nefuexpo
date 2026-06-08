@@ -41,7 +41,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         newArchEnabled: true,
       }
     }],
-    'expo-video',
+    ['expo-video', {
+      supportsBackgroundPlayback: true,
+      supportsPictureInPicture: true,
+    }],
     'expo-screen-orientation',
     '@react-native-firebase/app',
     '@react-native-firebase/auth',
