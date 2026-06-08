@@ -482,25 +482,16 @@ export default function ProfileScreen() {
   }, []);
 
   useFocusEffect(useCallback(() => {
-    let mounted = true;
-    const loadData = async () => {
-      try {
-        // xpStorage masih async (AsyncStorage) — await normal
-        const xp = await xpStorage.get().catch(() => ({
-          xp: 0, level: 1, streak: 0, lastWatchDate: '', _todayXP: 0,
-        }));
+    // Semua MMKV sync — tidak perlu async
+    let xp: XPData;
+    try { xp = xpStorage.get(); }
+    catch { xp = { xp: 0, level: 1, streak: 0, lastWatchDate: '', _todayXP: 0 }; }
 
-        // historyStorage sync (MMKV) — langsung, wrap try/catch
-        let hist: HistoryItem[] = [];
-        try { hist = historyStorage.getAll() ?? []; } catch { hist = []; }
+    let hist: HistoryItem[] = [];
+    try { hist = historyStorage.getAll() ?? []; } catch { hist = []; }
 
-        if (!mounted) return;
-        setXpData(xp as XPData);
-        setHistory(Array.isArray(hist) ? hist.slice(0, 5) : []);
-      } catch {}
-    };
-    loadData();
-    return () => { mounted = false; };
+    setXpData(xp);
+    setHistory(Array.isArray(hist) ? hist.slice(0, 5) : []);
   }, []));
 
   useEffect(() => {
