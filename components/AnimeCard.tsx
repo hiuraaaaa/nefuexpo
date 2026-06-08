@@ -19,6 +19,7 @@ interface Props {
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 export default function AnimeCard({ anime, onPress, width }: Props) {
+  console.log('[CARD]', anime.title, '|', anime.image_poster); // ← tambah ini
   const scale   = useSharedValue(1);
   const opacity = useSharedValue(1);
 
