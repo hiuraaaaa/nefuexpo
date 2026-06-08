@@ -212,7 +212,7 @@ export default function HomeScreen() {
       }
 
       // Fallback fetch langsung
-      const [schedRes, ongRes, movRes] = await api.home();
+      const [_rekom, ongRes, _comp, movRes, schedRes] = await api.home();
       setOngoing(shuffleArray(ongRes.data || []));
       setMovies(movRes.data || []);
       const todayKey = getTodayKey();
