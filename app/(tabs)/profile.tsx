@@ -15,12 +15,11 @@ import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { COLORS, THEMES } from '@/constants';
 import { signInWithGoogle, signOut, onAuthStateChanged, isAdmin } from '@/hooks/auth';
 import { xpStorage, XPData, LEVELS } from '@/hooks/xp';
-import { historyStorage, favoritStorage } from '@/hooks/storage';
+import { historyStorage, favoritStorage, storageMain } from '@/hooks/storage';
 import { useTheme, setGlobalTheme } from '@/hooks/theme';
 import { XPBar } from '@/components/XPBar';
 import { LevelBadge } from '@/components/LevelBadge';
 import { HistoryItem, Anime } from '@/types';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import firestore from '@react-native-firebase/firestore';
 
 const { width } = Dimensions.get('window');
@@ -184,10 +183,10 @@ function TentangModal({ visible, onClose }: { visible: boolean; onClose: () => v
 // ── Maintenance Modal ─────────────────────────────────────────────────────────
 
 function MaintenanceModal({ visible, onClose, theme }: { visible: boolean; onClose: () => void; theme: any }) {
-  const [isActive, setIsActive]   = useState(false);
-  const [message, setMessage]     = useState('');
-  const [estimasi, setEstimasi]   = useState('');
-  const [saving, setSaving]       = useState(false);
+  const [isActive, setIsActive] = useState(false);
+  const [message, setMessage]   = useState('');
+  const [estimasi, setEstimasi] = useState('');
+  const [saving, setSaving]     = useState(false);
 
   useEffect(() => {
     if (!visible) return;
@@ -203,10 +202,7 @@ function MaintenanceModal({ visible, onClose, theme }: { visible: boolean; onClo
     setSaving(true);
     try {
       await firestore().collection('config').doc('maintenance').set({
-        isActive,
-        message,
-        estimasi,
-        updatedAt: Date.now(),
+        isActive, message, estimasi, updatedAt: Date.now(),
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert('Berhasil', `Maintenance ${isActive ? 'diaktifkan' : 'dinonaktifkan'}`);
@@ -247,41 +243,21 @@ function MaintenanceModal({ visible, onClose, theme }: { visible: boolean; onClo
 
               <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Pesan</Text>
               <TextInput
-                value={message}
-                onChangeText={setMessage}
-                placeholder="Pesan untuk user..."
-                placeholderTextColor={theme.subtext}
-                multiline
-                numberOfLines={3}
-                style={{
-                  backgroundColor: theme.bg, color: theme.text, borderRadius: 10,
-                  paddingHorizontal: 14, paddingVertical: 12, fontSize: 13,
-                  borderWidth: 1, borderColor: theme.border, marginBottom: 12,
-                  textAlignVertical: 'top', minHeight: 80,
-                }}
+                value={message} onChangeText={setMessage}
+                placeholder="Pesan untuk user..." placeholderTextColor={theme.subtext}
+                multiline numberOfLines={3}
+                style={{ backgroundColor: theme.bg, color: theme.text, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 13, borderWidth: 1, borderColor: theme.border, marginBottom: 12, textAlignVertical: 'top', minHeight: 80 }}
               />
 
               <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Estimasi Selesai</Text>
               <TextInput
-                value={estimasi}
-                onChangeText={setEstimasi}
-                placeholder="Contoh: 14:00 WIB"
-                placeholderTextColor={theme.subtext}
-                style={{
-                  backgroundColor: theme.bg, color: theme.text, borderRadius: 10,
-                  paddingHorizontal: 14, paddingVertical: 12, fontSize: 13,
-                  borderWidth: 1, borderColor: theme.border, marginBottom: 20,
-                }}
+                value={estimasi} onChangeText={setEstimasi}
+                placeholder="Contoh: 14:00 WIB" placeholderTextColor={theme.subtext}
+                style={{ backgroundColor: theme.bg, color: theme.text, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 13, borderWidth: 1, borderColor: theme.border, marginBottom: 20 }}
               />
 
-              <TouchableOpacity
-                onPress={handleSave}
-                disabled={saving}
-                style={{
-                  backgroundColor: isActive ? '#e63946' : theme.accent,
-                  paddingVertical: 14, borderRadius: 10, alignItems: 'center',
-                }}
-              >
+              <TouchableOpacity onPress={handleSave} disabled={saving}
+                style={{ backgroundColor: isActive ? '#e63946' : theme.accent, paddingVertical: 14, borderRadius: 10, alignItems: 'center' }}>
                 <Text style={{ color: '#fff', fontWeight: '900', fontSize: 14 }}>
                   {saving ? 'Menyimpan...' : 'Simpan'}
                 </Text>
@@ -355,12 +331,10 @@ function AnnouncementModal({ visible, onClose, theme }: { visible: boolean; onCl
   const handleDelete = (id: string) => {
     Alert.alert('Hapus', 'Yakin mau hapus announcement ini?', [
       { text: 'Batal', style: 'cancel' },
-      {
-        text: 'Hapus', style: 'destructive', onPress: async () => {
-          await firestore().collection('announcements').doc(id).delete();
-          await loadAnnouncements();
-        }
-      },
+      { text: 'Hapus', style: 'destructive', onPress: async () => {
+        await firestore().collection('announcements').doc(id).delete();
+        await loadAnnouncements();
+      }},
     ]);
   };
 
@@ -369,7 +343,6 @@ function AnnouncementModal({ visible, onClose, theme }: { visible: boolean; onCl
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }}>
-        {/* Header */}
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 12 }}>
           <TouchableOpacity onPress={onClose} style={{ width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.card }}>
             <Ionicons name="arrow-back" size={20} color={theme.text} />
@@ -422,84 +395,50 @@ function AnnouncementModal({ visible, onClose, theme }: { visible: boolean; onCl
           />
         ) : (
           <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 60 }}>
-            {/* Type selector */}
             <View>
               <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>Tipe</Text>
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 {TYPES.map(t => (
-                  <TouchableOpacity
-                    key={t.id}
-                    onPress={() => { Haptics.selectionAsync(); setType(t.id); }}
-                    style={{
-                      flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center',
-                      backgroundColor: type === t.id ? `${t.color}20` : theme.card,
-                      borderWidth: 1, borderColor: type === t.id ? t.color : theme.border,
-                    }}
-                  >
+                  <TouchableOpacity key={t.id} onPress={() => { Haptics.selectionAsync(); setType(t.id); }}
+                    style={{ flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center', backgroundColor: type === t.id ? `${t.color}20` : theme.card, borderWidth: 1, borderColor: type === t.id ? t.color : theme.border }}>
                     <Text style={{ color: type === t.id ? t.color : theme.subtext, fontSize: 10, fontWeight: '800' }}>{t.label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
             </View>
 
-            {/* Judul */}
             <View>
               <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Judul</Text>
-              <TextInput
-                value={title} onChangeText={setTitle}
-                placeholder="Judul announcement..."
-                placeholderTextColor={theme.subtext}
-                style={{ backgroundColor: theme.card, color: theme.text, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 13, borderWidth: 1, borderColor: theme.border }}
-              />
+              <TextInput value={title} onChangeText={setTitle} placeholder="Judul announcement..." placeholderTextColor={theme.subtext}
+                style={{ backgroundColor: theme.card, color: theme.text, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 13, borderWidth: 1, borderColor: theme.border }} />
             </View>
 
-            {/* Pesan */}
             <View>
               <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Pesan</Text>
-              <TextInput
-                value={body} onChangeText={setBody}
-                placeholder="Isi pesan..."
-                placeholderTextColor={theme.subtext}
+              <TextInput value={body} onChangeText={setBody} placeholder="Isi pesan..." placeholderTextColor={theme.subtext}
                 multiline numberOfLines={4}
-                style={{ backgroundColor: theme.card, color: theme.text, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 13, borderWidth: 1, borderColor: theme.border, textAlignVertical: 'top', minHeight: 100 }}
-              />
+                style={{ backgroundColor: theme.card, color: theme.text, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 13, borderWidth: 1, borderColor: theme.border, textAlignVertical: 'top', minHeight: 100 }} />
             </View>
 
-            {/* CTA opsional */}
             <View>
               <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Tombol CTA (Opsional)</Text>
-              <TextInput
-                value={ctaText} onChangeText={setCtaText}
-                placeholder="Teks tombol, misal: Update Sekarang"
-                placeholderTextColor={theme.subtext}
-                style={{ backgroundColor: theme.card, color: theme.text, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 13, borderWidth: 1, borderColor: theme.border, marginBottom: 8 }}
-              />
-              <TextInput
-                value={ctaUrl} onChangeText={setCtaUrl}
-                placeholder="URL tujuan, misal: https://..."
-                placeholderTextColor={theme.subtext}
+              <TextInput value={ctaText} onChangeText={setCtaText} placeholder="Teks tombol, misal: Update Sekarang" placeholderTextColor={theme.subtext}
+                style={{ backgroundColor: theme.card, color: theme.text, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 13, borderWidth: 1, borderColor: theme.border, marginBottom: 8 }} />
+              <TextInput value={ctaUrl} onChangeText={setCtaUrl} placeholder="URL tujuan, misal: https://..." placeholderTextColor={theme.subtext}
                 autoCapitalize="none"
-                style={{ backgroundColor: theme.card, color: theme.text, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 13, borderWidth: 1, borderColor: theme.border }}
-              />
+                style={{ backgroundColor: theme.card, color: theme.text, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 13, borderWidth: 1, borderColor: theme.border }} />
             </View>
 
-            {/* Status */}
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: theme.card, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: theme.border }}>
               <View>
                 <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13 }}>Langsung Aktif</Text>
                 <Text style={{ color: theme.subtext, fontSize: 10, marginTop: 2 }}>Tampilkan ke user sekarang</Text>
               </View>
-              <Switch
-                value={isActive} onValueChange={setIsActive}
-                trackColor={{ false: theme.border, true: theme.accent }}
-                thumbColor={isActive ? theme.bg : theme.subtext}
-              />
+              <Switch value={isActive} onValueChange={setIsActive} trackColor={{ false: theme.border, true: theme.accent }} thumbColor={isActive ? theme.bg : theme.subtext} />
             </View>
 
-            <TouchableOpacity
-              onPress={handleSave} disabled={saving}
-              style={{ backgroundColor: selectedType.color, paddingVertical: 14, borderRadius: 10, alignItems: 'center' }}
-            >
+            <TouchableOpacity onPress={handleSave} disabled={saving}
+              style={{ backgroundColor: selectedType.color, paddingVertical: 14, borderRadius: 10, alignItems: 'center' }}>
               <Text style={{ color: '#fff', fontWeight: '900', fontSize: 14 }}>{saving ? 'Menyimpan...' : 'Kirim Announcement'}</Text>
             </TouchableOpacity>
           </ScrollView>
@@ -519,20 +458,23 @@ export default function ProfileScreen() {
   const [xpData, setXpData]       = useState<XPData>({ xp: 0, level: 1, streak: 0, lastWatchDate: '', _todayXP: 0 });
   const [history, setHistory]     = useState<HistoryItem[]>([]);
   const [favorites, setFavorites] = useState<Anime[]>([]);
-  const [pip, setPip]             = useState(false);
-  const [loading, setLoading]     = useState(false);
-  const [admin, setAdmin]         = useState(false);
 
-  const [showTheme, setShowTheme]           = useState(false);
-  const [showTentang, setShowTentang]       = useState(false);
-  const [showAdmin, setShowAdmin]           = useState(false);
-  const [showMaintenance, setShowMaintenance] = useState(false);
+  // PiP — MMKV sync, init langsung
+  const [pip, setPip] = useState(() => storageMain.getBoolean(PIP_KEY) ?? false);
+
+  const [loading, setLoading]   = useState(false);
+  const [admin, setAdmin]       = useState(false);
+
+  const [showTheme, setShowTheme]               = useState(false);
+  const [showTentang, setShowTentang]           = useState(false);
+  const [showAdmin, setShowAdmin]               = useState(false);
+  const [showMaintenance, setShowMaintenance]   = useState(false);
   const [showAnnouncement, setShowAnnouncement] = useState(false);
-  const [allUsers, setAllUsers]             = useState<any[]>([]);
-  const [adminLoading, setAdminLoading]     = useState(false);
-  const [selectedUser, setSelectedUser]     = useState<any>(null);
-  const [xpInput, setXpInput]               = useState('');
-  const [showUserModal, setShowUserModal]   = useState(false);
+  const [allUsers, setAllUsers]                 = useState<any[]>([]);
+  const [adminLoading, setAdminLoading]         = useState(false);
+  const [selectedUser, setSelectedUser]         = useState<any>(null);
+  const [xpInput, setXpInput]                   = useState('');
+  const [showUserModal, setShowUserModal]       = useState(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged((u: any) => { setUser(u); setAdmin(isAdmin()); });
@@ -543,15 +485,18 @@ export default function ProfileScreen() {
     let mounted = true;
     const loadData = async () => {
       try {
-        const [xp, hist, pipVal] = await Promise.all([
-          xpStorage.get().catch(() => ({ xp: 0, level: 1, streak: 0, lastWatchDate: '', _todayXP: 0 })),
-          Promise.resolve(historyStorage.getAll()).catch(() => []),
-          AsyncStorage.getItem(PIP_KEY).catch(() => null),
-        ]);
+        // xpStorage masih async (AsyncStorage) — await normal
+        const xp = await xpStorage.get().catch(() => ({
+          xp: 0, level: 1, streak: 0, lastWatchDate: '', _todayXP: 0,
+        }));
+
+        // historyStorage sync (MMKV) — langsung, wrap try/catch
+        let hist: HistoryItem[] = [];
+        try { hist = historyStorage.getAll() ?? []; } catch { hist = []; }
+
         if (!mounted) return;
         setXpData(xp as XPData);
-        setHistory(Array.isArray(hist) ? (hist as HistoryItem[]).slice(0, 5) : []);
-        setPip(pipVal === 'true');
+        setHistory(Array.isArray(hist) ? hist.slice(0, 5) : []);
       } catch {}
     };
     loadData();
@@ -560,11 +505,13 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     if (!user) { setFavorites([]); return; }
-    let mounted = true;
-    favoritStorage.getAll()
-      .then(favs => { if (mounted) setFavorites(Array.isArray(favs) ? favs : []); })
-      .catch(() => { if (mounted) setFavorites([]); });
-    return () => { mounted = false; };
+    // favoritStorage sync (MMKV)
+    try {
+      const favs = favoritStorage.getAll() ?? [];
+      setFavorites(Array.isArray(favs) ? favs : []);
+    } catch {
+      setFavorites([]);
+    }
   }, [user]);
 
   const handleLogin = async () => {
@@ -582,11 +529,12 @@ export default function ProfileScreen() {
     ]);
   };
 
-  const togglePip = async (val: boolean) => {
+  // PiP toggle — MMKV sync, tidak perlu async
+  const togglePip = useCallback((val: boolean) => {
     Haptics.selectionAsync();
     setPip(val);
-    await AsyncStorage.setItem(PIP_KEY, String(val));
-  };
+    storageMain.set(PIP_KEY, val);
+  }, []);
 
   const loadAllUsers = async () => {
     setAdminLoading(true);
@@ -686,9 +634,10 @@ export default function ProfileScreen() {
                 <SectionLabel label="Favorit" />
                 <Card>
                   {favorites.slice(0, 5).map((a, i) => (
-                    <TouchableOpacity key={`fav-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: i < Math.min(favorites.length, 5) - 1 ? 1 : 0, borderBottomColor: theme.border }}
+                    <TouchableOpacity key={`fav-${i}`}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: i < Math.min(favorites.length, 5) - 1 ? 1 : 0, borderBottomColor: theme.border }}
                       onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(`/watch/${a.id}`); }}>
-                      <Image source={{ uri: a.image_poster, priority: "normal" }} style={{ width: 38, aspectRatio: 3 / 4.5, borderRadius: 6 }} contentFit="cover" />
+                      <Image source={{ uri: a.image_poster, priority: 'normal' }} style={{ width: 38, aspectRatio: 3 / 4.5, borderRadius: 6 }} contentFit="cover" />
                       <View style={{ flex: 1 }}>
                         <Text style={{ color: theme.text, fontSize: 12, fontWeight: '600' }} numberOfLines={1}>{a.title}</Text>
                         <Text style={{ color: theme.subtext, fontSize: 10, marginTop: 2 }}>{a.type} • {a.status}</Text>
@@ -706,9 +655,10 @@ export default function ProfileScreen() {
                 <SectionLabel label="Terakhir Ditonton" />
                 <Card>
                   {history.map((h, i) => (
-                    <TouchableOpacity key={`hist-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: i < history.length - 1 ? 1 : 0, borderBottomColor: theme.border }}
+                    <TouchableOpacity key={`hist-${i}`}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: i < history.length - 1 ? 1 : 0, borderBottomColor: theme.border }}
                       onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(`/watch/${h.anime.id}`); }}>
-                      <Image source={{ uri: h.anime.image_poster, priority: "low" }} style={{ width: 38, aspectRatio: 3 / 4.5, borderRadius: 6 }} contentFit="cover" />
+                      <Image source={{ uri: h.anime.image_poster, priority: 'low' }} style={{ width: 38, aspectRatio: 3 / 4.5, borderRadius: 6 }} contentFit="cover" />
                       <View style={{ flex: 1 }}>
                         <Text style={{ color: theme.text, fontSize: 12, fontWeight: '600' }} numberOfLines={1}>{h.anime.title}</Text>
                         <Text style={{ color: theme.subtext, fontSize: 10, marginTop: 2 }}>Episode {h.episodeIndex}</Text>
@@ -724,10 +674,16 @@ export default function ProfileScreen() {
             <Animated.View entering={FadeInDown.delay(200).springify()}>
               <SectionLabel label="Pengaturan" />
               <Card>
-                <SettingRow icon="color-palette-outline" label="Tema" subtitle={`Sekarang: ${THEMES.find(t => t.id === theme.id)?.name ?? 'Gold'}`} onPress={() => { Haptics.selectionAsync(); setShowTheme(true); }} />
-                <SettingRow icon="tv-outline" label="Picture in Picture" subtitle="Video tetap jalan saat minimize" last right={
-                  <Switch value={pip} onValueChange={togglePip} trackColor={{ false: theme.border, true: theme.accent }} thumbColor={pip ? theme.bg : theme.subtext} />
-                } />
+                <SettingRow icon="color-palette-outline" label="Tema"
+                  subtitle={`Sekarang: ${THEMES.find(t => t.id === theme.id)?.name ?? 'Gold'}`}
+                  onPress={() => { Haptics.selectionAsync(); setShowTheme(true); }} />
+                <SettingRow icon="tv-outline" label="Picture in Picture"
+                  subtitle="Video tetap jalan saat minimize" last
+                  right={
+                    <Switch value={pip} onValueChange={togglePip}
+                      trackColor={{ false: theme.border, true: theme.accent }}
+                      thumbColor={pip ? theme.bg : theme.subtext} />
+                  } />
               </Card>
             </Animated.View>
 
@@ -735,20 +691,22 @@ export default function ProfileScreen() {
             <Animated.View entering={FadeInDown.delay(240).springify()}>
               <SectionLabel label="Tentang" />
               <Card>
-                <SettingRow icon="information-circle-outline" label="Tentang Aplikasi" subtitle="Versi, kebijakan privasi, & lainnya" last onPress={() => { Haptics.selectionAsync(); setShowTentang(true); }} />
+                <SettingRow icon="information-circle-outline" label="Tentang Aplikasi"
+                  subtitle="Versi, kebijakan privasi, & lainnya" last
+                  onPress={() => { Haptics.selectionAsync(); setShowTentang(true); }} />
               </Card>
             </Animated.View>
 
           </Animated.View>
         ) : (
           <>
-            {/* Login Box */}
             <Animated.View entering={FadeInDown.delay(60).springify()} style={{ marginHorizontal: 16, marginBottom: 12, borderRadius: 16, overflow: 'hidden', backgroundColor: theme.card, padding: 32, alignItems: 'center', gap: 8, borderWidth: 1, borderColor: theme.border }}>
               <LinearGradient colors={[theme.accentDim, 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
               <Ionicons name="person-circle-outline" size={64} color={theme.subtext} />
               <Text style={{ color: theme.text, fontSize: 18, fontWeight: '800', marginTop: 4 }}>Belum Login</Text>
               <Text style={{ color: theme.subtext, fontSize: 12, textAlign: 'center' }}>Login untuk simpan history & XP kamu</Text>
-              <TouchableOpacity onPress={handleLogin} disabled={loading} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: theme.accent, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 10, marginTop: 8 }}>
+              <TouchableOpacity onPress={handleLogin} disabled={loading}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: theme.accent, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 10, marginTop: 8 }}>
                 <Ionicons name="logo-google" size={16} color={theme.bg} />
                 <Text style={{ color: theme.bg, fontWeight: '800', fontSize: 14 }}>{loading ? 'Memuat...' : 'Login dengan Google'}</Text>
               </TouchableOpacity>
@@ -757,7 +715,9 @@ export default function ProfileScreen() {
             <Animated.View entering={FadeInDown.delay(120).springify()}>
               <SectionLabel label="Tentang" />
               <Card>
-                <SettingRow icon="information-circle-outline" label="Tentang Aplikasi" subtitle="Versi, kebijakan privasi, & lainnya" last onPress={() => { Haptics.selectionAsync(); setShowTentang(true); }} />
+                <SettingRow icon="information-circle-outline" label="Tentang Aplikasi"
+                  subtitle="Versi, kebijakan privasi, & lainnya" last
+                  onPress={() => { Haptics.selectionAsync(); setShowTentang(true); }} />
               </Card>
             </Animated.View>
           </>
@@ -784,7 +744,6 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          {/* Stats */}
           <View style={{ flexDirection: 'row', gap: 12, paddingHorizontal: 16, marginBottom: 16 }}>
             {[
               { label: 'Total User', value: allUsers.length },
@@ -797,13 +756,10 @@ export default function ProfileScreen() {
             ))}
           </View>
 
-          {/* System Tools */}
           <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '800', letterSpacing: 1.5, textTransform: 'uppercase', paddingHorizontal: 16, marginBottom: 10 }}>System</Text>
           <View style={{ marginHorizontal: 16, marginBottom: 16, backgroundColor: theme.card, borderRadius: 16, borderWidth: 1, borderColor: theme.border, overflow: 'hidden' }}>
-            <TouchableOpacity
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setShowMaintenance(true); }}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderBottomWidth: 1, borderBottomColor: theme.border }}
-            >
+            <TouchableOpacity onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setShowMaintenance(true); }}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderBottomWidth: 1, borderBottomColor: theme.border }}>
               <View style={{ width: 34, height: 34, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(230,57,70,0.15)' }}>
                 <Ionicons name="construct-outline" size={17} color="#e63946" />
               </View>
@@ -814,10 +770,8 @@ export default function ProfileScreen() {
               <Ionicons name="chevron-forward" size={16} color={theme.subtext} />
             </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setShowAnnouncement(true); }}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 }}
-            >
+            <TouchableOpacity onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setShowAnnouncement(true); }}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 }}>
               <View style={{ width: 34, height: 34, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(74,158,255,0.15)' }}>
                 <Ionicons name="megaphone-outline" size={17} color="#4a9eff" />
               </View>
@@ -829,7 +783,6 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Users */}
           <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '800', letterSpacing: 1.5, textTransform: 'uppercase', paddingHorizontal: 16, marginBottom: 10 }}>Semua User</Text>
 
           {adminLoading ? (
@@ -875,9 +828,12 @@ export default function ProfileScreen() {
               <Text style={{ color: theme.text, fontWeight: '900', fontSize: 16, marginBottom: 2 }}>{selectedUser?.displayName}</Text>
               <Text style={{ color: theme.subtext, fontSize: 11, marginBottom: 20 }}>{selectedUser?.email}</Text>
               <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Set XP</Text>
-              <TextInput value={xpInput} onChangeText={setXpInput} keyboardType="numeric" placeholder="Masukkan jumlah XP" placeholderTextColor={theme.subtext}
+              <TextInput value={xpInput} onChangeText={setXpInput} keyboardType="numeric"
+                placeholder="Masukkan jumlah XP" placeholderTextColor={theme.subtext}
                 style={{ backgroundColor: theme.bg, color: theme.text, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, borderWidth: 1, borderColor: theme.border, marginBottom: 12 }} />
-              <Text style={{ color: theme.subtext, fontSize: 10, marginBottom: 16, lineHeight: 16 }}>{LEVELS.map(l => `Lv${l.level}: ${l.min} XP`).join('  ·  ')}</Text>
+              <Text style={{ color: theme.subtext, fontSize: 10, marginBottom: 16, lineHeight: 16 }}>
+                {LEVELS.map(l => `Lv${l.level}: ${l.min} XP`).join('  ·  ')}
+              </Text>
               <TouchableOpacity onPress={handleSetXP} style={{ backgroundColor: theme.accent, paddingVertical: 14, borderRadius: 10, alignItems: 'center' }}>
                 <Text style={{ color: theme.bg, fontWeight: '900', fontSize: 14 }}>Simpan</Text>
               </TouchableOpacity>
