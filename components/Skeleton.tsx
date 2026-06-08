@@ -11,12 +11,6 @@ import { COLORS } from '@/constants';
 
 const { width } = Dimensions.get('window');
 
-// Episode size — sama persis kayak watch screen
-const EP_COLS    = 6;
-const EP_GAP     = 6;
-const EP_PADDING = 16;
-const EP_SIZE    = Math.floor((width - EP_PADDING * 2 - EP_GAP * (EP_COLS - 1)) / EP_COLS);
-
 // ─── ShimmerBox ───────────────────────────────────────────────────────────────
 
 export function ShimmerBox({ w, h, borderRadius = 6, style }: {
@@ -54,7 +48,6 @@ export function ShimmerBox({ w, h, borderRadius = 6, style }: {
 }
 
 // ─── CardSkeleton ─────────────────────────────────────────────────────────────
-// Dipakai di Explore & Ongoing — width dikontrol parent
 
 export function CardSkeleton() {
   return (
@@ -67,7 +60,6 @@ export function CardSkeleton() {
 }
 
 // ─── HeroSkeleton ─────────────────────────────────────────────────────────────
-// Hero asli pakai height: width * 0.7
 
 export function HeroSkeleton() {
   const heroH = width * 0.7;
@@ -89,7 +81,6 @@ export function HeroSkeleton() {
 }
 
 // ─── HorizontalCardSkeleton ───────────────────────────────────────────────────
-// Horizontal scroll di Home
 
 export function HorizontalCardSkeleton() {
   return (
@@ -102,7 +93,6 @@ export function HorizontalCardSkeleton() {
 }
 
 // ─── RankSkeleton ─────────────────────────────────────────────────────────────
-// Movies section di Home
 
 export function RankSkeleton() {
   return (
@@ -123,16 +113,13 @@ export function RankSkeleton() {
 export function ScheduleCardSkeleton() {
   return (
     <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
-      {/* Timeline */}
       <View style={{ width: 40, alignItems: 'center', paddingTop: 16 }}>
         <ShimmerBox w={32} h={10} borderRadius={4} />
         <View style={{ width: 1.5, flex: 1, backgroundColor: 'rgba(255,255,255,0.06)', marginTop: 6 }} />
       </View>
-      {/* Dot */}
       <View style={{ width: 10, alignItems: 'center', paddingTop: 18 }}>
         <ShimmerBox w={8} h={8} borderRadius={4} />
       </View>
-      {/* Card */}
       <View style={{ flex: 1, backgroundColor: COLORS.card, borderRadius: 14,
         overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' }}>
         <View style={{ flexDirection: 'row' }}>
@@ -148,62 +135,103 @@ export function ScheduleCardSkeleton() {
   );
 }
 
+// ─── EpisodeRowSkeleton ───────────────────────────────────────────────────────
+// Sinkron dengan EpisodeButton:
+// paddingHorizontal: 14, paddingVertical: 13, borderRadius: 10, marginBottom: 6
+
+function EpisodeRowSkeleton() {
+  return (
+    <View style={{
+      flexDirection: 'row', alignItems: 'center', gap: 10,
+      paddingHorizontal: 14, paddingVertical: 13,
+      borderRadius: 10, marginBottom: 6,
+      backgroundColor: 'transparent',
+      borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+    }}>
+      {/* index number */}
+      <ShimmerBox w={32} h={14} borderRadius={4} />
+      {/* title */}
+      <ShimmerBox w="65%" h={13} borderRadius={4} style={{ flex: 1 }} />
+    </View>
+  );
+}
+
 // ─── WatchSkeleton ────────────────────────────────────────────────────────────
-// Video height = width * 9/16, sama persis kayak watch screen
+// Sinkron penuh dengan watch screen layout
 
 export function WatchSkeleton() {
+  // Sinkron: width * (9/16) — sama persis kayak watch screen
   const videoH = width * (9 / 16);
+
+  // Sinkron: marginHorizontal: 16, padding: 16
+  const CARD_MX  = 16;
+  const CARD_PAD = 16;
+
   return (
     <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
       {/* Video area */}
       <ShimmerBox w={width} h={videoH} borderRadius={0} />
 
       <View style={{ padding: 16, gap: 12 }}>
-        {/* Episode nav buttons */}
+
+        {/* Tombol prev/next episode */}
         <View style={{ flexDirection: 'row', gap: 12 }}>
           <ShimmerBox w="48%" h={48} borderRadius={10} />
           <ShimmerBox w="48%" h={48} borderRadius={10} />
         </View>
 
-        {/* AutoNext */}
-        <ShimmerBox w="100%" h={60} borderRadius={10} />
+        {/* AutoNext toggle */}
+        <ShimmerBox w="100%" h={52} borderRadius={10} />
 
-        {/* Daftar Episode */}
-        <View style={{ backgroundColor: COLORS.card, borderRadius: 12, padding: EP_PADDING,
-          borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', gap: 12 }}>
+        {/* Daftar Episode — sinkron dengan card layout watch screen */}
+        <View style={{
+          marginHorizontal: 0,
+          backgroundColor: COLORS.card, borderRadius: 12,
+          borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+          padding: CARD_PAD,
+        }}>
           {/* Header */}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
             <ShimmerBox w={120} h={13} borderRadius={4} />
             <ShimmerBox w={40} h={13} borderRadius={4} />
           </View>
-          {/* Search */}
-          <ShimmerBox w="100%" h={36} borderRadius={8} />
-          {/* Grid episode — pakai EP_SIZE sama persis */}
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: EP_GAP }}>
-            {[...Array(12)].map((_, i) => (
-              <ShimmerBox key={i} w={EP_SIZE} h={EP_SIZE} borderRadius={6} />
-            ))}
+          {/* Search bar */}
+          <ShimmerBox w="100%" h={36} borderRadius={8} style={{ marginBottom: 12 }} />
+          {/* Episode rows — 6 baris */}
+          {Array.from({ length: 6 }).map((_, i) => (
+            <EpisodeRowSkeleton key={i} />
+          ))}
+        </View>
+
+        {/* Info Anime — sinkron: marginHorizontal 16, borderRadius 16 */}
+        <View style={{
+          borderRadius: 16, overflow: 'hidden',
+          backgroundColor: COLORS.card,
+          borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+        }}>
+          {/* Cover banner */}
+          <ShimmerBox w="100%" h={200} borderRadius={0} />
+          {/* Poster center */}
+          <View style={{ alignItems: 'center', marginTop: -50, marginBottom: 16 }}>
+            <ShimmerBox w={110} h={0} borderRadius={10} style={{ aspectRatio: 3 / 4.2 }} />
+          </View>
+          {/* Title */}
+          <View style={{ paddingHorizontal: 16, gap: 8, marginBottom: 16, alignItems: 'center' }}>
+            <ShimmerBox w="80%" h={18} borderRadius={4} />
+            <ShimmerBox w="60%" h={18} borderRadius={4} />
+            {/* Badges */}
+            <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
+              <ShimmerBox w={50} h={24} borderRadius={6} />
+              <ShimmerBox w={70} h={24} borderRadius={6} />
+              <ShimmerBox w={60} h={24} borderRadius={6} />
+            </View>
+            {/* Synopsis lines */}
+            <ShimmerBox w="100%" h={10} borderRadius={4} style={{ marginTop: 8 }} />
+            <ShimmerBox w="90%"  h={10} borderRadius={4} />
+            <ShimmerBox w="75%"  h={10} borderRadius={4} />
           </View>
         </View>
 
-        {/* Info Anime */}
-        <View style={{ backgroundColor: COLORS.card, borderRadius: 12, padding: 16,
-          borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' }}>
-          <View style={{ flexDirection: 'row', gap: 14 }}>
-            <ShimmerBox w={96} h={0} borderRadius={8} style={{ aspectRatio: 3 / 4.2 }} />
-            <View style={{ flex: 1, gap: 10 }}>
-              <ShimmerBox w="90%" h={15} borderRadius={4} />
-              <ShimmerBox w="70%" h={15} borderRadius={4} />
-              <View style={{ flexDirection: 'row', gap: 6 }}>
-                <ShimmerBox w={40} h={22} borderRadius={4} />
-                <ShimmerBox w={60} h={22} borderRadius={4} />
-              </View>
-              <ShimmerBox w="100%" h={10} borderRadius={4} />
-              <ShimmerBox w="85%" h={10} borderRadius={4} />
-              <ShimmerBox w="70%" h={10} borderRadius={4} />
-            </View>
-          </View>
-        </View>
       </View>
     </View>
   );
