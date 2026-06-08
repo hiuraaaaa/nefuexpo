@@ -53,6 +53,7 @@ export default function AnimeCard({ anime, onPress, width }: Props) {
             uri: anime.image_poster,
             priority: "normal",
             cachePolicy: "memory-disk",
+            headers: { Referer: 'https://myanimelist.net' },
           }}
           style={StyleSheet.absoluteFillObject}
           contentFit="cover"
