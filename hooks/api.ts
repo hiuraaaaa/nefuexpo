@@ -170,7 +170,7 @@ const fetchRekomendasi = async (): Promise<ApiResponse<Anime[]>> => {
 };
 
 const fetchSchedule = async (): Promise<ApiResponse<ScheduleDay>> => {
-  const json = await post<any>('/jadwal.php', '');
+  const json = await post<any>('/jadwal.php', {});
   const raw: any[] = json?.data ?? (Array.isArray(json) ? json : []);
   return { status: true, data: mapSchedule(raw) };
 };
