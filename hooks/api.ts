@@ -51,11 +51,11 @@ const get = async <T>(path: string, params?: Record<string, any>): Promise<T> =>
   return res.json();
 };
 
-const post = async <T>(path: string, body: object, flutter = false): Promise<T> => {
+const post = async <T>(path: string, body: object | string, flutter = false): Promise<T> => {
   const res = await fetch(`${API}${path}`, {
     method:  'POST',
     headers: HEADERS(flutter, true),
-    body:    JSON.stringify(body),
+    body:    typeof body === 'string' ? body : JSON.stringify(body),
   });
   return res.json();
 };
@@ -170,7 +170,7 @@ const fetchRekomendasi = async (): Promise<ApiResponse<Anime[]>> => {
 };
 
 const fetchSchedule = async (): Promise<ApiResponse<ScheduleDay>> => {
-  const json = await post<any>('/jadwal.php', {});
+  const json = await post<any>('/jadwal.php', '');
   const raw: any[] = json?.data ?? (Array.isArray(json) ? json : []);
   return { status: true, data: mapSchedule(raw) };
 };
