@@ -19,6 +19,7 @@ import Animated, {
   useSharedValue, useAnimatedStyle,
   withTiming, FadeIn, FadeOut,
 } from 'react-native-reanimated';
+import { useBatteryLevel, useBatteryState, BatteryState } from 'expo-battery';
 import { COLORS } from '@/constants';
 import { api, getAnimeSlug, decodeAnimeId, formatTime } from '@/hooks/api';
 import { historyStorage, progressStorage, favoritStorage } from '@/hooks/storage';
@@ -34,6 +35,60 @@ const SEEK_SEC     = 10;
 const EP_PAGE_SIZE = 100;
 
 type ServerGroup = { [quality: string]: Server[] };
+
+// ── Battery Icon ───────────────────────────────────────────────────────────────
+function BatteryIndicator() {
+  const level = useBatteryLevel();       // 0–1
+  const state = useBatteryState();       // BatteryState enum
+
+  const isCharging = state === BatteryState.CHARGING || state === BatteryState.FULL;
+  const pct        = level !== null ? Math.round(level * 100) : null;
+  const color      = isCharging
+    ? '#4ade80'                          // hijau saat charging
+    : pct !== null && pct <= 20
+      ? '#e63946'                        // merah saat low
+      : 'rgba(255,255,255,0.75)';
+
+  const iconName = isCharging
+    ? 'battery-charging'
+    : pct !== null && pct > 80 ? 'battery-full'
+    : pct !== null && pct > 50 ? 'battery-half'
+    : pct !== null && pct > 20 ? 'battery-low'
+    : 'battery-dead';
+
+  if (pct === null) return null;
+
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+      <Ionicons name={iconName as any} size={14} color={color} />
+      <Text style={{ color, fontSize: 11, fontWeight: '700' }}>
+        {pct}%{isCharging ? ' ⚡' : ''}
+      </Text>
+    </View>
+  );
+}
+
+// ── Clock ──────────────────────────────────────────────────────────────────────
+function Clock() {
+  const [time, setTime] = useState(() => {
+    const now = new Date();
+    return now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+  });
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = new Date();
+      setTime(now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 11, fontWeight: '700' }}>
+      {time}
+    </Text>
+  );
+}
 
 // ── Icons ──────────────────────────────────────────────────────────────────────
 const IconPrev = ({ color = '#fff', size = 28 }: { color?: string; size?: number }) => (
@@ -236,7 +291,7 @@ export default function WatchScreen() {
   const [isEpLoading, setIsEpLoading]           = useState(false);
   const [isFullscreen, setIsFullscreen]         = useState(false);
   const [autoNext, setAutoNext]                 = useState(
-    () => historyStorage.getAutoNext() // sync — langsung baca saat init
+    () => historyStorage.getAutoNext()
   );
   const [showControls, setShowControls]         = useState(true);
   const [showServerModal, setShowServerModal]   = useState(false);
@@ -271,7 +326,7 @@ export default function WatchScreen() {
     p => { p.pause(); }
   );
 
-  // ── Sync player state ke React state ──────────────────────────────────────
+  // ── Sync player state ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!player) return;
     const statusSub  = player.addListener('statusChange', ({ status }) => {
@@ -289,7 +344,6 @@ export default function WatchScreen() {
         if (now - lastSaveTime.current > 5000) {
           lastSaveTime.current = now;
           const dur = player.duration ?? 0;
-          // MMKV sync — tidak perlu await
           progressStorage.save(currentEpId, currentTime, dur);
           if (dur > 0) {
             const prog = currentTime / dur;
@@ -349,7 +403,6 @@ export default function WatchScreen() {
           setEpisodes(eps);
           setFilteredEps(eps);
 
-          // MMKV sync — baca progress semua episode sekaligus
           const progressMap: Record<string, number> = {};
           const watched = new Set<string>();
           for (const ep of eps) {
@@ -420,7 +473,6 @@ export default function WatchScreen() {
           if (bestQ && group[bestQ]?.length > 0) {
             setSelectedQuality(bestQ);
             setSelectedServer(group[bestQ][0]);
-            // Restore progress — MMKV sync
             const saved = progressStorage.get(currentEpId);
             if (saved && saved.position > 5) {
               setTimeout(() => {
@@ -435,20 +487,17 @@ export default function WatchScreen() {
     load();
   }, [currentEpId]);
 
-  // ── History — MMKV sync, tidak perlu await ────────────────────────────────
   useEffect(() => {
     if (!anime || !currentEpId) return;
     const ep = episodes.find(e => e.id === currentEpId);
     if (ep) historyStorage.add(anime, ep.index);
   }, [currentEpId, anime]);
 
-  // ── Favorit — MMKV sync ───────────────────────────────────────────────────
   useEffect(() => {
     if (!anime) return;
     setIsFavorited(favoritStorage.isFavorited(anime.id));
   }, [anime]);
 
-  // ── AutoNext — persist ke MMKV saat toggle ────────────────────────────────
   const toggleAutoNext = useCallback(() => {
     setAutoNext(prev => {
       const next = !prev;
@@ -531,7 +580,6 @@ export default function WatchScreen() {
     if (!getCurrentUser()) { Alert.alert('Login Dulu', 'Login untuk menyimpan favorit'); return; }
     if (!anime) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    // MMKV sync — tidak perlu await
     const result = favoritStorage.toggle(anime as any);
     setIsFavorited(result);
   }, [anime]);
@@ -633,6 +681,9 @@ export default function WatchScreen() {
             style={{ width: '100%', height: '100%' }}
             contentFit="contain"
             nativeControls={false}
+            allowsFullscreen
+            allowsPictureInPicture
+            startsPictureInPictureAutomatically={false}
           />
         ) : (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
@@ -673,33 +724,43 @@ export default function WatchScreen() {
               style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 90 }}
               pointerEvents="none" />
 
-            {/* Top bar */}
+            {/* ── Top bar: info (jam + baterai) + judul + bookmark ── */}
             <View style={{ position: 'absolute', top: 0, left: 0, right: 0,
-              flexDirection: 'row', alignItems: 'center',
-              paddingHorizontal: 12, paddingTop: 12, gap: 10 }}>
-              <TouchableOpacity
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  if (isFullscreen) toggleFullscreen();
-                  else if (router.canGoBack()) router.back();
-                  else router.replace('/(tabs)');
-                }}
-                style={{ width: 36, height: 36, borderRadius: 18,
-                  backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' }}>
-                <View style={{ width: 0, height: 0,
-                  borderTopWidth: 7, borderBottomWidth: 7, borderRightWidth: 10,
-                  borderTopColor: 'transparent', borderBottomColor: 'transparent',
-                  borderRightColor: '#fff', marginRight: 2 }} />
-              </TouchableOpacity>
-              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13, flex: 1 }} numberOfLines={1}>
-                {anime?.title}
-                <Text style={{ color: COLORS.gold, fontWeight: '900' }}>  Eps {currentEpNum}</Text>
-              </Text>
-              <TouchableOpacity onPress={handleBookmark}
-                style={{ width: 36, height: 36, borderRadius: 18,
-                  backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name={isFavorited ? 'bookmark' : 'bookmark-outline'} size={18} color={COLORS.gold} />
-              </TouchableOpacity>
+              paddingHorizontal: 12, paddingTop: 10, gap: 6 }}>
+
+              {/* Row 1: jam & baterai */}
+              <View style={{ flexDirection: 'row', alignItems: 'center',
+                justifyContent: 'space-between' }}>
+                <Clock />
+                <BatteryIndicator />
+              </View>
+
+              {/* Row 2: back + judul + bookmark */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <TouchableOpacity
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    if (isFullscreen) toggleFullscreen();
+                    else if (router.canGoBack()) router.back();
+                    else router.replace('/(tabs)');
+                  }}
+                  style={{ width: 36, height: 36, borderRadius: 18,
+                    backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' }}>
+                  <View style={{ width: 0, height: 0,
+                    borderTopWidth: 7, borderBottomWidth: 7, borderRightWidth: 10,
+                    borderTopColor: 'transparent', borderBottomColor: 'transparent',
+                    borderRightColor: '#fff', marginRight: 2 }} />
+                </TouchableOpacity>
+                <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13, flex: 1 }} numberOfLines={1}>
+                  {anime?.title}
+                  <Text style={{ color: COLORS.gold, fontWeight: '900' }}>  Eps {currentEpNum}</Text>
+                </Text>
+                <TouchableOpacity onPress={handleBookmark}
+                  style={{ width: 36, height: 36, borderRadius: 18,
+                    backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name={isFavorited ? 'bookmark' : 'bookmark-outline'} size={18} color={COLORS.gold} />
+                </TouchableOpacity>
+              </View>
             </View>
 
             {/* Center controls */}
@@ -775,7 +836,6 @@ export default function WatchScreen() {
       {!isFullscreen && (
         <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
 
-          {/* Prev / Next buttons */}
           <View style={{ flexDirection: 'row', gap: 12, padding: 16 }}>
             <TouchableOpacity
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); handlePrev(); }}
@@ -795,7 +855,6 @@ export default function WatchScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* AutoNext toggle */}
           <TouchableOpacity
             onPress={() => { Haptics.selectionAsync(); toggleAutoNext(); }}
             style={{ marginHorizontal: 16, marginBottom: 16, paddingVertical: 14,
@@ -998,7 +1057,6 @@ export default function WatchScreen() {
             </View>
           )}
 
-          {/* Share */}
           <TouchableOpacity onPress={handleShare}
             style={{ marginHorizontal: 16, marginBottom: 16, paddingVertical: 14,
               borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
@@ -1009,7 +1067,6 @@ export default function WatchScreen() {
             </Text>
           </TouchableOpacity>
 
-          {/* Rekomendasi */}
           {recommendations.length > 0 && (
             <View style={{ marginHorizontal: 16 }}>
               <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13, marginBottom: 12,
