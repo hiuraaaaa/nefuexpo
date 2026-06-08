@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
-import { VideoView, useVideoPlayer } from 'expo-video';
+import { VideoView, useVideoPlayer, isPictureInPictureSupported } from 'expo-video';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import * as Haptics from 'expo-haptics';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
@@ -325,6 +325,9 @@ export default function WatchScreen() {
   const controlsTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSaveTime   = useRef(0);
   const xpAwardedEps   = useRef<Set<string>>(new Set());
+  const videoRef       = useRef<VideoView>(null);
+
+  const pipSupported = isPictureInPictureSupported();
 
   const controlsOpacity = useSharedValue(1);
   const controlsStyle   = useAnimatedStyle(() => ({ opacity: controlsOpacity.value }));
@@ -686,6 +689,7 @@ export default function WatchScreen() {
 
         {selectedServer && !isEpLoading ? (
           <VideoView
+            ref={videoRef}
             player={player}
             style={{ width: '100%', height: '100%' }}
             contentFit="contain"
@@ -821,9 +825,9 @@ export default function WatchScreen() {
                   {formatTime(duration)}
                 </Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-                  {pipEnabled && (
+                  {pipEnabled && pipSupported && (
                     <TouchableOpacity
-                      onPress={() => { Haptics.selectionAsync(); player?.enterPictureInPicture?.(); resetControlsTimer(); }}
+                      onPress={() => { Haptics.selectionAsync(); videoRef.current?.startPictureInPicture(); resetControlsTimer(); }}
                       style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
                       <Ionicons name="tablet-portrait-outline" size={20} color="#fff" />
                     </TouchableOpacity>
