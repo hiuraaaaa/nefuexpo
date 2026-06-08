@@ -18,6 +18,7 @@ import firestore from '@react-native-firebase/firestore';
 
 import { LOGO_URL } from '@/constants';
 import { api, shuffleArray, getAnimeSlug } from '@/hooks/api';
+import { getHomeCache, clearHomeCache, prefetchHome } from '@/hooks/prefetch';
 import { useTheme } from '@/hooks/theme';
 import { Anime, ScheduleDay } from '@/types';
 import AnimeCard from '@/components/AnimeCard';
@@ -190,8 +191,26 @@ export default function HomeScreen() {
     return unsub;
   }, []);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (isRefresh = false) => {
     try {
+      // Kalau refresh, clear cache dulu
+      if (isRefresh) clearHomeCache();
+
+      // Coba ambil dari cache dulu
+      const cached = getHomeCache();
+      if (cached && !isRefresh) {
+        const todayKey = getTodayKey();
+        setOngoing(shuffleArray(cached.ongoing));
+        setMovies(cached.movies);
+        setTodayAnime(cached.schedule?.[todayKey] || []);
+        setIsLoading(false);
+        setRefreshing(false);
+        // Tetap prefetch ulang di background biar fresh
+        prefetchHome();
+        return;
+      }
+
+      // Fallback fetch langsung
       const [schedRes, ongRes, movRes] = await api.home();
       setOngoing(shuffleArray(ongRes.data || []));
       setMovies(movRes.data || []);
@@ -240,7 +259,7 @@ export default function HomeScreen() {
     setTimeout(() => setCopyToast(false), 2000);
   };
 
-  const onRefresh = () => { setRefreshing(true); fetchData(); };
+  const onRefresh = () => { setRefreshing(true); fetchData(true); };
 
   const visibleAnnouncements = announcements.filter(a => !dismissedIds.has(a.id));
 
