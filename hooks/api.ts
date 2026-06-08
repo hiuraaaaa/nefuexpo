@@ -83,6 +83,9 @@ const safePost = async <T>(path: string, body: object | string, flutter = false)
 // ─── Mappers ──────────────────────────────────────────────────────────────────
 
 function mapAnime(raw: any): Anime {
+  const cover = raw.cover ?? '';
+  if (!cover) console.warn('[NOCOVER]', raw.judul ?? raw.title);
+  else console.log('[COVER]', cover.substring(0, 60));
   const slug = (raw.url ?? raw.link ?? '').replace(/\/+$/, '');
   const id = slug || String(raw.id ?? '');
   return {
