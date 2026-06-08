@@ -85,6 +85,7 @@ const safePost = async <T>(path: string, body: object | string, flutter = false)
 
 function normalizeImageUrl(url: string): string {
   if (!url) return '';
+  const trimmed = url.trim(); // ← ini yang fix
   // Strip i0/i1/i2.wp.com proxy → langsung ke domain asli
   // https://i0.wp.com/cdn.myanimelist.net/... → https://cdn.myanimelist.net/...
   const wpMatch = url.match(/https?:\/\/i\d\.wp\.com\/(.+)/);
