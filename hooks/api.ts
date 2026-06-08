@@ -1,23 +1,63 @@
-import { API_BASE } from '@/constants';
 import { ApiResponse, Anime, AnimeDetail, ScheduleDay, Genre } from '@/types';
+import crypto from 'expo-crypto';
 
+// ─── Config ───────────────────────────────────────────────────────────────────
+
+const API = 'https://apps.animekita.org/api/v1.2.5';
 const PAGE_SIZE = 24;
 
-const get = async <T>(path: string): Promise<T> => {
-  const res = await fetch(`${API_BASE}${path}`);
+const HEADERS = (isFlutter = false, isPost = false) => ({
+  'accept':                    'application/json',
+  'accept-encoding':           'gzip',
+  'host':                      'apps.animekita.org',
+  'access-control-allow-origin': '*',
+  'user-agent':                isFlutter ? 'Flutter/2.5.3' : 'Dart/3.9 (dart:io)',
+  ...(isPost ? { 'content-type': 'text/plain; charset=utf-8' } : {}),
+});
+
+// ─── Session token (guest login) ──────────────────────────────────────────────
+
+let _token: string | null = null;
+
+const getToken = async (): Promise<string> => {
+  if (_token) return _token;
+  const uid = Array.from(crypto.getRandomBytes(5))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+  const payload = {
+    user:    `Guest_${uid}`,
+    email:   `gienetic_${uid}@gmail.com`,
+    profil:  'https://lh3.googleusercontent.com/a/default',
+  };
+  const res = await fetch(`${API}/model/login.php`, {
+    method:  'POST',
+    headers: HEADERS(false, true),
+    body:    JSON.stringify(payload),
+  });
+  const json = await res.json();
+  _token = json?.data?.[0]?.token ?? '';
+  return _token!;
+};
+
+/** Panggil sekali saat app start biar token udah ready */
+export const initSession = async (): Promise<void> => { await getToken(); };
+
+// ─── HTTP helpers ─────────────────────────────────────────────────────────────
+
+const get = async <T>(path: string, params?: Record<string, any>): Promise<T> => {
+  const url = new URL(`${API}${path}`);
+  if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, String(v)));
+  const res = await fetch(url.toString(), { headers: HEADERS() });
   return res.json();
 };
 
-// ─── Cache anime-list ─────────────────────────────────────────────────────────
-let animeListCache: Anime[] | null = null;
-
-const getAnimeList = async (): Promise<Anime[]> => {
-  if (animeListCache) return animeListCache;
-  const json = await get<Record<string, any[]>>('/anime-list');
-  // Flatten semua huruf jadi satu array
-  const all: Anime[] = Object.values(json).flat().map(mapAnime);
-  animeListCache = all;
-  return all;
+const post = async <T>(path: string, body: object, flutter = false): Promise<T> => {
+  const res = await fetch(`${API}${path}`, {
+    method:  'POST',
+    headers: HEADERS(flutter, true),
+    body:    JSON.stringify(body),
+  });
+  return res.json();
 };
 
 // ─── Mappers ──────────────────────────────────────────────────────────────────
@@ -25,7 +65,7 @@ const getAnimeList = async (): Promise<Anime[]> => {
 function mapAnime(raw: any): Anime {
   return {
     id:           (raw.url ?? String(raw.id ?? '')).replace(/\/+$/, ''),
-    title:        raw.judul ?? raw.anime_name ?? '',
+    title:        raw.judul ?? raw.anime_name ?? raw.title ?? '',
     image_poster: raw.cover ?? '',
     image_cover:  raw.cover ?? '',
     synopsis:     raw.sinopsis ?? raw.synopsis ?? '',
@@ -39,26 +79,7 @@ function mapAnime(raw: any): Anime {
       : raw.genre ?? '',
     day:      raw.day ?? '',
     time:     raw.time ?? '',
-    key_time: raw.key_time ?? '',
-  };
-}
-
-function mapScheduleItem(raw: any): Anime {
-  return {
-    id:           (raw.link ?? raw.anime_name ?? '').replace(/\/+$/, ''),
-    title:        raw.anime_name ?? '',
-    image_poster: raw.cover ?? '',
-    image_cover:  raw.cover ?? '',
-    synopsis:     '',
-    type:         '',
-    status:       'ONGOING',
-    year:         '',
-    aired_start:  '',
-    studio:       '',
-    genre:        '',
-    day:          '',
-    time:         '',
-    key_time:     '',
+    key_time: (raw.day ?? '').toUpperCase(),
   };
 }
 
@@ -84,76 +105,111 @@ function mapAnimeDetail(raw: any): AnimeDetail {
 
   const episode_list = (raw.chapter ?? []).map((ch: any) => ({
     id:    (ch.url ?? '').replace(/\/+$/, ''),
-    index: ch.ch,
+    index: parseInt(ch.ch) || 0,
     title: `Episode ${ch.ch}`,
   }));
 
   return { ...base, episode_list };
 }
 
+function mapSchedule(raw: any[]): ScheduleDay {
+  const days: ScheduleDay = {};
+  for (const item of raw) {
+    const key = (item.day ?? '').toUpperCase();
+    days[key] = (item.animeList ?? []).map((a: any) => ({
+      id:           (a.link ?? a.url ?? '').replace(/\/+$/, ''),
+      title:        a.anime_name ?? a.judul ?? '',
+      image_poster: a.cover ?? '',
+      image_cover:  a.cover ?? '',
+      synopsis:     '',
+      type:         '',
+      status:       'ONGOING',
+      year:         '',
+      aired_start:  '',
+      studio:       '',
+      genre:        '',
+      day:          item.day ?? '',
+      time:         a.time ?? '',
+      key_time:     (item.day ?? '').toUpperCase(),
+    }));
+  }
+  return days;
+}
+
 // ─── Endpoints ────────────────────────────────────────────────────────────────
 
 const fetchOngoing = async (page = 0): Promise<ApiResponse<Anime[]>> => {
-  const json = await get<any>(`/latest?page=${page + 1}`);
-  const list = Array.isArray(json) ? json : (json?.data ?? []);
+  const json = await get<any>('/home/ongoing.php', { page: page + 1, type: 'all' });
+  const list: any[] = Array.isArray(json) ? json : (json?.data ?? []);
   return { status: true, data: list.map(mapAnime) };
 };
 
-const fetchPopular = async (_page = 0): Promise<ApiResponse<Anime[]>> => {
-  const json = await get<any>('/movies');
-  const list = Array.isArray(json) ? json : (json?.data ?? []);
+const fetchComplete = async (page = 0): Promise<ApiResponse<Anime[]>> => {
+  // baruupload.php isinya anime yang baru selesai / complete
+  const json = await get<any>('/baruupload.php', { page: page + 1 });
+  const list: any[] = Array.isArray(json) ? json : (json?.data ?? []);
+  return { status: true, data: list.map(mapAnime) };
+};
+
+const fetchMovie = async (page = 0): Promise<ApiResponse<Anime[]>> => {
+  const json = await get<any>('/movie.php', { page: page + 1 });
+  const list: any[] = Array.isArray(json) ? json : (json?.data ?? []);
+  return { status: true, data: list.map(mapAnime) };
+};
+
+const fetchRekomendasi = async (): Promise<ApiResponse<Anime[]>> => {
+  const json = await get<any>('/rekomendasi.php');
+  const list: any[] = Array.isArray(json) ? json : (json?.data ?? []);
   return { status: true, data: list.map(mapAnime) };
 };
 
 const fetchSchedule = async (): Promise<ApiResponse<ScheduleDay>> => {
-  const json = await get<any>('/schedule');
+  const json = await post<any>('/jadwal.php', '');
   const raw: any[] = json?.data ?? (Array.isArray(json) ? json : []);
-  const days: ScheduleDay = {};
-  for (const item of raw) {
-    const key = (item.day ?? '').toUpperCase();
-    days[key] = (item.animeList ?? []).map(mapScheduleItem);
-  }
-  return { status: true, data: days };
+  return { status: true, data: mapSchedule(raw) };
 };
 
 const fetchSearch = async (q: string, page = 0): Promise<ApiResponse<Anime[]>> => {
-  const json = await get<any>(`/search?q=${encodeURIComponent(q)}&page=${page + 1}`);
+  const json = await get<any>('/search.php', { keyword: q, page: page + 1, per_page: 20 });
   const result: any[] = json?.data?.[0]?.result ?? [];
   return { status: true, data: result.map(mapAnime) };
 };
 
 const fetchDetail = async (id: string): Promise<ApiResponse<AnimeDetail>> => {
-  const slugWithSlash = id.replace(/\/+$/, '') + '/';
-  let json = await get<any>(`/detail?url=${encodeURIComponent(slugWithSlash)}`);
-  let raw = json?.data?.[0];
-
-  if (!raw || !raw.judul) {
-    json = await get<any>(`/detail?url=${encodeURIComponent(id)}`);
-    raw = json?.data?.[0];
-  }
-
-  if (!raw || !raw.judul) return { status: false, data: null as any };
+  const token = await getToken();
+  const slug  = id.replace(/\/+$/, '');
+  const payload = { get: 'top', post_type: '1', post_id: slug, token };
+  const json = await post<any>(`/series.php?url=${slug}`, payload);
+  const raw = json?.data?.[0];
+  if (!raw?.judul) return { status: false, data: null as any };
   return { status: true, data: mapAnimeDetail(raw) };
 };
 
 const fetchEpisode = async (id: string): Promise<any> => {
-  const slugWithSlash = id.replace(/\/+$/, '') + '/';
-  let json = await get<any>(`/episode?url=${encodeURIComponent(slugWithSlash)}&reso=720p`);
-  let streamData: any[] = json?.data?.[0]?.stream ?? [];
+  const token  = await getToken();
+  const epId   = id.replace(/\/+$/, '');
+  // Ambil info episode dulu (series_id dari url)
+  const seriesSlug = epId.split('/').filter(Boolean).pop() ?? epId;
+  const epNum = (epId.match(/episode-(\d+)/) ?? [])[1] ?? '1';
+  const payload = {
+    post_type:  '2',
+    post_id:    epId,
+    series_id:  seriesSlug,
+    series_url: seriesSlug,
+    episode:    epNum,
+    token,
+  };
+  const json = await post<any>(`/series/episode/data.php?url=${epId}`, payload, true);
+  const streamData: any[] = json?.data?.[0]?.streams ?? [];
 
-  if (streamData.length === 0) {
-    json = await get<any>(`/episode?url=${encodeURIComponent(id)}&reso=720p`);
-    streamData = json?.data?.[0]?.stream ?? [];
-  }
-
-  const mp4s        = streamData.filter((s: any) => s.link && s.link.split('?')[0].endsWith('.mp4') && !s.link.includes('pixeldrain.com'));
-  const pixeldrain  = streamData.filter((s: any) => s.link && s.link.includes('pixeldrain.com') && !s.link.includes('?download'));
-  const m3u8s       = streamData.filter((s: any) => s.link && s.link.includes('.m3u8'));
-  const combined    = [...mp4s, ...pixeldrain, ...m3u8s];
+  const mp4s       = streamData.filter(s => s.link && s.link.split('?')[0].endsWith('.mp4') && !s.link.includes('pixeldrain.com'));
+  const pixeldrain = streamData.filter(s => s.link && s.link.includes('pixeldrain.com') && !s.link.includes('?download'));
+  const m3u8s      = streamData.filter(s => s.link && s.link.includes('.m3u8'));
+  const combined   = [...mp4s, ...pixeldrain, ...m3u8s];
 
   const server = combined.map((s: any, i: number) => ({
     id:      String(i),
-    quality: s.reso ?? 'AUTO',
+    quality: s.reso ?? s.quality ?? 'AUTO',
     link:    s.link,
     type:    s.link.includes('.m3u8') ? 'hls' : 'direct',
   }));
@@ -163,19 +219,32 @@ const fetchEpisode = async (id: string): Promise<any> => {
 
 // ─── Anime List (untuk explore) ───────────────────────────────────────────────
 
+let animeListCache: Anime[] | null = null;
+
+const getAnimeList = async (): Promise<Anime[]> => {
+  if (animeListCache) return animeListCache;
+  // Gabungin ongoing + complete untuk list explore
+  const [ong, comp] = await Promise.all([
+    fetchOngoing(0),
+    fetchComplete(0),
+  ]);
+  const merged = [...ong.data, ...comp.data];
+  // Dedupe by id
+  const seen = new Set<string>();
+  animeListCache = merged.filter(a => { if (seen.has(a.id)) return false; seen.add(a.id); return true; });
+  return animeListCache;
+};
+
 const fetchAnimeList = async (page = 0): Promise<ApiResponse<Anime[]>> => {
-  const all = await getAnimeList();
+  const all   = await getAnimeList();
   const start = page * PAGE_SIZE;
-  const slice = all.slice(start, start + PAGE_SIZE);
-  return { status: true, data: slice };
+  return { status: true, data: all.slice(start, start + PAGE_SIZE) };
 };
 
 const fetchAnimeListSearch = async (q: string): Promise<ApiResponse<Anime[]>> => {
-  // Search lokal dari anime-list — cocok buat nama yg ga ada di /search
-  const all = await getAnimeList();
+  const all   = await getAnimeList();
   const lower = q.toLowerCase();
-  const found = all.filter(a => a.title.toLowerCase().includes(lower));
-  return { status: true, data: found.slice(0, 48) };
+  return { status: true, data: all.filter(a => a.title.toLowerCase().includes(lower)).slice(0, 48) };
 };
 
 const fetchGenre = async (): Promise<ApiResponse<Genre[]>> => ({ status: true, data: [] });
@@ -184,36 +253,41 @@ const fetchGenreFilter = async (_ids: string[], _page = 0): Promise<ApiResponse<
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 export const api = {
-  home:          ()                          => Promise.all([fetchSchedule(), fetchOngoing(), fetchPopular()]),
-  detail:        (id: string)                => fetchDetail(id),
-  episode:       (id: string)                => fetchEpisode(id),
-  search:        (q: string, page = 0)       => fetchSearch(q, page),
-  searchLocal:   (q: string)                 => fetchAnimeListSearch(q),
-  popular:       (page = 0)                  => fetchPopular(page),
-  ongoing:       (page = 0)                  => fetchOngoing(page),
-  schedule:      ()                          => fetchSchedule(),
-  genre:         ()                          => fetchGenre(),
-  genreFilter:   (ids: string[], page = 0)   => fetchGenreFilter(ids, page),
-  // Explore
-  animeList:     (page = 0)                  => fetchAnimeList(page),
-  animeListAll:  ()                          => getAnimeList(),
+  // Home — parallel fetch: rekomendasi + ongoing + complete + movie + jadwal
+  home:         () => Promise.all([
+    fetchRekomendasi(),   // [0] hero carousel
+    fetchOngoing(),       // [1] terbaru
+    fetchComplete(),      // [2] complete
+    fetchMovie(),         // [3] movies
+    fetchSchedule(),      // [4] jadwal
+  ]),
+  detail:       (id: string)               => fetchDetail(id),
+  episode:      (id: string)               => fetchEpisode(id),
+  search:       (q: string, page = 0)      => fetchSearch(q, page),
+  searchLocal:  (q: string)                => fetchAnimeListSearch(q),
+  ongoing:      (page = 0)                 => fetchOngoing(page),
+  complete:     (page = 0)                 => fetchComplete(page),
+  movie:        (page = 0)                 => fetchMovie(page),
+  schedule:     ()                         => fetchSchedule(),
+  rekomendasi:  ()                         => fetchRekomendasi(),
+  genre:        ()                         => fetchGenre(),
+  genreFilter:  (ids: string[], page = 0)  => fetchGenreFilter(ids, page),
+  animeList:    (page = 0)                 => fetchAnimeList(page),
+  animeListAll: ()                         => getAnimeList(),
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 export const getAnimeSlug = (anime: Anime): string => {
-  const encodedId = encodeURIComponent(anime.id).replace(/%/g, '_');
+  const encodedId  = encodeURIComponent(anime.id).replace(/%/g, '_');
   const titleKebab = (anime.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
   return `${encodedId}---${titleKebab}`;
 };
 
 export const decodeAnimeId = (slug: string): string => {
   const encoded = slug.split('---')[0];
-  try {
-    return decodeURIComponent(encoded.replace(/_/g, '%'));
-  } catch {
-    return encoded;
-  }
+  try { return decodeURIComponent(encoded.replace(/_/g, '%')); }
+  catch { return encoded; }
 };
 
 export const shuffleArray = <T>(array: T[]): T[] => {
