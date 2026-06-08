@@ -52,10 +52,10 @@ export default function AnimeCard({ anime, onPress, width }: Props) {
   onLayout={(e) => console.log('[LAYOUT]', e.nativeEvent.layout)}
 >
         <Image
-          source={{ uri: anime.image_poster }}
-          style={StyleSheet.absoluteFillObject}
-          contentFit="cover"
-        />
+  source={{ uri: 'https://cdn.myanimelist.net/images/anime/1394/145458l.jpg' }}
+  style={{ width: '100%', height: '100%' }}
+  contentFit="cover"
+/>
 
         <LinearGradient
           colors={['transparent', 'rgba(0,0,0,0.6)']}
