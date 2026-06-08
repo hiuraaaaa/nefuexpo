@@ -25,7 +25,7 @@ export const prefetchHome = (): void => {
   if (inflight) return;
 
   inflight = api.home()
-    .then(([schedRes, ongRes, movRes]) => {
+    .then(([_rekom, ongRes, _comp, movRes, schedRes]) => {
       cache = {
         ongoing:   ongRes.data   || [],
         movies:    movRes.data   || [],
