@@ -49,17 +49,15 @@ export default function AnimeCard({ anime, onPress, width }: Props) {
       {/* Poster */}
       <View style={styles.posterWrapper}>
         <Image
-          source={{
-            uri: anime.image_poster,
-            priority: "normal",
-            cachePolicy: "memory-disk",
-            headers: { Referer: 'https://myanimelist.net' },
-          }}
-          onError={(e) => console.warn('[IMG ERROR]', anime.image_poster, e.error)}
-          style={StyleSheet.absoluteFillObject}
-          contentFit="cover"
-        />
-
+  source={{ uri: anime.image_poster }}
+  requestOptions={{
+    headers: { Referer: 'https://myanimelist.net' },
+  }}
+  priority="normal"
+  cachePolicy="memory-disk"
+  style={StyleSheet.absoluteFillObject}
+  contentFit="cover"
+/>
         <LinearGradient
           colors={['transparent', 'rgba(0,0,0,0.6)']}
           style={styles.gradient}
