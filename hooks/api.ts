@@ -42,30 +42,47 @@ const getToken = async (): Promise<string> => {
 /** Panggil sekali saat app start biar token udah ready */
 export const initSession = async (): Promise<void> => { await getToken(); };
 
-// ─── HTTP helpers ─────────────────────────────────────────────────────────────
+// ─── HTTP helpers (safe — gak throw, return null kalau gagal) ─────────────────
 
-const get = async <T>(path: string, params?: Record<string, any>): Promise<T> => {
-  const url = new URL(`${API}${path}`);
-  if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, String(v)));
-  const res = await fetch(url.toString(), { headers: HEADERS() });
-  return res.json();
+const safeGet = async <T>(path: string, params?: Record<string, any>): Promise<T | null> => {
+  try {
+    const url = new URL(`${API}${path}`);
+    if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, String(v)));
+    const res = await fetch(url.toString(), { headers: HEADERS() });
+    const text = await res.text();
+    if (!text || !text.trim().startsWith('{') && !text.trim().startsWith('[')) {
+      console.warn(`[API] safeGet non-JSON response: ${path} →`, text.substring(0, 100));
+      return null;
+    }
+    return JSON.parse(text);
+  } catch (e: any) {
+    console.warn(`[API] safeGet failed: ${path} —`, e?.message);
+    return null;
+  }
 };
 
-const post = async <T>(path: string, body: object | string, flutter = false): Promise<T> => {
-  const res = await fetch(`${API}${path}`, {
-    method:  'POST',
-    headers: HEADERS(flutter, true),
-    body:    typeof body === 'string' ? body : JSON.stringify(body),
-  });
-  return res.json();
+const safePost = async <T>(path: string, body: object | string, flutter = false): Promise<T | null> => {
+  try {
+    const res = await fetch(`${API}${path}`, {
+      method:  'POST',
+      headers: HEADERS(flutter, true),
+      body:    typeof body === 'string' ? body : JSON.stringify(body),
+    });
+    const text = await res.text();
+    if (!text || !text.trim().startsWith('{') && !text.trim().startsWith('[')) {
+      console.warn(`[API] safePost non-JSON response: ${path} →`, text.substring(0, 100));
+      return null;
+    }
+    return JSON.parse(text);
+  } catch (e: any) {
+    console.warn(`[API] safePost failed: ${path} —`, e?.message);
+    return null;
+  }
 };
 
 // ─── Mappers ──────────────────────────────────────────────────────────────────
 
 function mapAnime(raw: any): Anime {
-  // ongoing.php: id = integer index (1-10), url = slug
-  // baruupload/rekomendasi: id = real numeric ID, url = slug
-  // jadwal animeList: link = slug, id = real numeric ID
   const slug = (raw.url ?? raw.link ?? '').replace(/\/+$/, '');
   const id = slug || String(raw.id ?? '');
   return {
@@ -122,7 +139,7 @@ function mapSchedule(raw: any[]): ScheduleDay {
   for (const item of raw) {
     const key = (item.day ?? '').toUpperCase();
     days[key] = (item.animeList ?? []).map((a: any) => ({
-      id:           (a.link ?? a.url ?? '').replace(/\/+$/, ''),  // link = slug
+      id:           (a.link ?? a.url ?? '').replace(/\/+$/, ''),
       title:        a.anime_name ?? a.judul ?? '',
       image_poster: a.cover ?? '',
       image_cover:  a.cover ?? '',
@@ -144,39 +161,37 @@ function mapSchedule(raw: any[]): ScheduleDay {
 // ─── Endpoints ────────────────────────────────────────────────────────────────
 
 const fetchOngoing = async (page = 0): Promise<ApiResponse<Anime[]>> => {
-  // baruupload.php lebih lengkap (sinopsis, genre, studio) vs ongoing.php yang cuma 10 item index
-  const json = await get<any>('/baruupload.php', { page: page + 1 });
+  const json = await safeGet<any>('/baruupload.php', { page: page + 1 });
   const list: any[] = Array.isArray(json) ? json : (json?.data ?? []);
   return { status: true, data: list.map(mapAnime) };
 };
 
 const fetchComplete = async (page = 0): Promise<ApiResponse<Anime[]>> => {
-  // complete pakai ongoing.php (list ongoing + completed)
-  const json = await get<any>('/home/ongoing.php', { page: page + 1, type: 'all' });
+  const json = await safeGet<any>('/home/ongoing.php', { page: page + 1, type: 'all' });
   const list: any[] = Array.isArray(json) ? json : (json?.data ?? []);
   return { status: true, data: list.map(mapAnime) };
 };
 
 const fetchMovie = async (page = 0): Promise<ApiResponse<Anime[]>> => {
-  const json = await get<any>('/movie.php', { page: page + 1 });
+  const json = await safeGet<any>('/movie.php', { page: page + 1 });
   const list: any[] = Array.isArray(json) ? json : (json?.data ?? []);
   return { status: true, data: list.map(mapAnime) };
 };
 
 const fetchRekomendasi = async (): Promise<ApiResponse<Anime[]>> => {
-  const json = await get<any>('/rekomendasi.php');
+  const json = await safeGet<any>('/rekomendasi.php');
   const list: any[] = Array.isArray(json) ? json : (json?.data ?? []);
   return { status: true, data: list.map(mapAnime) };
 };
 
 const fetchSchedule = async (): Promise<ApiResponse<ScheduleDay>> => {
-  const json = await post<any>('/jadwal.php', '');
+  const json = await safePost<any>('/jadwal.php', '');
   const raw: any[] = json?.data ?? (Array.isArray(json) ? json : []);
   return { status: true, data: mapSchedule(raw) };
 };
 
 const fetchSearch = async (q: string, page = 0): Promise<ApiResponse<Anime[]>> => {
-  const json = await get<any>('/search.php', { keyword: q, page: page + 1, per_page: 20 });
+  const json = await safeGet<any>('/search.php', { keyword: q, page: page + 1, per_page: 20 });
   const result: any[] = json?.data?.[0]?.result ?? [];
   return { status: true, data: result.map(mapAnime) };
 };
@@ -185,7 +200,7 @@ const fetchDetail = async (id: string): Promise<ApiResponse<AnimeDetail>> => {
   const token = await getToken();
   const slug  = id.replace(/\/+$/, '');
   const payload = { get: 'top', post_type: '1', post_id: slug, token };
-  const json = await post<any>(`/series.php?url=${slug}`, payload);
+  const json = await safePost<any>(`/series.php?url=${slug}`, payload);
   const raw = json?.data?.[0];
   if (!raw?.judul) return { status: false, data: null as any };
   return { status: true, data: mapAnimeDetail(raw) };
@@ -194,7 +209,6 @@ const fetchDetail = async (id: string): Promise<ApiResponse<AnimeDetail>> => {
 const fetchEpisode = async (id: string): Promise<any> => {
   const token  = await getToken();
   const epId   = id.replace(/\/+$/, '');
-  // Ambil info episode dulu (series_id dari url)
   const seriesSlug = epId.split('/').filter(Boolean).pop() ?? epId;
   const epNum = (epId.match(/episode-(\d+)/) ?? [])[1] ?? '1';
   const payload = {
@@ -205,7 +219,7 @@ const fetchEpisode = async (id: string): Promise<any> => {
     episode:    epNum,
     token,
   };
-  const json = await post<any>(`/series/episode/data.php?url=${epId}`, payload, true);
+  const json = await safePost<any>(`/series/episode/data.php?url=${epId}`, payload, true);
   const streamData: any[] = json?.data?.[0]?.streams ?? [];
 
   const mp4s       = streamData.filter(s => s.link && s.link.split('?')[0].endsWith('.mp4') && !s.link.includes('pixeldrain.com'));
@@ -229,13 +243,14 @@ let animeListCache: Anime[] | null = null;
 
 const getAnimeList = async (): Promise<Anime[]> => {
   if (animeListCache) return animeListCache;
-  // Gabungin ongoing + complete untuk list explore
-  const [ong, comp] = await Promise.all([
+  const results = await Promise.allSettled([
     fetchOngoing(0),
     fetchComplete(0),
   ]);
+  const [ong, comp] = results.map(r =>
+    r.status === 'fulfilled' ? r.value : { status: false, data: [] as Anime[] }
+  );
   const merged = [...ong.data, ...comp.data];
-  // Dedupe by id
   const seen = new Set<string>();
   animeListCache = merged.filter(a => { if (seen.has(a.id)) return false; seen.add(a.id); return true; });
   return animeListCache;
@@ -258,15 +273,30 @@ const fetchGenreFilter = async (_ids: string[], _page = 0): Promise<ApiResponse<
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
+const EMPTY_LIST: ApiResponse<Anime[]>    = { status: false, data: [] };
+const EMPTY_SCHED: ApiResponse<ScheduleDay> = { status: false, data: {} };
+
 export const api = {
-  // Home — parallel fetch: rekomendasi + ongoing + complete + movie + jadwal
-  home:         () => Promise.all([
-    fetchRekomendasi(),   // [0] hero carousel
-    fetchOngoing(),       // [1] terbaru
-    fetchComplete(),      // [2] complete
-    fetchMovie(),         // [3] movies
-    fetchSchedule(),      // [4] jadwal
-  ]),
+  // Home — parallel fetch, kalau salah satu gagal sisanya tetap jalan
+  home: async (): Promise<[ApiResponse<Anime[]>, ApiResponse<Anime[]>, ApiResponse<Anime[]>, ApiResponse<Anime[]>, ApiResponse<ScheduleDay>]> => {
+    const results = await Promise.allSettled([
+      fetchRekomendasi(),   // [0] hero carousel
+      fetchOngoing(),       // [1] terbaru
+      fetchComplete(),      // [2] complete
+      fetchMovie(),         // [3] movies
+      fetchSchedule(),      // [4] jadwal
+    ]);
+
+    const [rekom, ong, comp, mov, sched] = results;
+
+    return [
+      rekom.status === 'fulfilled' ? rekom.value : EMPTY_LIST,
+      ong.status   === 'fulfilled' ? ong.value   : EMPTY_LIST,
+      comp.status  === 'fulfilled' ? comp.value  : EMPTY_LIST,
+      mov.status   === 'fulfilled' ? mov.value   : EMPTY_LIST,
+      sched.status === 'fulfilled' ? sched.value : EMPTY_SCHED,
+    ];
+  },
   detail:       (id: string)               => fetchDetail(id),
   episode:      (id: string)               => fetchEpisode(id),
   search:       (q: string, page = 0)      => fetchSearch(q, page),
