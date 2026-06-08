@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -19,7 +20,6 @@ interface Props {
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 export default function AnimeCard({ anime, onPress, width }: Props) {
-  console.log('[CARD]', anime.title, '|', anime.image_poster); // ← tambah ini
   const scale   = useSharedValue(1);
   const opacity = useSharedValue(1);
 
@@ -51,7 +51,7 @@ export default function AnimeCard({ anime, onPress, width }: Props) {
         <Image
           source={{ uri: anime.image_poster }}
           style={StyleSheet.absoluteFillObject}
-          resizeMode="cover"
+          contentFit="cover"
         />
 
         <LinearGradient
