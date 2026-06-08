@@ -15,6 +15,9 @@ import '../global.css';
 
 SplashScreen.preventAutoHideAsync();
 
+Image.clearDiskCache();
+Image.clearMemoryCache();
+
 // ─── Error Boundary ───────────────────────────────────────────────────────────
 class RootErrorBoundary extends Component<
   { children: ReactNode },
