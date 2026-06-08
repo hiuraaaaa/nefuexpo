@@ -194,10 +194,8 @@ export default function HomeScreen() {
 
   const fetchData = useCallback(async (isRefresh = false) => {
     try {
-      // Kalau refresh, clear cache dulu
       if (isRefresh) clearHomeCache();
 
-      // Coba ambil dari cache dulu
       const cached = getHomeCache();
       if (cached && !isRefresh) {
         const todayKey = getTodayKey();
@@ -206,19 +204,34 @@ export default function HomeScreen() {
         setTodayAnime(cached.schedule?.[todayKey] || []);
         setIsLoading(false);
         setRefreshing(false);
-        // Tetap prefetch ulang di background biar fresh
         prefetchHome();
+        console.info('[HOME] loaded from cache, ongoing=' + cached.ongoing.length + ' movies=' + cached.movies.length);
         return;
       }
 
-      // Fallback fetch langsung
-      const [_rekom, ongRes, _comp, movRes, schedRes] = await api.home();
+      console.info('[HOME] fetching from API...');
+      const results = await api.home();
+      const [_rekom, ongRes, _comp, movRes, schedRes] = results;
+
+      console.info('[HOME] results:');
+      results.forEach((r, i) => {
+        const label = ['rekom','ongoing','complete','movie','jadwal'][i];
+        const count = Array.isArray(r?.data) ? r.data.length : (typeof r?.data === 'object' ? Object.keys(r?.data||{}).length : r?.data);
+        console.info('  [' + i + '] ' + label + ' status=' + r?.status + ' count=' + count);
+      });
+
+      if (!ongRes?.data?.length) console.warn('[HOME] ongoing kosong!');
+      if (!movRes?.data?.length) console.warn('[HOME] movies kosong!');
+
       setOngoing(shuffleArray(ongRes.data || []));
       setMovies(movRes.data || []);
       const todayKey = getTodayKey();
       const schedData = schedRes.data as ScheduleDay;
       setTodayAnime(schedData?.[todayKey] || []);
-    } catch {}
+    } catch (e: any) {
+      console.error('[HOME] FETCH ERROR: ' + (e?.message || String(e)));
+      console.error('[HOME] stack: ' + e?.stack);
+    }
     setIsLoading(false);
     setRefreshing(false);
   }, []);
