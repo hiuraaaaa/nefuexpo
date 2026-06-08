@@ -47,7 +47,10 @@ export default function AnimeCard({ anime, onPress, width }: Props) {
       style={[animStyle, width ? { width } : { flex: 1 }]}
     >
       {/* Poster */}
-      <View style={styles.posterWrapper}>
+      <View
+  style={styles.posterWrapper}
+  onLayout={(e) => console.log('[LAYOUT]', e.nativeEvent.layout)}
+>
         <Image
           source={{ uri: anime.image_poster }}
           style={StyleSheet.absoluteFillObject}
@@ -84,6 +87,7 @@ export default function AnimeCard({ anime, onPress, width }: Props) {
 const styles = StyleSheet.create({
   posterWrapper: {
     aspectRatio: 3 / 4.5,
+    width: '100%',        // ← tambah
     backgroundColor: COLORS.card,
     borderRadius: 8,
     overflow: 'hidden',
