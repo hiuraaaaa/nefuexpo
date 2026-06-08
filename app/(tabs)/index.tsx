@@ -17,7 +17,8 @@ import Animated, {
 import firestore from '@react-native-firebase/firestore';
 
 import { LOGO_URL } from '@/constants';
-import { api, shuffleArray, getAnimeSlug } from '@/hooks/api';
+//import { api, shuffleArray, getAnimeSlug } from '@/hooks/api';
+import { api, shuffleArray, getAnimeSlug } from '@/hooks/scraper';
 import { getHomeCache, clearHomeCache, prefetchHome } from '@/hooks/prefetch';
 import { useTheme } from '@/hooks/theme';
 import { Anime, ScheduleDay } from '@/types';
