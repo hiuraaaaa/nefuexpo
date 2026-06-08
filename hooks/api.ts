@@ -63,8 +63,13 @@ const post = async <T>(path: string, body: object, flutter = false): Promise<T> 
 // ─── Mappers ──────────────────────────────────────────────────────────────────
 
 function mapAnime(raw: any): Anime {
+  // ongoing.php: id = integer index (1-10), url = slug
+  // baruupload/rekomendasi: id = real numeric ID, url = slug
+  // jadwal animeList: link = slug, id = real numeric ID
+  const slug = (raw.url ?? raw.link ?? '').replace(/\/+$/, '');
+  const id = slug || String(raw.id ?? '');
   return {
-    id:           (raw.url ?? String(raw.id ?? '')).replace(/\/+$/, ''),
+    id,
     title:        raw.judul ?? raw.anime_name ?? raw.title ?? '',
     image_poster: raw.cover ?? '',
     image_cover:  raw.cover ?? '',
@@ -117,7 +122,7 @@ function mapSchedule(raw: any[]): ScheduleDay {
   for (const item of raw) {
     const key = (item.day ?? '').toUpperCase();
     days[key] = (item.animeList ?? []).map((a: any) => ({
-      id:           (a.link ?? a.url ?? '').replace(/\/+$/, ''),
+      id:           (a.link ?? a.url ?? '').replace(/\/+$/, ''),  // link = slug
       title:        a.anime_name ?? a.judul ?? '',
       image_poster: a.cover ?? '',
       image_cover:  a.cover ?? '',
@@ -139,14 +144,15 @@ function mapSchedule(raw: any[]): ScheduleDay {
 // ─── Endpoints ────────────────────────────────────────────────────────────────
 
 const fetchOngoing = async (page = 0): Promise<ApiResponse<Anime[]>> => {
-  const json = await get<any>('/home/ongoing.php', { page: page + 1, type: 'all' });
+  // baruupload.php lebih lengkap (sinopsis, genre, studio) vs ongoing.php yang cuma 10 item index
+  const json = await get<any>('/baruupload.php', { page: page + 1 });
   const list: any[] = Array.isArray(json) ? json : (json?.data ?? []);
   return { status: true, data: list.map(mapAnime) };
 };
 
 const fetchComplete = async (page = 0): Promise<ApiResponse<Anime[]>> => {
-  // baruupload.php isinya anime yang baru selesai / complete
-  const json = await get<any>('/baruupload.php', { page: page + 1 });
+  // complete pakai ongoing.php (list ongoing + completed)
+  const json = await get<any>('/home/ongoing.php', { page: page + 1, type: 'all' });
   const list: any[] = Array.isArray(json) ? json : (json?.data ?? []);
   return { status: true, data: list.map(mapAnime) };
 };
