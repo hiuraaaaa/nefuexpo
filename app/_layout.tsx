@@ -102,7 +102,7 @@ function AppLayout() {
         <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
         <Stack.Screen name="watch/[slug]" options={{ animation: 'slide_from_bottom' }} />
       </Stack>
-      {__DEV__ && <DebugOverlay />}
+      <DebugOverlay />
     </>
   );
 }
