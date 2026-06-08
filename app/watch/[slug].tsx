@@ -5,7 +5,7 @@ import {
   Modal, Alert, TextInput, useWindowDimensions,
 } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import * as Haptics from 'expo-haptics';
@@ -308,6 +308,15 @@ export default function WatchScreen() {
 
   const [seekLeft, setSeekLeft]   = useState(false);
   const [seekRight, setSeekRight] = useState(false);
+
+  // ── Settings dari profile (MMKV sync) ─────────────────────────────────────
+  const [pipEnabled, setPipEnabled]   = useState(() => storageMain.getBoolean('nefusoft_pip')  ?? false);
+  const [infoEnabled, setInfoEnabled] = useState(() => storageMain.getBoolean('nefusoft_info') ?? false);
+
+  useFocusEffect(useCallback(() => {
+    setPipEnabled(storageMain.getBoolean('nefusoft_pip')  ?? false);
+    setInfoEnabled(storageMain.getBoolean('nefusoft_info') ?? false);
+  }, []));
 
   const seekLeftTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seekRightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -682,7 +691,7 @@ export default function WatchScreen() {
             contentFit="contain"
             nativeControls={false}
             allowsFullscreen
-            allowsPictureInPicture={storageMain.getBoolean('nefusoft_pip') ?? false}
+            allowsPictureInPicture={pipEnabled}
             startsPictureInPictureAutomatically={false}
           />
         ) : (
@@ -728,12 +737,14 @@ export default function WatchScreen() {
             <View style={{ position: 'absolute', top: 0, left: 0, right: 0,
               paddingHorizontal: 12, paddingTop: 10, gap: 6 }}>
 
-              {/* Row 1: jam & baterai */}
-              <View style={{ flexDirection: 'row', alignItems: 'center',
-                justifyContent: 'space-between' }}>
-                <Clock />
-                <BatteryIndicator />
-              </View>
+              {/* Row 1: jam & baterai — tampil hanya kalau info diaktifkan */}
+              {infoEnabled && (
+                <View style={{ flexDirection: 'row', alignItems: 'center',
+                  justifyContent: 'space-between' }}>
+                  <Clock />
+                  <BatteryIndicator />
+                </View>
+              )}
 
               {/* Row 2: back + judul + bookmark */}
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -810,6 +821,13 @@ export default function WatchScreen() {
                   {formatTime(duration)}
                 </Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                  {pipEnabled && (
+                    <TouchableOpacity
+                      onPress={() => { Haptics.selectionAsync(); player?.enterPictureInPicture?.(); resetControlsTimer(); }}
+                      style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name="tablet-portrait-outline" size={20} color="#fff" />
+                    </TouchableOpacity>
+                  )}
                   <TouchableOpacity
                     onPress={() => { Haptics.selectionAsync(); setShowServerModal(true); resetControlsTimer(); }}
                     style={{ overflow: 'hidden', borderRadius: 6 }}>
