@@ -14,7 +14,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     backgroundColor: '#0a0a0c',
   },
   updates: {
-    url: 'https://u.expo.dev/6e2fd9c8-8a82-474e-b71d-0428d2ce108b',
+    url: 'https://u.expo.dev/84bec026-9bfb-4ff8-9ce2-eb8f8be30e45',
   },
   runtimeVersion: {
     policy: 'appVersion',
@@ -57,8 +57,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   extra: {
     eas: {
-      projectId: '6e2fd9c8-8a82-474e-b71d-0428d2ce108b',
+      projectId: '84bec026-9bfb-4ff8-9ce2-eb8f8be30e45',
     },
   },
-  owner: 'henxena',
+  owner: 'xena444',
 });
