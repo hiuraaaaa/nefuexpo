@@ -163,6 +163,7 @@ function mapSchedule(raw: any[]): ScheduleDay {
 const fetchOngoing = async (page = 0): Promise<ApiResponse<Anime[]>> => {
   const json = await safeGet<any>('/baruupload.php', { page: page + 1 });
   const list: any[] = Array.isArray(json) ? json : (json?.data ?? []);
+  console.log('[ONGOING] sample item:', JSON.stringify(list[0])); // ←
   return { status: true, data: list.map(mapAnime) };
 };
 
