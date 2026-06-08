@@ -143,7 +143,7 @@ function MovieRankItem({ anime, index, onPress, theme }: {
           borderColor: index < 3 ? theme.accentDim : theme.border,
         }}
       >
-        <Image source={{ uri: anime.image_cover || anime.image_poster, priority: "normal" }} style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '55%', opacity: 0.6 }} contentFit="cover" />
+        <Image source={{ uri: anime.image_cover || anime.image_poster, priority: "normal", headers: { Referer: 'https://myanimelist.net' } }} style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '55%', opacity: 0.6 }} contentFit="cover" />
         <LinearGradient colors={[theme.card, theme.card, 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '75%' }} />
         <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 16, zIndex: 1, backgroundColor: index < 3 ? theme.accent : theme.border, borderWidth: index < 3 ? 0 : 1, borderColor: theme.border }}>
           <Text style={{ fontWeight: '900', fontSize: 14, color: index < 3 ? '#000' : theme.subtext }}>{index + 1}</Text>
@@ -309,10 +309,10 @@ export default function HomeScreen() {
               <ScrollView ref={heroRef} horizontal pagingEnabled scrollEnabled={false} showsHorizontalScrollIndicator={false} style={{ width, height: '100%' }}>
                 {carouselItems.map((a, i) => (
                   <TouchableOpacity key={i} activeOpacity={0.9} onPress={() => goToAnime(a)} style={{ width, height: width * 0.7 }}>
-                    <Image source={{ uri: a.image_cover || a.image_poster, priority: "high" }} style={{ width: '100%', height: '100%', opacity: 0.6 }} contentFit="cover" />
+                    <Image source={{ uri: a.image_cover || a.image_poster, priority: "high", headers: { Referer: 'https://myanimelist.net' } }} style={{ width: '100%', height: '100%', opacity: 0.6 }} contentFit="cover" />
                     <LinearGradient colors={['transparent', `${theme.bg}99`, `${theme.bg}f5`]} locations={[0.2, 0.55, 1]} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '80%' }} />
                     <View style={{ position: 'absolute', bottom: 24, left: 24, right: 24, flexDirection: 'row', alignItems: 'flex-end', gap: 16 }}>
-                      <Image source={{ uri: a.image_poster, priority: "high" }} style={{ width: 80, aspectRatio: 3 / 4.2, borderRadius: 8 }} contentFit="cover" />
+                      <Image source={{ uri: a.image_poster, priority: "high", headers: { Referer: 'https://myanimelist.net' } }} style={{ width: 80, aspectRatio: 3 / 4.2, borderRadius: 8 }} contentFit="cover" />
                       <View style={{ flex: 1, marginBottom: 4 }}>
                         <Text style={{ color: theme.text, fontWeight: '900', fontSize: 18, lineHeight: 22, marginBottom: 4 }} numberOfLines={2}>{a.title}</Text>
                         <Text style={{ color: theme.subtext, fontSize: 10, lineHeight: 14, marginBottom: 8 }} numberOfLines={2}>{a.synopsis}</Text>
