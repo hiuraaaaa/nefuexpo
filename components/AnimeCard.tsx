@@ -1,7 +1,6 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Image } from 'expo-image';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -49,15 +48,11 @@ export default function AnimeCard({ anime, onPress, width }: Props) {
       {/* Poster */}
       <View style={styles.posterWrapper}>
         <Image
-  source={{ uri: anime.image_poster }}
-  requestOptions={{
-    headers: { Referer: 'https://myanimelist.net' },
-  }}
-  priority="normal"
-  cachePolicy="memory-disk"
-  style={StyleSheet.absoluteFillObject}
-  contentFit="cover"
-/>
+          source={{ uri: anime.image_poster }}
+          style={StyleSheet.absoluteFillObject}
+          resizeMode="cover"
+        />
+
         <LinearGradient
           colors={['transparent', 'rgba(0,0,0,0.6)']}
           style={styles.gradient}
