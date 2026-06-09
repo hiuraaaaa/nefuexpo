@@ -297,7 +297,7 @@ export default function HomeScreen() {
         style={{ flex: 1 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.accent} />}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 100 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
       >
 
         {/* ── Hero Carousel — full bleed, mulai dari top: 0 ── */}
