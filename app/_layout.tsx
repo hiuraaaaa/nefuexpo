@@ -59,7 +59,7 @@ function AppLayout() {
   useEffect(() => {
     loadSavedTheme();
     refreshDomain();
-    SplashScreen.hideAsync();
+   // SplashScreen.hideAsync();
   }, []);
 
   useEffect(() => {
