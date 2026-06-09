@@ -15,6 +15,7 @@ export interface Anime {
   day?: string;
   date?: string;        // ← tambah
   date_ts?: number | null;  // ← tambah
+  updated?: number | null;  // ← tambah ini
   time?: string;
   key_time?: string;
   // field tambahan dari API
