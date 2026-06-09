@@ -11,7 +11,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   splash: {
     image: './assets/splash.png',
     resizeMode: 'contain',
-    backgroundColor: '#0a0a0c',
+    backgroundColor: '#08080a',
   },
   updates: {
     url: 'https://u.expo.dev/84bec026-9bfb-4ff8-9ce2-eb8f8be30e45',
@@ -27,7 +27,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     splash: {
       image: './assets/splash.png',
       resizeMode: 'contain',
-      backgroundColor: '#0a0a0c',
+      backgroundColor: '#08080a',
     },
     package: 'com.nefusoft.anime',
     googleServicesFile: './google-services.json',
@@ -39,7 +39,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   androidTVBanner: './assets/tv-banner.png',
   plugins: [
-    'react-native-edge-to-edge',  // ← di sini
+    'react-native-edge-to-edge',
+    './plugins/withDarkBackground',
     'expo-router',
     ['expo-build-properties', {
       android: {
