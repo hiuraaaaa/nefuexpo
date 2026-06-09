@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, Dimensions,
-  StatusBar, Modal, ScrollView, BackHandler,
+  StatusBar, ScrollView, BackHandler,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,7 +12,8 @@ import Constants from 'expo-constants';
 import Animated, {
   useSharedValue, useAnimatedStyle,
   withTiming, withSpring, withRepeat, withSequence,
-  cancelAnimation, runOnJS, Easing, FadeIn,
+  cancelAnimation, runOnJS, Easing, FadeIn, FadeOut,
+  SlideInDown, SlideInRight,
 } from 'react-native-reanimated';
 import { COLORS, LOGO_URL } from '@/constants';
 import { api } from '@/hooks/api';
@@ -22,21 +23,22 @@ import { storageMain } from '@/hooks/storage';
 import { prefetchHome } from '@/hooks/prefetch';
 
 const { width, height } = Dimensions.get('window');
-
-// ── Versi dari app.config.ts — ubah di sana aja ──────────────────────────────
 const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0';
 
 // ── Poster grid config ────────────────────────────────────────────────────────
-const NUM_COLS     = 4;
-const CARD_GAP     = 6;
-const CARD_W       = (width * 1.3) / NUM_COLS - CARD_GAP;
-const CARD_H       = CARD_W * 1.45;
-const STEP         = CARD_H + CARD_GAP;
-const GRID_H       = height * 0.68;
-const REPEAT_COUNT = 4;
+const NUM_COLS      = 4;
+const CARD_GAP      = 6;
+const CARD_W        = (width * 1.3) / NUM_COLS - CARD_GAP;
+const CARD_H        = CARD_W * 1.45;
+const STEP          = CARD_H + CARD_GAP;
+const GRID_H        = height * 0.68;
+const REPEAT_COUNT  = 4;
 const COL_OFFSETS   = [0, -(STEP * 0.6), -(STEP * 0.2), -(STEP * 0.8)] as const;
 const COL_DURATIONS = [3800, 4400, 3400, 4800] as const;
 const DISCLAIMER_KEY = 'nefusoft_disclaimer_accepted';
+
+// ── Step flow ─────────────────────────────────────────────────────────────────
+type Step = 'loading' | 'welcome' | 'disclaimer' | 'login';
 
 // ── Poster components ─────────────────────────────────────────────────────────
 const PosterCard = React.memo(({ item }: { item: Anime }) => (
@@ -46,7 +48,7 @@ const PosterCard = React.memo(({ item }: { item: Anime }) => (
   }}>
     {item.image_poster ? (
       <Image
-        source={{ uri: item.image_poster, priority: 'low' }}
+        source={{ uri: item.image_poster }}
         style={{ width: '100%', height: '100%' }}
         contentFit="cover"
         transition={200}
@@ -59,7 +61,7 @@ const PosterColumn = React.memo(({ items, offsetY, duration }: {
   items: Anime[]; offsetY: number; duration: number;
 }) => {
   const translateY = useSharedValue(offsetY);
-  const repeated = useMemo(
+  const repeated   = useMemo(
     () => Array.from({ length: REPEAT_COUNT }, () => items).flat(),
     [items]
   );
@@ -88,67 +90,103 @@ const PosterColumn = React.memo(({ items, offsetY, duration }: {
   );
 });
 
-// ── Disclaimer Modal ──────────────────────────────────────────────────────────
-function DisclaimerModal({ visible, onAccept, onDecline }: {
-  visible: boolean;
+// ── Loading Screen ─────────────────────────────────────────────────────────────
+function LoadingScreen() {
+  const scale   = useSharedValue(1);
+  const opacity = useSharedValue(0.6);
+
+  useEffect(() => {
+    scale.value   = withRepeat(withSequence(
+      withTiming(1.08, { duration: 700, easing: Easing.inOut(Easing.ease) }),
+      withTiming(1,    { duration: 700, easing: Easing.inOut(Easing.ease) }),
+    ), -1, false);
+    opacity.value = withRepeat(withSequence(
+      withTiming(1,   { duration: 700 }),
+      withTiming(0.6, { duration: 700 }),
+    ), -1, false);
+  }, []);
+
+  const logoStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+    opacity:   opacity.value,
+  }));
+
+  return (
+    <Animated.View
+      entering={FadeIn.duration(200)}
+      exiting={FadeOut.duration(300)}
+      style={{
+        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+        backgroundColor: '#08080a',
+        alignItems: 'center', justifyContent: 'center', zIndex: 100,
+      }}
+    >
+      <Animated.View style={logoStyle}>
+        <Image
+          source={{ uri: LOGO_URL }}
+          style={{ width: 72, height: 72, borderRadius: 18 }}
+          contentFit="contain"
+        />
+      </Animated.View>
+      <Text style={{
+        color: 'rgba(255,255,255,0.2)', fontSize: 11,
+        marginTop: 24, fontWeight: '600', letterSpacing: 1,
+      }}>
+        NefuSoft v{APP_VERSION}
+      </Text>
+    </Animated.View>
+  );
+}
+
+// ── Disclaimer Screen ─────────────────────────────────────────────────────────
+function DisclaimerScreen({ onAccept, onDecline }: {
   onAccept: () => void;
   onDecline: () => void;
 }) {
-  // Block hardware back button saat disclaimer tampil
   useEffect(() => {
-    if (!visible) return;
     const sub = BackHandler.addEventListener('hardwareBackPress', () => true);
     return () => sub.remove();
-  }, [visible]);
+  }, []);
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      statusBarTranslucent
-      onRequestClose={() => {}}
+    <Animated.View
+      entering={SlideInRight.springify().damping(20)}
+      exiting={FadeOut.duration(200)}
+      style={{
+        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+        backgroundColor: '#08080a', zIndex: 50,
+      }}
     >
-      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'center', padding: 20 }}>
-        <Animated.View entering={FadeIn.duration(250)} style={{
-          backgroundColor: '#18181c',
-          borderRadius: 20,
-          borderWidth: 1,
-          borderColor: 'rgba(255,255,255,0.07)',
-          overflow: 'hidden',
-          maxHeight: height * 0.72,
-        }}>
-          {/* Blob decorations */}
-          <View style={{
-            position: 'absolute', top: -60, right: -60,
-            width: 200, height: 200, borderRadius: 100,
-            backgroundColor: `${COLORS.gold}12`,
-          }} />
-          <View style={{
-            position: 'absolute', bottom: -40, left: -40,
-            width: 150, height: 150, borderRadius: 75,
-            backgroundColor: `${COLORS.gold}08`,
-          }} />
-
-          <ScrollView
-            contentContainerStyle={{ padding: 28, paddingBottom: 8 }}
-            showsVerticalScrollIndicator={false}
-          >
-            <Text style={{
-              color: '#fff', fontSize: 22, fontWeight: '900',
-              letterSpacing: -0.5, marginBottom: 16,
-            }}>
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
+        <View style={{ flex: 1, padding: 24 }}>
+          {/* Header */}
+          <View style={{ marginBottom: 24 }}>
+            <Image
+              source={{ uri: LOGO_URL }}
+              style={{ width: 44, height: 44, borderRadius: 12, marginBottom: 16 }}
+              contentFit="contain"
+            />
+            <Text style={{ color: '#fff', fontSize: 26, fontWeight: '900', letterSpacing: -0.5 }}>
               Disclaimer
             </Text>
-            {[
-              'NefuSoft adalah aplikasi streaming anime pihak ketiga. Semua konten yang ditampilkan bersumber dari server eksternal dan tidak dihosting, dimiliki, atau berafiliasi dengan NefuSoft.',
-              'Dengan menggunakan aplikasi ini, Anda mengakui dan menyetujui bahwa:',
-            ].map((t, i) => (
-              <Text key={i} style={{
-                color: 'rgba(255,255,255,0.6)', fontSize: 13,
-                lineHeight: 20, marginBottom: 10,
-              }}>{t}</Text>
-            ))}
+            <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 4 }}>
+              Baca sebelum melanjutkan
+            </Text>
+          </View>
+
+          {/* Konten */}
+          <ScrollView
+            style={{ flex: 1 }}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 16 }}
+          >
+            <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 13, lineHeight: 20, marginBottom: 16 }}>
+              NefuSoft adalah aplikasi streaming anime pihak ketiga. Semua konten yang ditampilkan bersumber dari server eksternal dan tidak dihosting, dimiliki, atau berafiliasi dengan NefuSoft.
+            </Text>
+            <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 13, lineHeight: 20, marginBottom: 12 }}>
+              Dengan menggunakan aplikasi ini, Anda mengakui dan menyetujui bahwa:
+            </Text>
             {[
               'NefuSoft tidak menghosting, mengunggah, atau mendistribusikan konten media apa pun.',
               'Semua anime, video streaming, dan metadata disediakan oleh sumber pihak ketiga.',
@@ -157,63 +195,52 @@ function DisclaimerModal({ visible, onAccept, onDecline }: {
               'Anda bertanggung jawab penuh untuk mematuhi hukum di wilayah hukum Anda.',
               'Kami tidak mengumpulkan, menyimpan, atau mengirimkan data pribadi ke server eksternal.',
             ].map((item, i) => (
-              <View key={i} style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+              <View key={i} style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
                 <Text style={{ color: COLORS.gold, fontSize: 13, lineHeight: 20 }}>•</Text>
-                <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 13, lineHeight: 20, flex: 1 }}>
+                <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13, lineHeight: 20, flex: 1 }}>
                   {item}
                 </Text>
               </View>
             ))}
-            <Text style={{
-              color: 'rgba(255,255,255,0.4)', fontSize: 12,
-              lineHeight: 18, marginTop: 8, marginBottom: 4,
-            }}>
+            <Text style={{ color: 'rgba(255,255,255,0.25)', fontSize: 12, lineHeight: 18, marginTop: 8 }}>
               Jika Anda tidak menyetujui persyaratan ini, silakan tutup aplikasi.
             </Text>
           </ScrollView>
 
           {/* Buttons */}
-          <View style={{ padding: 20, paddingTop: 12, gap: 8 }}>
+          <View style={{ gap: 8, paddingTop: 16 }}>
             <TouchableOpacity
               onPress={onAccept}
               activeOpacity={0.85}
               style={{
                 backgroundColor: COLORS.gold,
-                paddingVertical: 15, borderRadius: 12,
-                alignItems: 'center',
+                paddingVertical: 16, borderRadius: 14, alignItems: 'center',
               }}
             >
-              <Text style={{ color: '#000', fontWeight: '900', fontSize: 14 }}>Setuju</Text>
+              <Text style={{ color: '#000', fontWeight: '900', fontSize: 14 }}>Setuju & Lanjutkan</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={onDecline}
               activeOpacity={0.85}
               style={{
-                paddingVertical: 15, borderRadius: 12,
-                alignItems: 'center',
+                paddingVertical: 16, borderRadius: 14, alignItems: 'center',
                 backgroundColor: 'rgba(255,255,255,0.04)',
                 borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
               }}
             >
-              <Text style={{ color: 'rgba(255,255,255,0.4)', fontWeight: '700', fontSize: 14 }}>Tolak</Text>
+              <Text style={{ color: 'rgba(255,255,255,0.4)', fontWeight: '700', fontSize: 14 }}>Tolak & Keluar</Text>
             </TouchableOpacity>
-            <Text style={{
-              color: 'rgba(255,255,255,0.2)', fontSize: 10,
-              textAlign: 'center', marginTop: 4,
-            }}>
-              NefuSoft v{APP_VERSION}
-            </Text>
           </View>
-        </Animated.View>
-      </View>
-    </Modal>
+        </View>
+      </SafeAreaView>
+    </Animated.View>
   );
 }
 
-// ── Login Sheet ───────────────────────────────────────────────────────────────
-function LoginModal({ visible, onSuccess }: {
-  visible: boolean;
+// ── Login Screen ──────────────────────────────────────────────────────────────
+function LoginScreen({ onSuccess, onSkip }: {
   onSuccess: () => void;
+  onSkip: () => void;
 }) {
   const [loading, setLoading] = useState(false);
 
@@ -228,174 +255,147 @@ function LoginModal({ visible, onSuccess }: {
   };
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      statusBarTranslucent
-      onRequestClose={() => {}}
+    <Animated.View
+      entering={SlideInDown.springify().damping(20)}
+      exiting={FadeOut.duration(200)}
+      style={{
+        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+        backgroundColor: '#08080a', zIndex: 50,
+      }}
     >
-      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' }}>
-        <Animated.View entering={FadeIn.duration(200)} style={{
-          backgroundColor: '#18181c',
-          borderTopLeftRadius: 28, borderTopRightRadius: 28,
-          borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
-          overflow: 'hidden',
-        }}>
-          {/* Blob decorations */}
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
+        <View style={{ flex: 1, padding: 28, justifyContent: 'flex-end', paddingBottom: 40 }}>
+
+          {/* Blob decorasi */}
           <View style={{
-            position: 'absolute', top: -80, right: -80,
+            position: 'absolute', top: height * 0.1, right: -60,
             width: 240, height: 240, borderRadius: 120,
             backgroundColor: `${COLORS.gold}10`,
           }} />
           <View style={{
-            position: 'absolute', top: 20, left: -60,
+            position: 'absolute', top: height * 0.25, left: -60,
             width: 180, height: 180, borderRadius: 90,
             backgroundColor: `${COLORS.gold}06`,
           }} />
 
-          <SafeAreaView edges={['bottom']}>
-            <View style={{ padding: 32, paddingBottom: 40 }}>
-              {/* Handle */}
-              <View style={{
-                width: 40, height: 4, borderRadius: 2,
-                backgroundColor: 'rgba(255,255,255,0.15)',
-                alignSelf: 'center', marginBottom: 32,
-              }} />
+          <Image
+            source={{ uri: LOGO_URL }}
+            style={{ width: 56, height: 56, borderRadius: 14, marginBottom: 24 }}
+            contentFit="contain"
+          />
 
-              <Image
-                source={{ uri: LOGO_URL, priority: 'high' }}
-                style={{ width: 52, height: 52, borderRadius: 14, marginBottom: 20 }}
-                contentFit="contain"
-              />
+          <Text style={{ color: '#fff', fontSize: 32, fontWeight: '900', letterSpacing: -1, marginBottom: 6 }}>
+            Selamat datang
+          </Text>
+          <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, lineHeight: 20, marginBottom: 40 }}>
+            Masuk untuk simpan progress,{'\n'}favorit, dan XP kamu.
+          </Text>
 
-              <Text style={{
-                color: '#fff', fontSize: 26, fontWeight: '900',
-                letterSpacing: -0.5, marginBottom: 6,
-              }}>
-                Selamat datang
-              </Text>
-              <Text style={{
-                color: 'rgba(255,255,255,0.4)', fontSize: 13,
-                lineHeight: 20, marginBottom: 36,
-              }}>
-                Masuk untuk simpan progress,{'\n'}favorit, dan XP kamu.
-              </Text>
-
-              {/* Google Button */}
-              <TouchableOpacity
-                onPress={handleGoogle}
-                disabled={loading}
-                activeOpacity={0.85}
-                style={{
-                  flexDirection: 'row', alignItems: 'center',
-                  justifyContent: 'center', gap: 10,
-                  backgroundColor: '#fff',
-                  paddingVertical: 16, borderRadius: 14,
-                  marginBottom: 12,
-                  opacity: loading ? 0.7 : 1,
-                }}
-              >
-                {/* Google G icon */}
-                <View style={{
-                  width: 20, height: 20, borderRadius: 10,
-                  backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <Text style={{ fontSize: 14, fontWeight: '900', color: '#4285F4' }}>G</Text>
-                </View>
-                <Text style={{ color: '#000', fontWeight: '800', fontSize: 14 }}>
-                  {loading ? 'Memuat...' : 'Masuk dengan Google'}
-                </Text>
-              </TouchableOpacity>
-
-              <Text style={{
-                color: 'rgba(255,255,255,0.2)', fontSize: 10,
-                textAlign: 'center', marginTop: 8,
-              }}>
-                NefuSoft v{APP_VERSION}
-              </Text>
+          {/* Google Button */}
+          <TouchableOpacity
+            onPress={handleGoogle}
+            disabled={loading}
+            activeOpacity={0.85}
+            style={{
+              flexDirection: 'row', alignItems: 'center',
+              justifyContent: 'center', gap: 10,
+              backgroundColor: '#fff',
+              paddingVertical: 16, borderRadius: 14,
+              marginBottom: 12,
+              opacity: loading ? 0.7 : 1,
+            }}
+          >
+            <View style={{
+              width: 20, height: 20, borderRadius: 10,
+              alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Text style={{ fontSize: 14, fontWeight: '900', color: '#4285F4' }}>G</Text>
             </View>
-          </SafeAreaView>
-        </Animated.View>
-      </View>
-    </Modal>
+            <Text style={{ color: '#000', fontWeight: '800', fontSize: 14 }}>
+              {loading ? 'Memuat...' : 'Masuk dengan Google'}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Skip */}
+          <TouchableOpacity onPress={onSkip} activeOpacity={0.7} style={{ alignItems: 'center', paddingVertical: 12 }}>
+            <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13, fontWeight: '600' }}>
+              Lewati, nonton tanpa akun
+            </Text>
+          </TouchableOpacity>
+
+          <Text style={{ color: 'rgba(255,255,255,0.15)', fontSize: 10, textAlign: 'center', marginTop: 16 }}>
+            NefuSoft v{APP_VERSION}
+          </Text>
+        </View>
+      </SafeAreaView>
+    </Animated.View>
   );
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function WelcomeScreen() {
   const router = useRouter();
-  const [posters, setPosters]             = useState<Anime[]>([]);
-  const [showDisclaimer, setShowDisclaimer] = useState(false);
-  const [showLogin, setShowLogin]           = useState(false);
-  const [checkingAuth, setCheckingAuth]     = useState(true);
+  const [step, setStep]         = useState<Step>('loading');
+  const [posters, setPosters]   = useState<Anime[]>([]);
 
-  const opacity        = useSharedValue(0);
-  const translateY     = useSharedValue(20);
-  const overlayOpacity = useSharedValue(1); // mulai dari 1 (hitam) → fade in biar ga blink
+  const overlayOpacity = useSharedValue(1);
+  const contentOpacity = useSharedValue(0);
+  const contentY       = useSharedValue(20);
 
   const cols = useMemo(
     () => [0, 1, 2, 3].map(i => posters.filter((_, idx) => idx % 4 === i)),
     [posters]
   );
 
-  // ── Cek auth state dulu sebelum tampil apapun ────────────────────────────
+  // ── Cek auth state ───────────────────────────────────────────────────────
   useEffect(() => {
     const unsub = onAuthStateChanged((user) => {
       if (user) {
-        // Udah login — langsung ke tabs tanpa tampil welcome
         router.replace('/(tabs)');
       } else {
-        setCheckingAuth(false);
+        // Mulai loading: prefetch + load posters
+        prefetchHome();
+        api.ongoing().then(r => {
+          setPosters(r.data?.slice(0, 32) || []);
+        }).catch(() => {});
+
+        // Simulasi loading 1.5 detik sambil API jalan di background
+        setTimeout(() => {
+          const disclaimerAccepted = storageMain.getBoolean(DISCLAIMER_KEY) ?? false;
+          // Kalau disclaimer udah accepted, langsung ke welcome
+          // Kalau belum, tetap ke welcome dulu — disclaimer muncul setelah klik tombol
+          setStep('welcome');
+          overlayOpacity.value = withTiming(0, { duration: 400 });
+          contentOpacity.value = withTiming(1, { duration: 600 });
+          contentY.value       = withSpring(0, { damping: 16, stiffness: 100 });
+        }, 1500);
       }
     });
     return unsub;
   }, []);
 
-  // ── Load posters & animasi masuk ─────────────────────────────────────────
-  useEffect(() => {
-    if (checkingAuth) return;
-
-    const disclaimerAccepted = storageMain.getBoolean(DISCLAIMER_KEY) ?? false;
-
-    // Prefetch home data di background sambil user baca disclaimer/login
-    prefetchHome();
-
-    api.ongoing().then(r => {
-      setPosters(r.data?.slice(0, 32) || []);
-    }).catch(() => {});
-
-    // Fade in dari hitam — anti blink
-    overlayOpacity.value = withTiming(0, { duration: 500 });
-    opacity.value        = withTiming(1, { duration: 600 });
-    translateY.value     = withSpring(0, { damping: 16, stiffness: 100 });
-
-    // Langsung show disclaimer kalau belum pernah setuju
-    if (!disclaimerAccepted) {
-      setTimeout(() => setShowDisclaimer(true), 400);
-    }
-  }, [checkingAuth]);
-
-  const contentStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ translateY: translateY.value }],
-  }));
-
-  const overlayStyle = useAnimatedStyle(() => ({ opacity: overlayOpacity.value }));
-
   const goMain = useCallback(() => router.replace('/(tabs)'), [router]);
 
   const navigateTo = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     overlayOpacity.value = withTiming(1, { duration: 250 }, (done) => {
       if (done) runOnJS(goMain)();
     });
   }, [goMain]);
 
+  const handleMulaiNonton = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const disclaimerAccepted = storageMain.getBoolean(DISCLAIMER_KEY) ?? false;
+    if (!disclaimerAccepted) {
+      setStep('disclaimer'); // slide in dari kanan
+    } else {
+      setStep('login');      // slide in dari bawah
+    }
+  }, []);
+
   const handleDisclaimerAccept = useCallback(() => {
     storageMain.set(DISCLAIMER_KEY, true);
-    setShowDisclaimer(false);
-    setTimeout(() => setShowLogin(true), 200);
+    setStep('login');
   }, []);
 
   const handleDisclaimerDecline = useCallback(() => {
@@ -403,24 +403,21 @@ export default function WelcomeScreen() {
   }, []);
 
   const handleLoginSuccess = useCallback(() => {
-    setShowLogin(false);
     navigateTo();
   }, [navigateTo]);
 
-  const handleMulaiNonton = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const disclaimerAccepted = storageMain.getBoolean(DISCLAIMER_KEY) ?? false;
-    if (!disclaimerAccepted) {
-      setShowDisclaimer(true);
-    } else {
-      setShowLogin(true);
-    }
-  }, []);
+  const handleSkip = useCallback(() => {
+    navigateTo();
+  }, [navigateTo]);
 
-  // Jangan render apapun saat cek auth
-  if (checkingAuth) {
-    return <View style={{ flex: 1, backgroundColor: '#08080a' }} />;
-  }
+  const contentStyle = useAnimatedStyle(() => ({
+    opacity:   contentOpacity.value,
+    transform: [{ translateY: contentY.value }],
+  }));
+
+  const overlayStyle = useAnimatedStyle(() => ({
+    opacity: overlayOpacity.value,
+  }));
 
   return (
     <View style={{ flex: 1, backgroundColor: '#08080a' }}>
@@ -429,10 +426,8 @@ export default function WelcomeScreen() {
       {/* Poster grid */}
       <View style={{
         position: 'absolute',
-        top: -height * 0.05,
-        left: -(width * 0.15),
-        width: width * 1.3,
-        height: GRID_H,
+        top: -height * 0.05, left: -(width * 0.15),
+        width: width * 1.3, height: GRID_H,
         overflow: 'hidden',
         transform: [{ rotate: '-10deg' }],
       }}>
@@ -448,7 +443,7 @@ export default function WelcomeScreen() {
         </View>
       </View>
 
-      {/* Gradient fade */}
+      {/* Gradient */}
       <LinearGradient
         colors={['transparent', 'rgba(8,8,10,0.5)', 'rgba(8,8,10,0.92)', '#08080a']}
         locations={[0, 0.35, 0.6, 0.8]}
@@ -458,83 +453,72 @@ export default function WelcomeScreen() {
         }}
       />
 
-      {/* Bottom content */}
+      {/* Welcome content */}
       <Animated.View style={[{
         position: 'absolute', bottom: 0, left: 0, right: 0,
       }, contentStyle]}>
         <SafeAreaView edges={['bottom']}>
           <View style={{ paddingHorizontal: 28, paddingBottom: 36 }}>
-
             <View style={{ marginBottom: 20 }}>
               <Image
-                source={{ uri: LOGO_URL, priority: 'high' }}
+                source={{ uri: LOGO_URL }}
                 style={{ width: 56, height: 56, borderRadius: 14 }}
                 contentFit="contain"
               />
             </View>
-
-            <Text style={{
-              color: '#fff', fontSize: 36, fontWeight: '900',
-              letterSpacing: -1, lineHeight: 42, marginBottom: 6,
-            }}>
+            <Text style={{ color: '#fff', fontSize: 36, fontWeight: '900', letterSpacing: -1, lineHeight: 42, marginBottom: 6 }}>
               Tonton Anime
             </Text>
-            <Text style={{
-              color: COLORS.gold, fontSize: 36, fontWeight: '900',
-              letterSpacing: -1, lineHeight: 42, marginBottom: 14,
-            }}>
+            <Text style={{ color: COLORS.gold, fontSize: 36, fontWeight: '900', letterSpacing: -1, lineHeight: 42, marginBottom: 14 }}>
               Favorit Kamu
             </Text>
-
-            <Text style={{
-              color: 'rgba(255,255,255,0.38)', fontSize: 13,
-              lineHeight: 21, marginBottom: 32, fontWeight: '500',
-            }}>
+            <Text style={{ color: 'rgba(255,255,255,0.38)', fontSize: 13, lineHeight: 21, marginBottom: 32, fontWeight: '500' }}>
               Ribuan judul anime subtitle Indonesia.{'\n'}Gratis, tanpa iklan, kualitas hingga 1080p.
             </Text>
-
             <TouchableOpacity
               onPress={handleMulaiNonton}
               activeOpacity={0.85}
               style={{
                 backgroundColor: COLORS.gold,
                 paddingVertical: 16, borderRadius: 14,
-                alignItems: 'center', marginBottom: 10,
-                elevation: 8,
+                alignItems: 'center', marginBottom: 10, elevation: 8,
               }}
             >
               <Text style={{ color: '#000', fontWeight: '900', fontSize: 15, letterSpacing: 0.2 }}>
                 Mulai Nonton
               </Text>
             </TouchableOpacity>
-
-            <Text style={{
-              color: 'rgba(255,255,255,0.15)', fontSize: 11,
-              textAlign: 'center', marginTop: 8,
-            }}>
+            <Text style={{ color: 'rgba(255,255,255,0.15)', fontSize: 11, textAlign: 'center', marginTop: 8 }}>
               v{APP_VERSION}
             </Text>
-
           </View>
         </SafeAreaView>
       </Animated.View>
 
-      {/* Overlay anti-blink — hitam di awal, fade ke transparan */}
+      {/* Overlay anti-blink */}
       <Animated.View style={[{
         position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
         backgroundColor: '#08080a', pointerEvents: 'none',
       }, overlayStyle]} />
 
-      {/* Modals */}
-      <DisclaimerModal
-        visible={showDisclaimer}
-        onAccept={handleDisclaimerAccept}
-        onDecline={handleDisclaimerDecline}
-      />
-      <LoginModal
-        visible={showLogin}
-        onSuccess={handleLoginSuccess}
-      />
+      {/* Loading screen — tampil saat step === 'loading' */}
+      {step === 'loading' && <LoadingScreen />}
+
+      {/* Disclaimer — slide dari kanan */}
+      {step === 'disclaimer' && (
+        <DisclaimerScreen
+          onAccept={handleDisclaimerAccept}
+          onDecline={handleDisclaimerDecline}
+        />
+      )}
+
+      {/* Login — slide dari bawah */}
+      {step === 'login' && (
+        <LoginScreen
+          onSuccess={handleLoginSuccess}
+          onSkip={handleSkip}
+        />
+      )}
     </View>
   );
 }
