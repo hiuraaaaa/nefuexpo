@@ -3,7 +3,6 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useEffect } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -12,7 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useTheme } from '@/hooks/theme';
 
-const TAB_HEIGHT = 60;
+const TAB_HEIGHT = 64;
 
 const TABS = [
   { name: 'index',    label: 'Home',     iconActive: 'home',      iconInactive: 'home-outline'      },
@@ -23,63 +22,39 @@ const TABS = [
 ] as const;
 
 // ── Tab Icon ───────────────────────────────────────────────────────────────────
-// FIX: theme dipass sebagai prop — hindari useTheme() per-icon (re-render mahal)
 function TabIcon({
-  focused,
-  label,
-  iconActive,
-  iconInactive,
-  badge,
-  accent,
-  subtext,
+  focused, label, iconActive, iconInactive, badge, accent, subtext,
 }: {
-  focused:      boolean;
-  label:        string;
-  iconActive:   string;
-  iconInactive: string;
-  badge?:       string;
-  accent:       string;
-  subtext:      string;
+  focused: boolean; label: string;
+  iconActive: string; iconInactive: string;
+  badge?: string; accent: string; subtext: string;
 }) {
-  const pillWidth  = useSharedValue(focused ? 72 : 36);
-  const dotScale   = useSharedValue(focused ? 1  : 0);
-  const iconColor  = useSharedValue(focused ? 1  : 0);
-  const translateY = useSharedValue(focused ? -1 : 2);
+  const iconScale  = useSharedValue(focused ? 1.1 : 1);
+  const labelOpacity = useSharedValue(focused ? 1 : 0);
+  const translateY = useSharedValue(focused ? 0 : 4);
 
   useEffect(() => {
-    pillWidth.value  = withSpring(focused ? 72 : 36, { damping: 18, stiffness: 200 });
-    dotScale.value   = withSpring(focused ? 1  : 0,  { damping: 16, stiffness: 240 });
-    translateY.value = withSpring(focused ? -1 : 2,  { damping: 16, stiffness: 200 });
-    iconColor.value  = withTiming(focused ? 1  : 0,  { duration: 180 });
+    iconScale.value    = withSpring(focused ? 1.1 : 1,  { damping: 15, stiffness: 200 });
+    labelOpacity.value = withTiming(focused ? 1 : 0,    { duration: 150 });
+    translateY.value   = withSpring(focused ? 0 : 4,    { damping: 15, stiffness: 200 });
   }, [focused]);
 
-  const pillStyle = useAnimatedStyle(() => ({
-    width: pillWidth.value,
-    // opacity-based bg — hex alpha dari iconColor
-    backgroundColor: `${accent}${Math.round(iconColor.value * 0x22)
-      .toString(16).padStart(2, '0')}`,
+  const iconStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: iconScale.value }],
   }));
 
-  const iconWrapStyle = useAnimatedStyle(() => ({
+  const labelStyle = useAnimatedStyle(() => ({
+    opacity:   labelOpacity.value,
     transform: [{ translateY: translateY.value }],
-  }));
-
-  const dotStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: dotScale.value }],
-    opacity: dotScale.value,
   }));
 
   return (
     <View style={styles.tabItem}>
-      {/* Pill indicator */}
-      <Animated.View style={[styles.pill, pillStyle]} />
-
-      {/* Icon */}
-      <Animated.View style={[styles.iconWrap, iconWrapStyle]}>
+      <Animated.View style={iconStyle}>
         <View>
           <Ionicons
             name={(focused ? iconActive : iconInactive) as any}
-            size={22}
+            size={24}
             color={focused ? accent : subtext}
           />
           {badge && (
@@ -90,35 +65,37 @@ function TabIcon({
         </View>
       </Animated.View>
 
-      {/* Label — opacity trick biar gak crash fontSize 0 */}
-      <Text
-        style={[styles.label, {
-          color:   accent,
-          opacity: focused ? 1 : 0,
-        }]}
+      {/* Label muncul di bawah icon saat aktif */}
+      <Animated.Text
+        style={[styles.label, { color: accent }, labelStyle]}
         numberOfLines={1}
       >
         {label.toUpperCase()}
-      </Text>
-
-      {/* Bottom dot */}
-      <Animated.View style={[styles.dot, { backgroundColor: accent }, dotStyle]} />
+      </Animated.Text>
     </View>
   );
 }
 
-// ── Tab Bar Background — BlurView biar lebih premium ─────────────────────────
+// ── Floating Tab Bar Background ───────────────────────────────────────────────
 function TabBarBackground() {
   const theme = useTheme();
   return (
-    <BlurView
-      intensity={60}
-      tint="dark"
+    <View
       style={[
         StyleSheet.absoluteFill,
         {
-          borderTopWidth: 1,
-          borderTopColor: theme.border,
+          backgroundColor: theme.card,
+          borderRadius: 30,
+          // Shadow Android
+          elevation: 20,
+          // Shadow iOS
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: 0.35,
+          shadowRadius: 16,
+          // Border tipis
+          borderWidth: 1,
+          borderColor: theme.border,
           overflow: 'hidden',
         },
       ]}
@@ -131,6 +108,9 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const theme  = useTheme();
 
+  const MARGIN_H      = 20;  // margin kiri kanan tab bar
+  const MARGIN_BOTTOM = Math.max(insets.bottom, 12) + 4; // jarak dari bawah layar
+
   return (
     <Tabs
       screenOptions={{
@@ -140,14 +120,19 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: 'transparent',
           borderTopWidth:  0,
-          height:          TAB_HEIGHT + insets.bottom,
-          paddingBottom:   insets.bottom,
+          height:          TAB_HEIGHT,
+          paddingBottom:   0,
           paddingTop:      0,
           position:        'absolute',
-          elevation:       0,
+          // Floating: margin kiri kanan + jarak dari bawah
+          left:            MARGIN_H,
+          right:           MARGIN_H,
+          bottom:          MARGIN_BOTTOM,
+          borderRadius:    30,
+          elevation:       0, // handled di background
         },
-        tabBarBackground:     () => <TabBarBackground />,
-        tabBarShowLabel:      false,
+        tabBarBackground:        () => <TabBarBackground />,
+        tabBarShowLabel:         false,
         tabBarActiveTintColor:   theme.accent,
         tabBarInactiveTintColor: theme.subtext,
       }}
@@ -172,57 +157,38 @@ export default function TabLayout() {
         />
       ))}
 
-      {/* Hidden screens — tidak tampil di tab bar */}
-      <Tabs.Screen name="ongoing"  options={{ href: null }} />
-      <Tabs.Screen name="history"  options={{ href: null }} />
+      <Tabs.Screen name="ongoing" options={{ href: null }} />
+      <Tabs.Screen name="history" options={{ href: null }} />
     </Tabs>
   );
 }
 
 const styles = StyleSheet.create({
   tabItem: {
-    alignItems:      'center',
-    justifyContent:  'center',
-    height:          TAB_HEIGHT,
-    width:           64,
-    gap:             3,
-  },
-  pill: {
-    position:      'absolute',
-    top:           8,
-    height:        32,
-    borderRadius:  16,
-  },
-  iconWrap: {
     alignItems:     'center',
     justifyContent: 'center',
-    height:         28,
+    height:         TAB_HEIGHT,
+    width:          56,
+    gap:            3,
   },
   label: {
-    fontSize:    9,
-    fontWeight:  '800',
-    letterSpacing: 0.6,
-    lineHeight:  11,
-  },
-  dot: {
-    position:     'absolute',
-    bottom:       6,
-    width:        4,
-    height:       4,
-    borderRadius: 2,
+    fontSize:      8,
+    fontWeight:    '900',
+    letterSpacing: 0.5,
+    lineHeight:    10,
   },
   badge: {
-    position:        'absolute',
-    top:             -4,
-    right:           -10,
-    borderRadius:    5,
+    position:          'absolute',
+    top:               -4,
+    right:             -10,
+    borderRadius:      5,
     paddingHorizontal: 3,
-    paddingVertical: 1,
+    paddingVertical:   1,
   },
   badgeText: {
-    fontSize:    6,
-    fontWeight:  '900',
-    color:       '#000',
+    fontSize:      6,
+    fontWeight:    '900',
+    color:         '#000',
     letterSpacing: 0.3,
   },
 });
