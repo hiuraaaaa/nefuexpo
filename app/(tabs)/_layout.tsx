@@ -21,23 +21,49 @@ const TABS = [
   { name: 'profile',  label: 'Profile',  iconActive: 'person',    iconInactive: 'person-outline'    },
 ] as const;
 
-// ── Tab Icon ───────────────────────────────────────────────────────────────────
+// ── Tab Icon — Pill Design ────────────────────────────────────────────────────
 function TabIcon({
-  focused, label, iconActive, iconInactive, badge, accent, subtext,
+  focused, label, iconActive, iconInactive, badge, accent, accentDim, subtext,
 }: {
   focused: boolean; label: string;
   iconActive: string; iconInactive: string;
-  badge?: string; accent: string; subtext: string;
+  badge?: string; accent: string; accentDim: string; subtext: string;
 }) {
-  const iconScale  = useSharedValue(focused ? 1.1 : 1);
-  const labelOpacity = useSharedValue(focused ? 1 : 0);
-  const translateY = useSharedValue(focused ? 0 : 4);
+  // Pill background
+  const pillWidth   = useSharedValue(focused ? 54 : 0);
+  const pillOpacity = useSharedValue(focused ? 1 : 0);
+  const pillScale   = useSharedValue(focused ? 1 : 0.7);
+
+  // Icon
+  const iconScale   = useSharedValue(focused ? 1.1 : 1);
+
+  // Label
+  const labelOpacity   = useSharedValue(focused ? 1 : 0);
+  const labelTranslate = useSharedValue(focused ? 0 : 4);
+
+  // Content translateY (slight lift when active)
+  const contentY = useSharedValue(focused ? 0 : 2);
 
   useEffect(() => {
-    iconScale.value    = withSpring(focused ? 1.1 : 1,  { damping: 15, stiffness: 200 });
-    labelOpacity.value = withTiming(focused ? 1 : 0,    { duration: 150 });
-    translateY.value   = withSpring(focused ? 0 : 4,    { damping: 15, stiffness: 200 });
+    const spring = { damping: 15, stiffness: 220 };
+
+    pillWidth.value   = withSpring(focused ? 54 : 0,   spring);
+    pillOpacity.value = withTiming(focused ? 1 : 0,    { duration: 200 });
+    pillScale.value   = withSpring(focused ? 1 : 0.7,  spring);
+
+    iconScale.value   = withSpring(focused ? 1.1 : 1,  spring);
+
+    labelOpacity.value   = withTiming(focused ? 1 : 0,  { duration: 150 });
+    labelTranslate.value = withSpring(focused ? 0 : 4,  spring);
+
+    contentY.value = withSpring(focused ? 0 : 2, spring);
   }, [focused]);
+
+  const pillStyle = useAnimatedStyle(() => ({
+    width:   pillWidth.value,
+    opacity: pillOpacity.value,
+    transform: [{ scale: pillScale.value }],
+  }));
 
   const iconStyle = useAnimatedStyle(() => ({
     transform: [{ scale: iconScale.value }],
@@ -45,33 +71,49 @@ function TabIcon({
 
   const labelStyle = useAnimatedStyle(() => ({
     opacity:   labelOpacity.value,
-    transform: [{ translateY: translateY.value }],
+    transform: [{ translateY: labelTranslate.value }],
+  }));
+
+  const contentStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: contentY.value }],
   }));
 
   return (
     <View style={styles.tabItem}>
-      <Animated.View style={iconStyle}>
-        <View>
-          <Ionicons
-            name={(focused ? iconActive : iconInactive) as any}
-            size={24}
-            color={focused ? accent : subtext}
-          />
-          {badge && (
-            <View style={[styles.badge, { backgroundColor: accent }]}>
-              <Text style={styles.badgeText}>{badge}</Text>
-            </View>
-          )}
-        </View>
-      </Animated.View>
+      {/* Pill background */}
+      <Animated.View
+        style={[
+          styles.pill,
+          { backgroundColor: accentDim },
+          pillStyle,
+        ]}
+      />
 
-      {/* Label muncul di bawah icon saat aktif */}
-      <Animated.Text
-        style={[styles.label, { color: accent }, labelStyle]}
-        numberOfLines={1}
-      >
-        {label.toUpperCase()}
-      </Animated.Text>
+      {/* Icon + Label stack */}
+      <Animated.View style={[styles.iconLabelStack, contentStyle]}>
+        <Animated.View style={iconStyle}>
+          <View>
+            <Ionicons
+              name={(focused ? iconActive : iconInactive) as any}
+              size={21}
+              color={focused ? accent : subtext}
+            />
+            {badge && (
+              <View style={[styles.badge, { backgroundColor: accent }]}>
+                <Text style={styles.badgeText}>{badge}</Text>
+              </View>
+            )}
+          </View>
+        </Animated.View>
+
+        {/* Label — hanya muncul saat aktif */}
+        <Animated.Text
+          style={[styles.label, { color: accent }, labelStyle]}
+          numberOfLines={1}
+        >
+          {label.toUpperCase()}
+        </Animated.Text>
+      </Animated.View>
     </View>
   );
 }
@@ -86,14 +128,11 @@ function TabBarBackground() {
         {
           backgroundColor: theme.card,
           borderRadius: 30,
-          // Shadow Android
           elevation: 20,
-          // Shadow iOS
           shadowColor: '#000',
           shadowOffset: { width: 0, height: 8 },
           shadowOpacity: 0.35,
           shadowRadius: 16,
-          // Border tipis
           borderWidth: 1,
           borderColor: theme.border,
           overflow: 'hidden',
@@ -108,8 +147,8 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const theme  = useTheme();
 
-  const MARGIN_H      = 20;  // margin kiri kanan tab bar
-  const MARGIN_BOTTOM = Math.max(insets.bottom, 12) + 4; // jarak dari bawah layar
+  const MARGIN_H      = 20;
+  const MARGIN_BOTTOM = Math.max(insets.bottom, 12) + 4;
 
   return (
     <Tabs
@@ -124,12 +163,11 @@ export default function TabLayout() {
           paddingBottom:   0,
           paddingTop:      0,
           position:        'absolute',
-          // Floating: margin kiri kanan + jarak dari bawah
           left:            MARGIN_H,
           right:           MARGIN_H,
           bottom:          MARGIN_BOTTOM,
           borderRadius:    30,
-          elevation:       0, // handled di background
+          elevation:       0,
         },
         tabBarBackground:        () => <TabBarBackground />,
         tabBarShowLabel:         false,
@@ -150,6 +188,7 @@ export default function TabLayout() {
                 iconInactive={tab.iconInactive}
                 badge={(tab as any).badge}
                 accent={theme.accent}
+                accentDim={theme.accentDim}
                 subtext={theme.subtext}
               />
             ),
@@ -169,7 +208,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     height:         TAB_HEIGHT,
     width:          56,
+    position:       'relative',
+  },
+  pill: {
+    position:     'absolute',
+    height:       36,
+    borderRadius: 18,
+    // width dihandle via Animated
+  },
+  iconLabelStack: {
+    alignItems:     'center',
+    justifyContent: 'center',
     gap:            3,
+    zIndex:         1,
   },
   label: {
     fontSize:      8,
@@ -181,7 +232,7 @@ const styles = StyleSheet.create({
     position:          'absolute',
     top:               -4,
     right:             -10,
-    borderRadius:      5,
+    borderRadius:      4,
     paddingHorizontal: 3,
     paddingVertical:   1,
   },
