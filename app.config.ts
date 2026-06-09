@@ -24,6 +24,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       foregroundImage: './assets/icon.png',
       backgroundColor: '#F4CB7A',
     },
+    splash: {
+      image: './assets/splash.png',
+      resizeMode: 'contain',
+      backgroundColor: '#0a0a0c',
+    },
     package: 'com.nefusoft.anime',
     googleServicesFile: './google-services.json',
     permissions: [],
