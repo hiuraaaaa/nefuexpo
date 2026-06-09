@@ -15,6 +15,9 @@ import '../global.css';
 
 SplashScreen.preventAutoHideAsync();
 
+//Image.clearDiskCache();
+//Image.clearMemoryCache();
+
 // ─── Error Boundary ───────────────────────────────────────────────────────────
 class RootErrorBoundary extends Component<
   { children: ReactNode },
@@ -55,12 +58,7 @@ function AppLayout() {
   const [maintenance, setMaintenance] = useState<MaintenanceData | null>(null);
   const [adminUser, setAdminUser]     = useState(false);
 
-  // ✅ FIX: Langsung hide splash screen + load theme & domain sekaligus
-  useEffect(() => {
-    loadSavedTheme();
-    refreshDomain();
-   // SplashScreen.hideAsync();
-  }, []);
+  useEffect(() => { loadSavedTheme(); refreshDomain(); }, []);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(() => { setAdminUser(isAdmin()); });
@@ -100,7 +98,7 @@ function AppLayout() {
         <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
         <Stack.Screen name="watch/[slug]" options={{ animation: 'slide_from_bottom' }} />
       </Stack>
-      {__DEV__ && <DebugOverlay />}
+      <DebugOverlay />
     </>
   );
 }
