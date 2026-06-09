@@ -39,6 +39,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   androidTVBanner: './assets/tv-banner.png',
   plugins: [
+    'react-native-edge-to-edge',  // ← di sini
     'expo-router',
     ['expo-build-properties', {
       android: {
