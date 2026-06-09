@@ -38,16 +38,14 @@ type ServerGroup = { [quality: string]: Server[] };
 
 // ── Battery Icon ───────────────────────────────────────────────────────────────
 function BatteryIndicator() {
-  const level = useBatteryLevel();       // 0–1
-  const state = useBatteryState();       // BatteryState enum
+  const level = useBatteryLevel();
+  const state = useBatteryState();
 
   const isCharging = state === BatteryState.CHARGING || state === BatteryState.FULL;
   const pct        = level !== null ? Math.round(level * 100) : null;
   const color      = isCharging
-    ? '#4ade80'                          // hijau saat charging
-    : pct !== null && pct <= 20
-      ? '#e63946'                        // merah saat low
-      : 'rgba(255,255,255,0.75)';
+    ? '#4ade80'
+    : pct !== null && pct <= 20 ? '#e63946' : 'rgba(255,255,255,0.75)';
 
   const iconName = isCharging
     ? 'battery-charging'
@@ -136,29 +134,29 @@ const IconPause = ({ size = 28 }: { size?: number }) => (
 );
 
 const IconFullscreen = ({ exit = false }: { exit?: boolean }) => {
-  const c = '#fff'; const s = 7; const t = 2;
+  const c = '#fff'; const sz = 7; const t = 2;
   if (exit) return (
     <View style={{ width: 18, height: 18 }}>
-      <View style={{ position: 'absolute', top: s-t, left: 0, width: s, height: t, backgroundColor: c }} />
-      <View style={{ position: 'absolute', top: 0, left: s-t, width: t, height: s, backgroundColor: c }} />
-      <View style={{ position: 'absolute', top: s-t, right: 0, width: s, height: t, backgroundColor: c }} />
-      <View style={{ position: 'absolute', top: 0, right: s-t, width: t, height: s, backgroundColor: c }} />
-      <View style={{ position: 'absolute', bottom: s-t, left: 0, width: s, height: t, backgroundColor: c }} />
-      <View style={{ position: 'absolute', bottom: 0, left: s-t, width: t, height: s, backgroundColor: c }} />
-      <View style={{ position: 'absolute', bottom: s-t, right: 0, width: s, height: t, backgroundColor: c }} />
-      <View style={{ position: 'absolute', bottom: 0, right: s-t, width: t, height: s, backgroundColor: c }} />
+      <View style={{ position: 'absolute', top: sz-t, left: 0, width: sz, height: t, backgroundColor: c }} />
+      <View style={{ position: 'absolute', top: 0, left: sz-t, width: t, height: sz, backgroundColor: c }} />
+      <View style={{ position: 'absolute', top: sz-t, right: 0, width: sz, height: t, backgroundColor: c }} />
+      <View style={{ position: 'absolute', top: 0, right: sz-t, width: t, height: sz, backgroundColor: c }} />
+      <View style={{ position: 'absolute', bottom: sz-t, left: 0, width: sz, height: t, backgroundColor: c }} />
+      <View style={{ position: 'absolute', bottom: 0, left: sz-t, width: t, height: sz, backgroundColor: c }} />
+      <View style={{ position: 'absolute', bottom: sz-t, right: 0, width: sz, height: t, backgroundColor: c }} />
+      <View style={{ position: 'absolute', bottom: 0, right: sz-t, width: t, height: sz, backgroundColor: c }} />
     </View>
   );
   return (
     <View style={{ width: 18, height: 18 }}>
-      <View style={{ position: 'absolute', top: 0, left: 0, width: s, height: t, backgroundColor: c }} />
-      <View style={{ position: 'absolute', top: 0, left: 0, width: t, height: s, backgroundColor: c }} />
-      <View style={{ position: 'absolute', top: 0, right: 0, width: s, height: t, backgroundColor: c }} />
-      <View style={{ position: 'absolute', top: 0, right: 0, width: t, height: s, backgroundColor: c }} />
-      <View style={{ position: 'absolute', bottom: 0, left: 0, width: s, height: t, backgroundColor: c }} />
-      <View style={{ position: 'absolute', bottom: 0, left: 0, width: t, height: s, backgroundColor: c }} />
-      <View style={{ position: 'absolute', bottom: 0, right: 0, width: s, height: t, backgroundColor: c }} />
-      <View style={{ position: 'absolute', bottom: 0, right: 0, width: t, height: s, backgroundColor: c }} />
+      <View style={{ position: 'absolute', top: 0, left: 0, width: sz, height: t, backgroundColor: c }} />
+      <View style={{ position: 'absolute', top: 0, left: 0, width: t, height: sz, backgroundColor: c }} />
+      <View style={{ position: 'absolute', top: 0, right: 0, width: sz, height: t, backgroundColor: c }} />
+      <View style={{ position: 'absolute', top: 0, right: 0, width: t, height: sz, backgroundColor: c }} />
+      <View style={{ position: 'absolute', bottom: 0, left: 0, width: sz, height: t, backgroundColor: c }} />
+      <View style={{ position: 'absolute', bottom: 0, left: 0, width: t, height: sz, backgroundColor: c }} />
+      <View style={{ position: 'absolute', bottom: 0, right: 0, width: sz, height: t, backgroundColor: c }} />
+      <View style={{ position: 'absolute', bottom: 0, right: 0, width: t, height: sz, backgroundColor: c }} />
     </View>
   );
 };
@@ -303,13 +301,12 @@ export default function WatchScreen() {
 
   const [isPlaying, setIsPlaying]     = useState(false);
   const [position, setPosition]       = useState(0);
-  const [duration, setDuration]       = useState(0);
+  const [duration, setDuration]       = useState(0);  // ← fix: state terpisah
   const [isBuffering, setIsBuffering] = useState(false);
 
   const [seekLeft, setSeekLeft]   = useState(false);
   const [seekRight, setSeekRight] = useState(false);
 
-  // ── Settings dari profile (MMKV sync) ─────────────────────────────────────
   const [pipEnabled, setPipEnabled]   = useState(() => storageMain.getBoolean('nefusoft_pip')  ?? false);
   const [infoEnabled, setInfoEnabled] = useState(() => storageMain.getBoolean('nefusoft_info') ?? false);
 
@@ -341,21 +338,32 @@ export default function WatchScreen() {
   // ── Sync player state ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!player) return;
-    const statusSub  = player.addListener('statusChange', ({ status }) => {
+
+    const statusSub = player.addListener('statusChange', ({ status }) => {
       setIsBuffering(status === 'loading');
     });
+
     const playingSub = player.addListener('playingChange', ({ isPlaying: playing }) => {
       setIsPlaying(playing);
     });
-    const timeSub    = player.addListener('timeUpdate', ({ currentTime }) => {
+
+    // FIX: durasi diambil dari event durationChange, bukan dari timeUpdate
+    // player.duration di timeUpdate sering belum ready (return 0/NaN)
+    const durationSub = player.addListener('durationChange' as any, ({ duration: dur }: { duration: number }) => {
+      if (dur && dur > 0) setDuration(dur);
+    });
+
+    const timeSub = player.addListener('timeUpdate', ({ currentTime }) => {
       setPosition(currentTime);
-      setDuration(player.duration ?? 0);
+
+      // Fallback: kalau durationChange belum fire, coba ambil dari player langsung
+      const dur = player.duration ?? 0;
+      if (dur > 0) setDuration(dur);
 
       if (currentEpId) {
         const now = Date.now();
         if (now - lastSaveTime.current > 5000) {
           lastSaveTime.current = now;
-          const dur = player.duration ?? 0;
           progressStorage.save(currentEpId, currentTime, dur);
           if (dur > 0) {
             const prog = currentTime / dur;
@@ -372,6 +380,7 @@ export default function WatchScreen() {
         }
       }
     });
+
     const endSub = player.addListener('playToEnd', () => {
       if (autoNext) handleNext();
     });
@@ -379,6 +388,7 @@ export default function WatchScreen() {
     return () => {
       statusSub.remove();
       playingSub.remove();
+      durationSub.remove();
       timeSub.remove();
       endSub.remove();
     };
@@ -421,11 +431,8 @@ export default function WatchScreen() {
             const saved = progressStorage.get(ep.id);
             if (saved && saved.position > 0) {
               const ratio = saved.duration > 0 ? saved.position / saved.duration : 0;
-              if (ratio > 0.9) {
-                watched.add(ep.id);
-              } else {
-                progressMap[ep.id] = ratio;
-              }
+              if (ratio > 0.9) watched.add(ep.id);
+              else progressMap[ep.id] = ratio;
             }
           }
           setEpProgress(progressMap);
@@ -437,9 +444,12 @@ export default function WatchScreen() {
           if (target) setCurrentEpId(target.id);
         }
         setIsLoading(false);
-        api.popular().then(recRes => {
+
+        // FIX: ganti api.popular() → api.rekomendasi()
+        api.rekomendasi().then(recRes => {
           setRecommendations((recRes.data || []).slice(0, 5));
         }).catch(() => {});
+
       } catch {
         setIsLoading(false);
       }
@@ -468,6 +478,7 @@ export default function WatchScreen() {
       setSelectedQuality('');
       setSelectedServer(null);
       setPosition(0);
+      setDuration(0); // reset durasi tiap ganti episode
       setIsPlaying(false);
       try {
         const res = await api.episode(currentEpId);
@@ -737,20 +748,15 @@ export default function WatchScreen() {
               style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 90 }}
               pointerEvents="none" />
 
-            {/* ── Top bar: info (jam + baterai) + judul + bookmark ── */}
+            {/* Top bar */}
             <View style={{ position: 'absolute', top: 0, left: 0, right: 0,
               paddingHorizontal: 12, paddingTop: 10, gap: 6 }}>
-
-              {/* Row 1: jam & baterai — tampil hanya kalau info diaktifkan */}
               {infoEnabled && (
-                <View style={{ flexDirection: 'row', alignItems: 'center',
-                  justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                   <Clock />
                   <BatteryIndicator />
                 </View>
               )}
-
-              {/* Row 2: back + judul + bookmark */}
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 <TouchableOpacity
                   onPress={() => {
@@ -807,7 +813,9 @@ export default function WatchScreen() {
             <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0,
               paddingHorizontal: 12, paddingBottom: 10 }}>
               <Slider style={{ width: '100%', height: 20 }}
-                minimumValue={0} maximumValue={duration || 1} value={position}
+                minimumValue={0}
+                maximumValue={duration > 0 ? duration : 1}
+                value={position}
                 minimumTrackTintColor={COLORS.gold}
                 maximumTrackTintColor="rgba(255,255,255,0.25)"
                 thumbTintColor={COLORS.gold}
@@ -822,7 +830,7 @@ export default function WatchScreen() {
                   fontWeight: '700', letterSpacing: 0.5 }}>
                   {formatTime(position)}
                   <Text style={{ color: 'rgba(255,255,255,0.4)' }}> / </Text>
-                  {formatTime(duration)}
+                  {duration > 0 ? formatTime(duration) : '--:--'}
                 </Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
                   {pipEnabled && pipSupported && (
@@ -988,8 +996,9 @@ export default function WatchScreen() {
               overflow: 'hidden', backgroundColor: COLORS.card,
               borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' }}>
               <View style={{ height: 200, alignItems: 'center', justifyContent: 'flex-end' }}>
+                {/* FIX: hapus priority dari source */}
                 <Image
-                  source={{ uri: anime.image_cover || anime.image_poster, priority: 'normal' }}
+                  source={{ uri: anime.image_cover || anime.image_poster }}
                   style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.25 }}
                   contentFit="cover"
                 />
@@ -998,7 +1007,7 @@ export default function WatchScreen() {
                   style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '60%' }}
                 />
                 <Image
-                  source={{ uri: anime.image_poster, priority: 'high' }}
+                  source={{ uri: anime.image_poster }}
                   style={{ width: 110, aspectRatio: 3 / 4.2, borderRadius: 10 }}
                   contentFit="cover"
                 />
@@ -1100,9 +1109,12 @@ export default function WatchScreen() {
                     marginBottom: 10, backgroundColor: COLORS.card, borderRadius: 10,
                     padding: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' }}
                   activeOpacity={0.8}>
-                  <Image source={{ uri: a.image_poster, priority: 'low' }}
+                  {/* FIX: hapus priority dari source */}
+                  <Image
+                    source={{ uri: a.image_poster }}
                     style={{ width: 44, aspectRatio: 3 / 4.2, borderRadius: 6 }}
-                    contentFit="cover" />
+                    contentFit="cover"
+                  />
                   <View style={{ flex: 1 }}>
                     <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}
                       numberOfLines={1}>{a.title}</Text>
