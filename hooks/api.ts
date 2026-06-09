@@ -131,7 +131,7 @@ function mapAnimeDetail(raw: any): AnimeDetail {
     studio:        raw.author ?? '',
     genre: Array.isArray(raw.genre) ? raw.genre.join(', ') : raw.genre ?? '',
     day: '', time: '', key_time: '',
-    score:         raw.rating ?? null,   // di detail field-nya "rating", bukan "score"
+    score:         raw.rating ?? null,
     total_episode: raw.total_episode ?? null,
     last_chapter:  raw.lastch ?? null,
     last_update:   raw.lastup ?? null,
@@ -141,7 +141,6 @@ function mapAnimeDetail(raw: any): AnimeDetail {
     id:          (ch.url ?? '').replace(/\/+$/, ''),
     index:       parseInt(ch.ch) || 0,
     title:       `Episode ${ch.ch}`,
-    // field tambahan
     chapter_id:  ch.id ?? null,
     date:        ch.date ?? '',
     views:       ch.views ?? 0,
@@ -172,6 +171,8 @@ function mapSchedule(raw: any[]): ScheduleDay {
       synopsis: '', type: '', status: 'ONGOING',
       year: '', aired_start: '', studio: '', genre: '',
       day:      item.day ?? '',
+      date:     item.date ?? '',        // ← tanggal "16"
+      date_ts:  item.date_ts ?? null,   // ← unix timestamp
       time:     a.time ?? '',
       key_time: (item.day ?? '').toUpperCase(),
     }));
@@ -228,7 +229,6 @@ const fetchDetail = async (id: string): Promise<ApiResponse<AnimeDetail>> => {
 };
 
 // [7] Episode Stream — /series/episode/data.php
-// streams = object { "480p": [...], "720p": [...] }, bukan flat array
 const fetchEpisode = async (id: string): Promise<any> => {
   const token      = await getToken();
   const epId       = id.replace(/\/+$/, '');
@@ -248,7 +248,6 @@ const fetchEpisode = async (id: string): Promise<any> => {
   const raw        = json?.data?.[0];
   if (!raw) return { status: false, data: { server: [] } };
 
-  // streams adalah object per kualitas, iterate tiap key
   const streamsObj: Record<string, any[]> = raw.streams ?? {};
   const resoSize:   Record<string, string> = raw.resoSize   ?? {};
   const resoSizeKb: Record<string, number> = raw.resoSizeKb ?? {};
@@ -258,11 +257,8 @@ const fetchEpisode = async (id: string): Promise<any> => {
   for (const [quality, list] of Object.entries(streamsObj)) {
     for (const s of list) {
       const isPixeldrainDownload = s.link?.includes('pixeldrain.com') && s.link?.includes('?download');
-      // Skip pixeldrain ?download — tidak bisa langsung diplay
       if (isPixeldrainDownload) continue;
-
       const isM3u8 = s.link?.includes('.m3u8');
-
       server.push({
         id:       String(s.id),
         quality,
@@ -275,7 +271,6 @@ const fetchEpisode = async (id: string): Promise<any> => {
     }
   }
 
-  // Sort priority: mp4 direct > pixeldrain > m3u8
   server.sort((a, b) => {
     const rank = (link: string) =>
       link.includes('.m3u8')          ? 2 :
@@ -392,3 +387,21 @@ export const formatTime = (seconds: number): string => {
   const s = Math.floor(seconds % 60).toString().padStart(2, '0');
   return `${m}:${s}`;
 };
+
+// ─── Schedule Helpers ─────────────────────────────────────────────────────────
+
+export const formatScheduleDate = (date_ts: number): string =>
+  new Date(date_ts * 1000).toLocaleDateString('id-ID', {
+    weekday: 'long',
+    day:     'numeric',
+    month:   'long',
+    year:    'numeric',
+  });
+// → "Selasa, 16 Juni 2026"
+
+export const formatScheduleTime = (date_ts: number): string =>
+  new Date(date_ts * 1000).toLocaleTimeString('id-ID', {
+    hour:   '2-digit',
+    minute: '2-digit',
+  });
+// → "05.30"
