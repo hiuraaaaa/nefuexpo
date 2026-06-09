@@ -128,7 +128,7 @@ const ScheduleCard = React.memo(({ anime, index, onPress, theme }: ScheduleCardP
       >
         <View style={s.row}>
           <Image
-            source={{ uri: anime.image_poster, priority: "normal" }}
+            source={{ uri: item.image_poster }}
             style={s.poster}
             contentFit="cover"
           />
