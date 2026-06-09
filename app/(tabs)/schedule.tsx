@@ -90,13 +90,14 @@ type ScheduleCardProps = {
 };
 
 const ScheduleCard = React.memo(({ anime, index, onPress, theme }: ScheduleCardProps) => {
-  // Prioritas: date_ts → formatScheduleTime, fallback ke anime.time, fallback '--:--'
   const timeText = useMemo(() => {
-    if (anime.date_ts) return formatScheduleTime(anime.date_ts);
-    if (anime.time) return anime.time.substring(0, 5);
+    if (anime.updated) {
+      return new Date(anime.updated * 1000)
+        .toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    }
     return '--:--';
-  }, [anime.date_ts, anime.time]);
-
+  }, [anime.updated]);
+  
   return (
     <Animated.View
       entering={FadeInDown.delay(index * 40).springify()}
