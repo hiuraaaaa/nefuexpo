@@ -173,6 +173,7 @@ function mapSchedule(raw: any[]): ScheduleDay {
       day:      item.day ?? '',
       date:     item.date ?? '',        // ← tanggal "16"
       date_ts:  item.date_ts ?? null,   // ← unix timestamp
+      updated:  a.updated ?? null,   // ← tambah ini
       time:     a.time ?? '',
       key_time: (item.day ?? '').toUpperCase(),
     }));
