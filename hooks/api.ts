@@ -1,5 +1,5 @@
 import { ApiResponse, Anime, AnimeDetail, ScheduleDay, Genre } from '@/types';
-import crypto from 'expo-crypto';
+const uid = Math.random().toString(36).substring(2, 7);
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -19,9 +19,7 @@ let _token: string | null = null;
 
 const getToken = async (): Promise<string> => {
   if (_token) return _token;
-  const uid = Array.from(crypto.getRandomBytes(5))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
+  const uid = Math.random().toString(36).substring(2, 7);
   const payload = {
     user:   `Guest_${uid}`,
     email:  `gienetic_${uid}@gmail.com`,
