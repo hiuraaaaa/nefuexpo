@@ -13,6 +13,8 @@ export interface Anime {
   synonyms?: string;
   favorites?: string | number;
   day?: string;
+  date?: string;        // ← tambah
+  date_ts?: number | null;  // ← tambah
   time?: string;
   key_time?: string;
   // field tambahan dari API
