@@ -238,9 +238,8 @@ function DisclaimerScreen({ onAccept, onDecline }: {
 }
 
 // ── Login Screen ──────────────────────────────────────────────────────────────
-function LoginScreen({ onSuccess, onSkip }: {
+function LoginScreen({ onSuccess }: {
   onSuccess: () => void;
-  onSkip: () => void;
 }) {
   const [loading, setLoading] = useState(false);
 
@@ -317,13 +316,6 @@ function LoginScreen({ onSuccess, onSkip }: {
             </Text>
           </TouchableOpacity>
 
-          {/* Skip */}
-          <TouchableOpacity onPress={onSkip} activeOpacity={0.7} style={{ alignItems: 'center', paddingVertical: 12 }}>
-            <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13, fontWeight: '600' }}>
-              Lewati, nonton tanpa akun
-            </Text>
-          </TouchableOpacity>
-
           <Text style={{ color: 'rgba(255,255,255,0.15)', fontSize: 10, textAlign: 'center', marginTop: 16 }}>
             NefuSoft v{APP_VERSION}
           </Text>
@@ -362,9 +354,6 @@ export default function WelcomeScreen() {
 
         // Simulasi loading 1.5 detik sambil API jalan di background
         setTimeout(() => {
-          const disclaimerAccepted = storageMain.getBoolean(DISCLAIMER_KEY) ?? false;
-          // Kalau disclaimer udah accepted, langsung ke welcome
-          // Kalau belum, tetap ke welcome dulu — disclaimer muncul setelah klik tombol
           setStep('welcome');
           overlayOpacity.value = withTiming(0, { duration: 400 });
           contentOpacity.value = withTiming(1, { duration: 600 });
@@ -385,12 +374,7 @@ export default function WelcomeScreen() {
 
   const handleMulaiNonton = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const disclaimerAccepted = storageMain.getBoolean(DISCLAIMER_KEY) ?? false;
-    if (!disclaimerAccepted) {
-      setStep('disclaimer'); // slide in dari kanan
-    } else {
-      setStep('login');      // slide in dari bawah
-    }
+    setStep('disclaimer');
   }, []);
 
   const handleDisclaimerAccept = useCallback(() => {
@@ -403,10 +387,6 @@ export default function WelcomeScreen() {
   }, []);
 
   const handleLoginSuccess = useCallback(() => {
-    navigateTo();
-  }, [navigateTo]);
-
-  const handleSkip = useCallback(() => {
     navigateTo();
   }, [navigateTo]);
 
@@ -516,7 +496,6 @@ export default function WelcomeScreen() {
       {step === 'login' && (
         <LoginScreen
           onSuccess={handleLoginSuccess}
-          onSkip={handleSkip}
         />
       )}
     </View>
