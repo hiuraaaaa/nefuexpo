@@ -15,23 +15,44 @@ export interface Anime {
   day?: string;
   time?: string;
   key_time?: string;
+  // field tambahan dari API
+  score?: string | null;
+  total_episode?: number | null;
+  last_chapter?: string | null;
+  last_update?: string | null;
 }
 
 export interface Episode {
   id: string;
   index: number;
   title?: string;
+  // field tambahan dari API
+  chapter_id?: number | null;
+  date?: string;
+  views?: number;
+  last_durasi?: number | null;
+  full_durasi?: number | null;
 }
 
 export interface Server {
   id: string;
   quality: string;
   link: string;
-  type: string;
+  type: 'direct' | 'hls';
+  // field tambahan dari API
+  provide?: number | null;
+  size_kb?: number | null;
+  size?: string | null;
 }
 
 export interface AnimeDetail extends Anime {
   episode_list: Episode[];
+  // field tambahan dari API
+  rating?: string | null;
+  countdown?: string | null;
+  bookmark?: string | null;
+  genreurl?: string[];
+  history?: string[];
 }
 
 export interface ScheduleDay {
