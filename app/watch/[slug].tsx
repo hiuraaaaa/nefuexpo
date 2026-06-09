@@ -275,6 +275,12 @@ export default function WatchScreen() {
   const { width: screenWidth } = useWindowDimensions();
   const animeId = decodeAnimeId(slug ?? '');
 
+  // ── DEBUG STATE (hapus setelah fix) ───────────────────────────────────────
+  const [debugLog, setDebugLog] = useState<string[]>([]);
+  const addLog = useCallback((msg: string) => {
+    setDebugLog(prev => [...prev.slice(-10), msg]);
+  }, []);
+
   const [anime, setAnime]                       = useState<AnimeDetail | null>(null);
   const [episodes, setEpisodes]                 = useState<Episode[]>([]);
   const [filteredEps, setFilteredEps]           = useState<Episode[]>([]);
@@ -301,7 +307,7 @@ export default function WatchScreen() {
 
   const [isPlaying, setIsPlaying]     = useState(false);
   const [position, setPosition]       = useState(0);
-  const [duration, setDuration]       = useState(0);  // ← fix: state terpisah
+  const [duration, setDuration]       = useState(0);
   const [isBuffering, setIsBuffering] = useState(false);
 
   const [seekLeft, setSeekLeft]   = useState(false);
@@ -329,13 +335,11 @@ export default function WatchScreen() {
   const controlsOpacity = useSharedValue(1);
   const controlsStyle   = useAnimatedStyle(() => ({ opacity: controlsOpacity.value }));
 
-  // ── expo-video player ──────────────────────────────────────────────────────
   const player = useVideoPlayer(
     selectedServer?.link ? { uri: selectedServer.link } : null,
     p => { p.pause(); }
   );
 
-  // ── Sync player state ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!player) return;
 
@@ -347,16 +351,12 @@ export default function WatchScreen() {
       setIsPlaying(playing);
     });
 
-    // FIX: durasi diambil dari event durationChange, bukan dari timeUpdate
-    // player.duration di timeUpdate sering belum ready (return 0/NaN)
     const durationSub = player.addListener('durationChange' as any, ({ duration: dur }: { duration: number }) => {
       if (dur && dur > 0) setDuration(dur);
     });
 
     const timeSub = player.addListener('timeUpdate', ({ currentTime }) => {
       setPosition(currentTime);
-
-      // Fallback: kalau durationChange belum fire, coba ambil dari player langsung
       const dur = player.duration ?? 0;
       if (dur > 0) setDuration(dur);
 
@@ -417,11 +417,17 @@ export default function WatchScreen() {
     if (!animeId) return;
     const load = async () => {
       setIsLoading(true);
+      addLog(`[1] animeId: ${animeId}`);
       try {
         const detailRes = await api.detail(animeId);
+        addLog(`[2] status: ${detailRes.status}`);
+        addLog(`[3] data: ${detailRes.data ? 'ada' : 'null'}`);
+
         if (detailRes.status && detailRes.data) {
-          setAnime(detailRes.data);
+          addLog(`[4] title: ${detailRes.data.title}`);
           const eps = detailRes.data.episode_list || [];
+          addLog(`[5] eps: ${eps.length}`);
+          setAnime(detailRes.data);
           setEpisodes(eps);
           setFilteredEps(eps);
 
@@ -441,16 +447,23 @@ export default function WatchScreen() {
           const target = epParam
             ? eps.find((e: Episode) => e.index.toString() === epParam)
             : eps[eps.length - 1];
-          if (target) setCurrentEpId(target.id);
+          if (target) {
+            addLog(`[6] target ep: ${target.id}`);
+            setCurrentEpId(target.id);
+          } else {
+            addLog(`[6] no target ep!`);
+          }
+        } else {
+          addLog(`[4] GAGAL - status=${detailRes.status} data=${!!detailRes.data}`);
         }
         setIsLoading(false);
 
-        // FIX: ganti api.popular() → api.rekomendasi()
         api.rekomendasi().then(recRes => {
           setRecommendations((recRes.data || []).slice(0, 5));
         }).catch(() => {});
 
-      } catch {
+      } catch (err: any) {
+        addLog(`[ERR] ${err?.message ?? String(err)}`);
         setIsLoading(false);
       }
     };
@@ -462,13 +475,6 @@ export default function WatchScreen() {
     return () => unsubNet();
   }, [animeId]);
 
-  useEffect(() => {
-    if (!epSearch.trim()) setFilteredEps(episodes);
-    else setFilteredEps(episodes.filter(e =>
-      String(e.index).includes(epSearch.trim())
-    ));
-  }, [epSearch, episodes]);
-
   // ── Load episode servers ───────────────────────────────────────────────────
   useEffect(() => {
     if (!currentEpId) return;
@@ -478,10 +484,14 @@ export default function WatchScreen() {
       setSelectedQuality('');
       setSelectedServer(null);
       setPosition(0);
-      setDuration(0); // reset durasi tiap ganti episode
+      setDuration(0);
       setIsPlaying(false);
+      addLog(`[EP1] load ep: ${currentEpId}`);
       try {
         const res = await api.episode(currentEpId);
+        addLog(`[EP2] status: ${res.status}`);
+        addLog(`[EP3] servers: ${res.data?.server?.length ?? 0}`);
+
         if (res.status && res.data) {
           const allServers: Server[] = res.data.server || [];
           const group: ServerGroup = {};
@@ -493,22 +503,37 @@ export default function WatchScreen() {
           setServerGroup(group);
           const qualities = ['1080p', '720p', '480p', '360p'];
           const bestQ = qualities.find(q => group[q]?.length > 0) || Object.keys(group)[0];
+          addLog(`[EP4] bestQ: ${bestQ}`);
           if (bestQ && group[bestQ]?.length > 0) {
             setSelectedQuality(bestQ);
             setSelectedServer(group[bestQ][0]);
+            addLog(`[EP5] link: ${group[bestQ][0]?.link?.substring(0, 60)}`);
             const saved = progressStorage.get(currentEpId);
             if (saved && saved.position > 5) {
               setTimeout(() => {
                 if (player) player.seekBy(saved.position - (player.currentTime ?? 0));
               }, 800);
             }
+          } else {
+            addLog(`[EP4] no quality found! keys: ${Object.keys(group).join(',')}`);
           }
+        } else {
+          addLog(`[EP2] GAGAL`);
         }
-      } catch {}
+      } catch (err: any) {
+        addLog(`[EP ERR] ${err?.message ?? String(err)}`);
+      }
       setIsEpLoading(false);
     };
     load();
   }, [currentEpId]);
+
+  useEffect(() => {
+    if (!epSearch.trim()) setFilteredEps(episodes);
+    else setFilteredEps(episodes.filter(e =>
+      String(e.index).includes(epSearch.trim())
+    ));
+  }, [epSearch, episodes]);
 
   useEffect(() => {
     if (!anime || !currentEpId) return;
@@ -734,6 +759,27 @@ export default function WatchScreen() {
 
         <SeekToast direction="left"  visible={seekLeft}  />
         <SeekToast direction="right" visible={seekRight} />
+
+        {/* ── DEBUG OVERLAY (hapus setelah fix) ── */}
+        {debugLog.length > 0 && (
+          <TouchableOpacity
+            onPress={() => setDebugLog([])}
+            style={{
+              position: 'absolute', top: 8, left: 8, right: 8,
+              backgroundColor: 'rgba(0,0,0,0.88)', borderRadius: 8,
+              padding: 8, zIndex: 999,
+              borderWidth: 1, borderColor: '#0f04',
+            }}>
+            {debugLog.map((log, i) => (
+              <Text key={i} style={{ color: '#0f0', fontSize: 9.5, fontFamily: 'monospace', lineHeight: 14 }}>
+                {log}
+              </Text>
+            ))}
+            <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 8, marginTop: 4 }}>
+              tap to dismiss
+            </Text>
+          </TouchableOpacity>
+        )}
 
         {selectedServer && !isEpLoading && (
           <Animated.View style={[
@@ -996,7 +1042,6 @@ export default function WatchScreen() {
               overflow: 'hidden', backgroundColor: COLORS.card,
               borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' }}>
               <View style={{ height: 200, alignItems: 'center', justifyContent: 'flex-end' }}>
-                {/* FIX: hapus priority dari source */}
                 <Image
                   source={{ uri: anime.image_cover || anime.image_poster }}
                   style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.25 }}
@@ -1109,7 +1154,6 @@ export default function WatchScreen() {
                     marginBottom: 10, backgroundColor: COLORS.card, borderRadius: 10,
                     padding: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' }}
                   activeOpacity={0.8}>
-                  {/* FIX: hapus priority dari source */}
                   <Image
                     source={{ uri: a.image_poster }}
                     style={{ width: 44, aspectRatio: 3 / 4.2, borderRadius: 6 }}
