@@ -3,7 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useEffect, useState, Component, ReactNode } from 'react';
-import { View, Text, ScrollView } from 'react-native';
+import { Text, ScrollView } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { loadSavedTheme, useTheme } from '@/hooks/theme';
 import { isAdmin, onAuthStateChanged } from '@/hooks/auth';
@@ -11,12 +11,10 @@ import DebugOverlay from '@/components/DebugOverlay';
 import MaintenancePage from '@/components/MaintenancePage';
 import firestore from '@react-native-firebase/firestore';
 import { refreshDomain } from '@/hooks/scraper';
+import { SystemBars } from 'react-native-edge-to-edge';
 import '../global.css';
 
 SplashScreen.preventAutoHideAsync();
-
-//Image.clearDiskCache();
-//Image.clearMemoryCache();
 
 // ─── Error Boundary ───────────────────────────────────────────────────────────
 class RootErrorBoundary extends Component<
@@ -80,7 +78,8 @@ function AppLayout() {
   if (maintenance) {
     return (
       <>
-        <StatusBar style={theme.id === 'pure-white' ? 'dark' : 'light'} backgroundColor={theme.bg} />
+        <SystemBars style="light" />
+        <StatusBar style={theme.id === 'pure-white' ? 'dark' : 'light'} />
         <MaintenancePage message={maintenance.message} estimasi={maintenance.estimasi} />
       </>
     );
@@ -88,7 +87,8 @@ function AppLayout() {
 
   return (
     <>
-      <StatusBar style={theme.id === 'pure-white' ? 'dark' : 'light'} backgroundColor={theme.bg} />
+      <SystemBars style="light" />
+      <StatusBar style={theme.id === 'pure-white' ? 'dark' : 'light'} />
       <Stack screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: theme.bg },
@@ -98,7 +98,7 @@ function AppLayout() {
         <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
         <Stack.Screen name="watch/[slug]" options={{ animation: 'slide_from_bottom' }} />
       </Stack>
-      <DebugOverlay />
+      {__DEV__ && <DebugOverlay />}
     </>
   );
 }
