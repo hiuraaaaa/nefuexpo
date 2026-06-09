@@ -2,23 +2,23 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
   Dimensions, RefreshControl, Share, Linking,
+  StatusBar,
 } from 'react-native';
 import { Image } from 'expo-image';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, {
   FadeIn, FadeOut, FadeInDown,
-  useSharedValue, useAnimatedStyle, withSpring, withTiming,
+  useSharedValue, useAnimatedStyle, withSpring,
 } from 'react-native-reanimated';
 import firestore from '@react-native-firebase/firestore';
 
 import { LOGO_URL } from '@/constants';
 import { api, shuffleArray, getAnimeSlug } from '@/hooks/api';
-//import { api, shuffleArray, getAnimeSlug } from '@/hooks/scraper';
 import { getHomeCache, clearHomeCache, prefetchHome } from '@/hooks/prefetch';
 import { useTheme } from '@/hooks/theme';
 import { Anime, ScheduleDay } from '@/types';
@@ -27,6 +27,9 @@ import SearchModal from '@/components/SearchModal';
 import { HeroSkeleton, HorizontalCardSkeleton, RankSkeleton } from '@/components/Skeleton';
 
 const { width } = Dimensions.get('window');
+
+// Hero height: full bleed sampai status bar
+const HERO_HEIGHT = width * 0.85;
 
 const getTodayKey = (): string => {
   const days = ['MINGGU', 'SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU'];
@@ -51,16 +54,16 @@ const TYPE_ICONS: Record<string, string> = {
 
 // ── Announcement Banner ───────────────────────────────────────────────────────
 function AnnouncementBanner({ item, onDismiss }: { item: any; onDismiss: () => void }) {
-  const theme  = useTheme();
-  const color  = TYPE_COLORS[item.type] ?? '#4a9eff';
-  const icon   = TYPE_ICONS[item.type] ?? 'information-circle-outline';
+  const theme = useTheme();
+  const color = TYPE_COLORS[item.type] ?? '#4a9eff';
+  const icon  = TYPE_ICONS[item.type]  ?? 'information-circle-outline';
 
   return (
     <Animated.View
       entering={FadeInDown.duration(400).springify()}
       exiting={FadeOut.duration(200)}
       style={{
-        marginHorizontal: 16, marginTop: 16,
+        marginHorizontal: 16, marginTop: 12,
         borderRadius: 14, overflow: 'hidden',
         backgroundColor: theme.card,
         borderWidth: 1, borderColor: theme.border,
@@ -68,7 +71,6 @@ function AnnouncementBanner({ item, onDismiss }: { item: any; onDismiss: () => v
       }}
     >
       <View style={{ padding: 14 }}>
-        {/* Header */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
           <View style={{ width: 26, height: 26, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: `${color}20` }}>
             <Ionicons name={icon as any} size={14} color={color} />
@@ -80,24 +82,12 @@ function AnnouncementBanner({ item, onDismiss }: { item: any; onDismiss: () => v
             <Ionicons name="close" size={16} color={theme.subtext} />
           </TouchableOpacity>
         </View>
-
-        {/* Content */}
-        <Text style={{ color: theme.text, fontWeight: '800', fontSize: 13, marginBottom: 4 }}>
-          {item.title}
-        </Text>
-        <Text style={{ color: theme.subtext, fontSize: 11, lineHeight: 17 }}>
-          {item.body}
-        </Text>
-
-        {/* CTA */}
+        <Text style={{ color: theme.text, fontWeight: '800', fontSize: 13, marginBottom: 4 }}>{item.title}</Text>
+        <Text style={{ color: theme.subtext, fontSize: 11, lineHeight: 17 }}>{item.body}</Text>
         {item.ctaText && item.ctaUrl && (
           <TouchableOpacity
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); Linking.openURL(item.ctaUrl); }}
-            style={{
-              marginTop: 10, alignSelf: 'flex-start',
-              paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8,
-              backgroundColor: `${color}20`, borderWidth: 1, borderColor: `${color}40`,
-            }}
+            style={{ marginTop: 10, alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8, backgroundColor: `${color}20`, borderWidth: 1, borderColor: `${color}40` }}
           >
             <Text style={{ color, fontSize: 11, fontWeight: '800' }}>{item.ctaText} →</Text>
           </TouchableOpacity>
@@ -126,7 +116,7 @@ function SectionHeader({ title, subtitle, onPress, theme }: {
 function MovieRankItem({ anime, index, onPress, theme }: {
   anime: Anime; index: number; onPress: () => void; theme: any;
 }) {
-  const scale = useSharedValue(1);
+  const scale    = useSharedValue(1);
   const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
   return (
@@ -143,14 +133,31 @@ function MovieRankItem({ anime, index, onPress, theme }: {
           borderColor: index < 3 ? theme.accentDim : theme.border,
         }}
       >
-        <Image source={{ uri: anime.image_cover || anime.image_poster, priority: "normal", headers: { Referer: 'https://myanimelist.net' } }} style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '55%', opacity: 0.6 }} contentFit="cover" />
-        <LinearGradient colors={[theme.card, theme.card, 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '75%' }} />
-        <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 16, zIndex: 1, backgroundColor: index < 3 ? theme.accent : theme.border, borderWidth: index < 3 ? 0 : 1, borderColor: theme.border }}>
+        <Image
+          source={{ uri: anime.image_cover || anime.image_poster }}
+          style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '55%', opacity: 0.6 }}
+          contentFit="cover"
+        />
+        <LinearGradient
+          colors={[theme.card, theme.card, 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+          style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '75%' }}
+        />
+        <View style={{
+          width: 40, height: 40, borderRadius: 20,
+          alignItems: 'center', justifyContent: 'center', marginRight: 16, zIndex: 1,
+          backgroundColor: index < 3 ? theme.accent : theme.border,
+          borderWidth: index < 3 ? 0 : 1, borderColor: theme.border,
+        }}>
           <Text style={{ fontWeight: '900', fontSize: 14, color: index < 3 ? '#000' : theme.subtext }}>{index + 1}</Text>
         </View>
         <View style={{ flex: 1, zIndex: 1 }}>
           <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13 }} numberOfLines={1}>{anime.title}</Text>
-          {anime.year ? <Text style={{ color: theme.subtext, fontSize: 10, marginTop: 3 }}>{anime.year}{anime.studio ? ` · ${anime.studio}` : ''}</Text> : null}
+          {anime.year ? (
+            <Text style={{ color: theme.subtext, fontSize: 10, marginTop: 3 }}>
+              {anime.year}{anime.studio ? ` · ${anime.studio}` : ''}
+            </Text>
+          ) : null}
         </View>
       </TouchableOpacity>
     </Animated.View>
@@ -161,17 +168,18 @@ function MovieRankItem({ anime, index, onPress, theme }: {
 export default function HomeScreen() {
   const router = useRouter();
   const theme  = useTheme();
+  const insets = useSafeAreaInsets();
 
-  const [ongoing, setOngoing]           = useState<Anime[]>([]);
-  const [movies, setMovies]             = useState<Anime[]>([]);
-  const [todayAnime, setTodayAnime]     = useState<Anime[]>([]);
-  const [isLoading, setIsLoading]       = useState(true);
-  const [refreshing, setRefreshing]     = useState(false);
-  const [heroIndex, setHeroIndex]       = useState(0);
-  const [searchOpen, setSearchOpen]     = useState(false);
-  const [copyToast, setCopyToast]       = useState(false);
+  const [ongoing, setOngoing]             = useState<Anime[]>([]);
+  const [movies, setMovies]               = useState<Anime[]>([]);
+  const [todayAnime, setTodayAnime]       = useState<Anime[]>([]);
+  const [isLoading, setIsLoading]         = useState(true);
+  const [refreshing, setRefreshing]       = useState(false);
+  const [heroIndex, setHeroIndex]         = useState(0);
+  const [searchOpen, setSearchOpen]       = useState(false);
+  const [copyToast, setCopyToast]         = useState(false);
   const [announcements, setAnnouncements] = useState<any[]>([]);
-  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+  const [dismissedIds, setDismissedIds]   = useState<Set<string>>(new Set());
 
   const heroRef    = useRef<ScrollView>(null);
   const ongoingRef = useRef<ScrollView>(null);
@@ -205,32 +213,19 @@ export default function HomeScreen() {
         setIsLoading(false);
         setRefreshing(false);
         prefetchHome();
-        console.info('[HOME] loaded from cache, ongoing=' + cached.ongoing.length + ' movies=' + cached.movies.length);
         return;
       }
 
-      console.info('[HOME] fetching from API...');
       const results = await api.home();
       const [_rekom, ongRes, _comp, movRes, schedRes] = results;
 
-      console.info('[HOME] results:');
-      results.forEach((r, i) => {
-        const label = ['rekom','ongoing','complete','movie','jadwal'][i];
-        const count = Array.isArray(r?.data) ? r.data.length : (typeof r?.data === 'object' ? Object.keys(r?.data||{}).length : r?.data);
-        console.info('  [' + i + '] ' + label + ' status=' + r?.status + ' count=' + count);
-      });
-
-      if (!ongRes?.data?.length) console.warn('[HOME] ongoing kosong!');
-      if (!movRes?.data?.length) console.warn('[HOME] movies kosong!');
-
       setOngoing(shuffleArray(ongRes.data || []));
       setMovies(movRes.data || []);
-      const todayKey = getTodayKey();
+      const todayKey  = getTodayKey();
       const schedData = schedRes.data as ScheduleDay;
       setTodayAnime(schedData?.[todayKey] || []);
     } catch (e: any) {
-      console.error('[HOME] FETCH ERROR: ' + (e?.message || String(e)));
-      console.error('[HOME] stack: ' + e?.stack);
+      console.error('[HOME] FETCH ERROR:', e?.message);
     }
     setIsLoading(false);
     setRefreshing(false);
@@ -238,6 +233,7 @@ export default function HomeScreen() {
 
   useEffect(() => { fetchData(); }, []);
 
+  // Auto-advance carousel tiap 6 detik
   useEffect(() => {
     if (carouselItems.length === 0) return;
     const itv = setInterval(() => {
@@ -278,12 +274,21 @@ export default function HomeScreen() {
   const visibleAnnouncements = announcements.filter(a => !dismissedIds.has(a.id));
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }} edges={['top']}>
+    <View style={{ flex: 1, backgroundColor: theme.bg }}>
+      {/* Status bar transparan biar hero full bleed */}
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* Copy Toast */}
       {copyToast && (
-        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(300)}
-          style={{ position: 'absolute', top: 80, alignSelf: 'center', zIndex: 999, backgroundColor: theme.accent, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 999 }}>
+        <Animated.View
+          entering={FadeIn.duration(200)} exiting={FadeOut.duration(300)}
+          style={{
+            position: 'absolute', top: insets.top + 60,
+            alignSelf: 'center', zIndex: 999,
+            backgroundColor: theme.accent,
+            paddingHorizontal: 24, paddingVertical: 12, borderRadius: 999,
+          }}
+        >
           <Text style={{ color: '#000', fontWeight: '900', fontSize: 12 }}>Tautan berhasil disalin!</Text>
         </Animated.View>
       )}
@@ -295,43 +300,123 @@ export default function HomeScreen() {
         contentContainerStyle={{ paddingBottom: 100 }}
       >
 
-        {/* Hero Carousel */}
-        <View style={{ width, height: width * 0.7, backgroundColor: theme.card }}>
-          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 30, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10 }}>
-            <Image source={{ uri: LOGO_URL, priority: "high" }} style={{ width: 40, height: 40 }} contentFit="contain" />
-            <TouchableOpacity onPress={() => { Haptics.selectionAsync(); setSearchOpen(true); }} style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}>
-              <View style={{ width: 13, height: 13, borderRadius: 6.5, borderWidth: 2, borderColor: 'rgba(255,255,255,0.8)' }} />
+        {/* ── Hero Carousel — full bleed, mulai dari top: 0 ── */}
+        <View style={{ width, height: HERO_HEIGHT, backgroundColor: theme.card }}>
+
+          {/* Navbar overlay — di atas hero, padding top dari insets */}
+          <View style={{
+            position: 'absolute', top: 0, left: 0, right: 0, zIndex: 30,
+            flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+            paddingHorizontal: 20,
+            paddingTop: insets.top + 10,  // ← safe area top
+            paddingBottom: 10,
+          }}>
+            <Image
+              source={{ uri: LOGO_URL }}
+              style={{ width: 40, height: 40 }}
+              contentFit="contain"
+            />
+            <TouchableOpacity
+              onPress={() => { Haptics.selectionAsync(); setSearchOpen(true); }}
+              style={{
+                width: 36, height: 36, borderRadius: 18,
+                alignItems: 'center', justifyContent: 'center',
+                backgroundColor: 'rgba(0,0,0,0.4)',
+                borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
+              }}
+            >
+              <Ionicons name="search-outline" size={18} color="rgba(255,255,255,0.9)" />
             </TouchableOpacity>
           </View>
 
           {isLoading ? <HeroSkeleton /> : (
             <>
-              <ScrollView ref={heroRef} horizontal pagingEnabled scrollEnabled={false} showsHorizontalScrollIndicator={false} style={{ width, height: '100%' }}>
+              <ScrollView
+                ref={heroRef}
+                horizontal pagingEnabled scrollEnabled={false}
+                showsHorizontalScrollIndicator={false}
+                style={{ width, height: '100%' }}
+              >
                 {carouselItems.map((a, i) => (
-                  <TouchableOpacity key={i} activeOpacity={0.9} onPress={() => goToAnime(a)} style={{ width, height: width * 0.7 }}>
-                    <Image source={{ uri: a.image_cover || a.image_poster, priority: "high", headers: { Referer: 'https://myanimelist.net' } }} style={{ width: '100%', height: '100%', opacity: 0.6 }} contentFit="cover" />
-                    <LinearGradient colors={['transparent', `${theme.bg}99`, `${theme.bg}f5`]} locations={[0.2, 0.55, 1]} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '80%' }} />
-                    <View style={{ position: 'absolute', bottom: 24, left: 24, right: 24, flexDirection: 'row', alignItems: 'flex-end', gap: 16 }}>
-                      <Image source={{ uri: a.image_poster, priority: "high", headers: { Referer: 'https://myanimelist.net' } }} style={{ width: 80, aspectRatio: 3 / 4.2, borderRadius: 8 }} contentFit="cover" />
-                      <View style={{ flex: 1, marginBottom: 4 }}>
-                        <Text style={{ color: theme.text, fontWeight: '900', fontSize: 18, lineHeight: 22, marginBottom: 4 }} numberOfLines={2}>{a.title}</Text>
-                        <Text style={{ color: theme.subtext, fontSize: 10, lineHeight: 14, marginBottom: 8 }} numberOfLines={2}>{a.synopsis}</Text>
-                        <TouchableOpacity onPress={() => goToAnime(a)} onPressIn={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: theme.accent, paddingHorizontal: 20, paddingVertical: 8, borderRadius: 4, alignSelf: 'flex-start' }}>
-                          <Text style={{ fontSize: 10 }}>▶</Text>
-                          <Text style={{ color: '#000', fontWeight: '900', fontSize: 10, letterSpacing: 1 }}>TONTON</Text>
-                        </TouchableOpacity>
+                  <TouchableOpacity
+                    key={i} activeOpacity={0.9}
+                    onPress={() => goToAnime(a)}
+                    style={{ width, height: HERO_HEIGHT }}
+                  >
+                    {/* Background cover — full bleed */}
+                    <Image
+                      source={{ uri: a.image_cover || a.image_poster }}
+                      style={{ width: '100%', height: '100%', opacity: 0.65 }}
+                      contentFit="cover"
+                    />
+
+                    {/* Gradient fade ke bawah */}
+                    <LinearGradient
+                      colors={['transparent', `${theme.bg}88`, theme.bg]}
+                      locations={[0.3, 0.65, 1]}
+                      style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '70%' }}
+                    />
+
+                    {/* Info di bawah */}
+                    <View style={{
+                      position: 'absolute', bottom: 28, left: 20, right: 20,
+                      flexDirection: 'row', alignItems: 'flex-end', gap: 14,
+                    }}>
+                      {/* Poster */}
+                      <Image
+                        source={{ uri: a.image_poster }}
+                        style={{ width: 80, aspectRatio: 3 / 4.2, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}
+                        contentFit="cover"
+                      />
+
+                      {/* Text + tombol */}
+                      <View style={{ flex: 1, marginBottom: 4, gap: 6 }}>
+                        <Text style={{ color: '#fff', fontWeight: '900', fontSize: 17, lineHeight: 22 }} numberOfLines={2}>
+                          {a.title}
+                        </Text>
+                        <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 10, lineHeight: 14 }} numberOfLines={2}>
+                          {a.synopsis}
+                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                          <TouchableOpacity
+                            onPress={() => goToAnime(a)}
+                            onPressIn={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
+                            style={{
+                              flexDirection: 'row', alignItems: 'center', gap: 6,
+                              backgroundColor: theme.accent,
+                              paddingHorizontal: 18, paddingVertical: 8,
+                              borderRadius: 6,
+                            }}
+                          >
+                            <Ionicons name="play" size={11} color="#000" />
+                            <Text style={{ color: '#000', fontWeight: '900', fontSize: 11, letterSpacing: 0.5 }}>TONTON</Text>
+                          </TouchableOpacity>
+                        </View>
                       </View>
                     </View>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
 
+              {/* Counter + next arrow */}
               {carouselItems.length > 0 && (
-                <View style={{ position: 'absolute', bottom: 24, right: 24, flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 20 }}>
-                  <Text style={{ color: theme.text, fontWeight: '900', fontSize: 10 }}>{heroIndex + 1} / {carouselItems.length}</Text>
-                  <View style={{ width: 32, height: 2, backgroundColor: theme.border, borderRadius: 1 }} />
-                  <TouchableOpacity onPress={handleHeroNext} style={{ width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }}>
-                    <Text style={{ color: theme.text, fontSize: 18, fontWeight: '900' }}>›</Text>
+                <View style={{
+                  position: 'absolute', bottom: 28, right: 20,
+                  flexDirection: 'row', alignItems: 'center', gap: 6, zIndex: 20,
+                }}>
+                  <Text style={{ color: 'rgba(255,255,255,0.7)', fontWeight: '800', fontSize: 10 }}>
+                    {heroIndex + 1} / {carouselItems.length}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={handleHeroNext}
+                    style={{
+                      width: 26, height: 26, borderRadius: 13,
+                      alignItems: 'center', justifyContent: 'center',
+                      backgroundColor: 'rgba(255,255,255,0.15)',
+                      borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
+                    }}
+                  >
+                    <Ionicons name="chevron-forward" size={14} color="#fff" />
                   </TouchableOpacity>
                 </View>
               )}
@@ -348,37 +433,68 @@ export default function HomeScreen() {
           />
         ))}
 
-        {/* Share Banner */}
-        <View style={{ marginHorizontal: 16, marginTop: 16, borderRadius: 16, overflow: 'hidden', backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border }}>
-          <Image source={{ uri: 'https://raw.githubusercontent.com/alip-jmbd/alipp/main/bc.jpg' }} style={{ position: 'absolute', width: '100%', height: '100%', opacity: 0.15 }} contentFit="cover" />
-          <LinearGradient colors={[theme.accentDim, 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
+        {/* ── Share Banner ── */}
+        <View style={{
+          marginHorizontal: 16, marginTop: 16,
+          borderRadius: 16, overflow: 'hidden',
+          backgroundColor: theme.card,
+          borderWidth: 1, borderColor: theme.border,
+        }}>
+          <Image
+            source={{ uri: 'https://raw.githubusercontent.com/alip-jmbd/alipp/main/bc.jpg' }}
+            style={{ position: 'absolute', width: '100%', height: '100%', opacity: 0.15 }}
+            contentFit="cover"
+          />
+          <LinearGradient
+            colors={[theme.accentDim, 'transparent']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+          />
           <View style={{ padding: 18 }}>
-            <Text style={{ color: theme.text, fontWeight: '900', fontSize: 13, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 3 }}>Sebarkan Keseruan Ini!</Text>
-            <Text style={{ color: theme.subtext, fontSize: 11, marginBottom: 14 }}>Ajak teman-temanmu marathon anime favorit bareng di NefuSoft.</Text>
+            <Text style={{ color: theme.text, fontWeight: '900', fontSize: 13, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 3 }}>
+              Sebarkan Keseruan Ini!
+            </Text>
+            <Text style={{ color: theme.subtext, fontSize: 11, marginBottom: 14 }}>
+              Ajak teman-temanmu marathon anime favorit bareng di NefuSoft.
+            </Text>
             <View style={{ flexDirection: 'row', gap: 8 }}>
-              <TouchableOpacity onPress={handleCopy} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 9, borderRadius: 999, backgroundColor: theme.border, borderWidth: 1, borderColor: theme.border }}>
-                <View style={{ width: 10, height: 10, borderRadius: 2, borderWidth: 1.5, borderColor: theme.subtext }} />
+              <TouchableOpacity
+                onPress={handleCopy}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 9, borderRadius: 999, backgroundColor: theme.border, borderWidth: 1, borderColor: theme.border }}
+              >
+                <Ionicons name="copy-outline" size={12} color={theme.subtext} />
                 <Text style={{ color: theme.text, fontWeight: '800', fontSize: 11 }}>Salin Link</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={handleShare} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 9, borderRadius: 999, backgroundColor: theme.border, borderWidth: 1, borderColor: theme.border }}>
-                <Text style={{ color: theme.subtext, fontSize: 12 }}>&#8599;</Text>
+              <TouchableOpacity
+                onPress={handleShare}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 9, borderRadius: 999, backgroundColor: theme.border, borderWidth: 1, borderColor: theme.border }}
+              >
+                <Ionicons name="share-outline" size={12} color={theme.subtext} />
                 <Text style={{ color: theme.text, fontWeight: '800', fontSize: 11 }}>Lainnya</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
 
-        {/* Ongoing */}
+        {/* ── Ongoing / Terbaru ── */}
         <View style={{ marginTop: 28 }}>
           <SectionHeader title="Terbaru" subtitle="Anime baru diupload" onPress={() => router.push('/(tabs)/ongoing')} theme={theme} />
           <View style={{ paddingHorizontal: 16 }}>
-            <ScrollView ref={ongoingRef} horizontal showsHorizontalScrollIndicator={false} snapToInterval={110} decelerationRate="fast" snapToAlignment="start" contentContainerStyle={{ gap: 10 }}>
-              {isLoading ? [...Array(6)].map((_, i) => <HorizontalCardSkeleton key={i} />) : ongoing.map(item => <AnimeCard key={item.id} anime={item} onPress={() => goToAnime(item)} width={100} />)}
+            <ScrollView
+              ref={ongoingRef} horizontal
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={110} decelerationRate="fast" snapToAlignment="start"
+              contentContainerStyle={{ gap: 10 }}
+            >
+              {isLoading
+                ? [...Array(6)].map((_, i) => <HorizontalCardSkeleton key={i} />)
+                : ongoing.map(item => <AnimeCard key={item.id} anime={item} onPress={() => goToAnime(item)} width={100} />)
+              }
             </ScrollView>
           </View>
         </View>
 
-        {/* Tayang Hari Ini */}
+        {/* ── Tayang Hari Ini ── */}
         <View style={{ marginTop: 28 }}>
           <SectionHeader title={`Hari ${todayLabel}`} subtitle="Tayang hari ini" onPress={() => router.push('/(tabs)/schedule')} theme={theme} />
           <View style={{ paddingHorizontal: 16 }}>
@@ -391,14 +507,19 @@ export default function HomeScreen() {
                 <Text style={{ color: theme.subtext, fontSize: 12, fontWeight: '700' }}>Tidak ada anime hari ini</Text>
               </View>
             ) : (
-              <ScrollView ref={todayRef} horizontal showsHorizontalScrollIndicator={false} snapToInterval={110} decelerationRate="fast" snapToAlignment="start" contentContainerStyle={{ gap: 10 }}>
+              <ScrollView
+                ref={todayRef} horizontal
+                showsHorizontalScrollIndicator={false}
+                snapToInterval={110} decelerationRate="fast" snapToAlignment="start"
+                contentContainerStyle={{ gap: 10 }}
+              >
                 {todayAnime.map(item => <AnimeCard key={item.id} anime={item} onPress={() => goToAnime(item)} width={100} />)}
               </ScrollView>
             )}
           </View>
         </View>
 
-        {/* Movies */}
+        {/* ── Movies ── */}
         <View style={{ marginTop: 28, paddingHorizontal: 16 }}>
           <TouchableOpacity onPress={() => router.push('/(tabs)/ongoing')} style={{ marginBottom: 20 }} activeOpacity={0.7}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -407,12 +528,17 @@ export default function HomeScreen() {
             </View>
             <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, marginTop: 2 }}>Film anime terpopuler</Text>
           </TouchableOpacity>
-          {isLoading ? [...Array(5)].map((_, i) => <RankSkeleton key={i} />) : movies.slice(0, 10).map((anime, index) => <MovieRankItem key={anime.id} anime={anime} index={index} onPress={() => goToAnime(anime)} theme={theme} />)}
+          {isLoading
+            ? [...Array(5)].map((_, i) => <RankSkeleton key={i} />)
+            : movies.slice(0, 10).map((anime, index) => (
+                <MovieRankItem key={anime.id} anime={anime} index={index} onPress={() => goToAnime(anime)} theme={theme} />
+              ))
+          }
         </View>
 
       </ScrollView>
 
       <SearchModal visible={searchOpen} onClose={() => setSearchOpen(false)} />
-    </SafeAreaView>
+    </View>
   );
 }
