@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, FlatList, ScrollView, Dimensions, StyleSh
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { DAY_KEYS, DAY_NAMES } from '@/constants';
-import { api, getAnimeSlug } from '@/hooks/api';
+import { api, getAnimeSlug, formatScheduleTime } from '@/hooks/api';
 import { Anime, ScheduleDay } from '@/types';
 import { ScheduleCardSkeleton } from '@/components/Skeleton';
 import { useTheme } from '@/hooks/theme';
@@ -44,6 +44,7 @@ const s = StyleSheet.create({
   gradientFade: { width: 24, position: 'absolute', left: 52, top: 0, bottom: 0 },
   cardInfo:     { flex: 1, padding: 12, justifyContent: 'center', gap: 4 },
   cardTitle:    { fontWeight: '800', fontSize: 12, lineHeight: 16 },
+  cardMeta:     { fontSize: 9, fontWeight: '600' },
   cardGenre:    { fontSize: 9, fontWeight: '600' },
   arrowWrap:    { justifyContent: 'center', paddingRight: 12 },
   skeletonContent: { paddingHorizontal: 16, paddingBottom: 100 },
@@ -72,20 +73,10 @@ const DayItem = React.memo(({
     activeOpacity={0.7}
     style={[s.dayItem, { width: DAY_ITEM_W }]}
   >
-    <Text style={[s.dayName, { color: isSelected ? accent : subtext }]}>
-      {name}
-    </Text>
-    <Text style={[s.dayDate, { color: isSelected ? accent : text }]}>
-      {date}
-    </Text>
-    {isToday && (
-      <View style={[s.dot, { backgroundColor: isSelected ? accent : subtext }]} />
-    )}
-    <View style={{
-      height: 2, borderRadius: 1, marginTop: 6,
-      width: isSelected ? DAY_ITEM_W * 0.6 : 0,
-      backgroundColor: accent,
-    }} />
+    <Text style={[s.dayName, { color: isSelected ? accent : subtext }]}>{name}</Text>
+    <Text style={[s.dayDate, { color: isSelected ? accent : text }]}>{date}</Text>
+    {isToday && <View style={[s.dot, { backgroundColor: isSelected ? accent : subtext }]} />}
+    <View style={{ height: 2, borderRadius: 1, marginTop: 6, width: isSelected ? DAY_ITEM_W * 0.6 : 0, backgroundColor: accent }} />
   </TouchableOpacity>
 ));
 
@@ -99,10 +90,12 @@ type ScheduleCardProps = {
 };
 
 const ScheduleCard = React.memo(({ anime, index, onPress, theme }: ScheduleCardProps) => {
-  const timeText = useMemo(() =>
-    anime.key_time ? anime.key_time.split(' ')[1]?.substring(0, 5) : '--:--',
-    [anime.key_time]
-  );
+  // Prioritas: date_ts → formatScheduleTime, fallback ke anime.time, fallback '--:--'
+  const timeText = useMemo(() => {
+    if (anime.date_ts) return formatScheduleTime(anime.date_ts);
+    if (anime.time) return anime.time.substring(0, 5);
+    return '--:--';
+  }, [anime.date_ts, anime.time]);
 
   return (
     <Animated.View
@@ -127,8 +120,9 @@ const ScheduleCard = React.memo(({ anime, index, onPress, theme }: ScheduleCardP
         style={[s.card, { backgroundColor: theme.card, borderColor: theme.border }]}
       >
         <View style={s.row}>
+          {/* FIX: anime bukan item */}
           <Image
-            source={{ uri: item.image_poster }}
+            source={{ uri: anime.image_poster }}
             style={s.poster}
             contentFit="cover"
           />
@@ -142,6 +136,12 @@ const ScheduleCard = React.memo(({ anime, index, onPress, theme }: ScheduleCardP
             <Text style={[s.cardTitle, { color: theme.text }]} numberOfLines={2}>
               {anime.title}
             </Text>
+            {/* date string sebagai subtext */}
+            {anime.date ? (
+              <Text style={[s.cardMeta, { color: theme.accent }]} numberOfLines={1}>
+                {anime.date}
+              </Text>
+            ) : null}
             {anime.genre ? (
               <Text style={[s.cardGenre, { color: theme.subtext }]} numberOfLines={1}>
                 {anime.genre.replace(/,/g, ' · ')}
@@ -275,4 +275,4 @@ export default function ScheduleScreen() {
 
     </SafeAreaView>
   );
-            }
+}
