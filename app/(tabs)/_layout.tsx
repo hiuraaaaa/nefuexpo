@@ -11,7 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useTheme } from '@/hooks/theme';
 
-const TAB_HEIGHT = 64;
+const TAB_HEIGHT = 68;
 
 const TABS = [
   { name: 'index',    label: 'Home',     iconActive: 'home',      iconInactive: 'home-outline'      },
@@ -47,7 +47,7 @@ function TabIcon({
   useEffect(() => {
     const spring = { damping: 15, stiffness: 220 };
 
-    pillWidth.value   = withSpring(focused ? 54 : 0,   spring);
+    pillWidth.value   = withSpring(focused ? 60 : 0,   spring);
     pillOpacity.value = withTiming(focused ? 1 : 0,    { duration: 200 });
     pillScale.value   = withSpring(focused ? 1 : 0.7,  spring);
 
@@ -95,7 +95,7 @@ function TabIcon({
           <View>
             <Ionicons
               name={(focused ? iconActive : iconInactive) as any}
-              size={21}
+              size={23}
               color={focused ? accent : subtext}
             />
             {badge && (
@@ -169,6 +169,13 @@ export default function TabLayout() {
           borderRadius:    30,
           elevation:       0,
         },
+        tabBarItemStyle: {
+          height:          TAB_HEIGHT,
+          paddingVertical: 0,
+          paddingBottom:   0,
+          paddingTop:      0,
+          marginVertical:  0,
+        },
         tabBarBackground:        () => <TabBarBackground />,
         tabBarShowLabel:         false,
         tabBarActiveTintColor:   theme.accent,
@@ -207,13 +214,13 @@ const styles = StyleSheet.create({
     alignItems:     'center',
     justifyContent: 'center',
     height:         TAB_HEIGHT,
-    width:          56,
+    width:          '100%',
     position:       'relative',
   },
   pill: {
     position:     'absolute',
-    height:       36,
-    borderRadius: 18,
+    height:       38,
+    borderRadius: 19,
     // width dihandle via Animated
   },
   iconLabelStack: {
