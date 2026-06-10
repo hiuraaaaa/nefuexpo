@@ -10,6 +10,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useTheme } from '@/hooks/theme';
+import { BlurView } from 'expo-blur';
 
 const TABS = [
   { name: 'index',    label: 'Home',     iconActive: 'home',      iconInactive: 'home-outline'      },
@@ -18,6 +19,10 @@ const TABS = [
   { name: 'schedule', label: 'Schedule', iconActive: 'calendar',  iconInactive: 'calendar-outline'  },
   { name: 'profile',  label: 'Profile',  iconActive: 'person',    iconInactive: 'person-outline'    },
 ] as const;
+
+const FLOAT_MARGIN  = 12; // jarak dari kiri/kanan/bawah
+const TAB_H         = 62; // tinggi tab bar floating
+const BORDER_RADIUS = 24; // rounded
 
 // ── Tab Icon ──────────────────────────────────────────────────────────────────
 function TabIcon({
@@ -29,17 +34,17 @@ function TabIcon({
 }) {
   const iconScale      = useSharedValue(focused ? 1.08 : 1);
   const labelOpacity   = useSharedValue(focused ? 1 : 0);
-  const labelTranslate = useSharedValue(focused ? 0 : 3);
+  const labelTranslate = useSharedValue(focused ? 0 : 4);
   const pillOpacity    = useSharedValue(focused ? 1 : 0);
-  const pillScale      = useSharedValue(focused ? 1 : 0.6);
+  const pillScale      = useSharedValue(focused ? 1 : 0.5);
 
   useEffect(() => {
     const sp = { damping: 14, stiffness: 200 };
-    iconScale.value      = withSpring(focused ? 1.08 : 1, sp);
-    labelOpacity.value   = withTiming(focused ? 1 : 0, { duration: 160 });
-    labelTranslate.value = withSpring(focused ? 0 : 3, sp);
+    iconScale.value      = withSpring(focused ? 1.1 : 1, sp);
+    labelOpacity.value   = withTiming(focused ? 1 : 0, { duration: 150 });
+    labelTranslate.value = withSpring(focused ? 0 : 4, sp);
     pillOpacity.value    = withTiming(focused ? 1 : 0, { duration: 180 });
-    pillScale.value      = withSpring(focused ? 1 : 0.6, sp);
+    pillScale.value      = withSpring(focused ? 1 : 0.5, sp);
   }, [focused]);
 
   const iconStyle  = useAnimatedStyle(() => ({ transform: [{ scale: iconScale.value }] }));
@@ -54,10 +59,7 @@ function TabIcon({
 
   return (
     <View style={styles.tabItem}>
-      {/* Pill glow behind icon */}
       <Animated.View style={[styles.pill, { backgroundColor: accentDim }, pillStyle]} />
-
-      {/* Icon */}
       <Animated.View style={iconStyle}>
         <View>
           <Ionicons
@@ -72,8 +74,6 @@ function TabIcon({
           )}
         </View>
       </Animated.View>
-
-      {/* Label — always rendered, opacity animates */}
       <Animated.Text style={[styles.label, { color: accent }, labelStyle]} numberOfLines={1}>
         {label.toUpperCase()}
       </Animated.Text>
@@ -81,31 +81,28 @@ function TabIcon({
   );
 }
 
-// ── Tab Bar Background ────────────────────────────────────────────────────────
+// ── Floating Tab Bar Background ───────────────────────────────────────────────
 function TabBarBackground() {
   const theme = useTheme();
   return (
-    <View
-      style={[
+    <View style={[StyleSheet.absoluteFill, styles.floatBg]}>
+      {/* Blur layer */}
+      <BlurView
+        intensity={60}
+        tint="dark"
+        style={[StyleSheet.absoluteFill, { borderRadius: BORDER_RADIUS, overflow: 'hidden' }]}
+      />
+      {/* Solid overlay biar ga terlalu transparan */}
+      <View style={[
         StyleSheet.absoluteFill,
         {
-          backgroundColor: theme.card,
-          borderTopLeftRadius:  20,
-          borderTopRightRadius: 20,
-          borderTopWidth: 1,
-          borderLeftWidth: 1,
-          borderRightWidth: 1,
+          borderRadius: BORDER_RADIUS,
+          backgroundColor: theme.card + 'cc',
+          borderWidth: 1,
           borderColor: theme.border,
-          // Shadow iOS
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: -4 },
-          shadowOpacity: 0.3,
-          shadowRadius: 12,
-          // Shadow Android
-          elevation: 24,
-        },
-      ]}
-    />
+        }
+      ]} />
+    </View>
   );
 }
 
@@ -114,8 +111,7 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const theme  = useTheme();
 
-  // Tab bar nempel bawah, tinggi = 58px + safe area bottom
-  const TAB_BAR_HEIGHT = 58 + insets.bottom;
+  const bottomPad = Math.max(insets.bottom, 8);
 
   return (
     <Tabs
@@ -125,22 +121,25 @@ export default function TabLayout() {
         animation:   'fade',
         tabBarStyle: {
           position:        'absolute',
-          bottom:          0,
-          left:            0,
-          right:           0,
-          height:          TAB_BAR_HEIGHT,
-          paddingBottom:   insets.bottom,
+          bottom:          bottomPad + FLOAT_MARGIN,
+          left:            FLOAT_MARGIN,
+          right:           FLOAT_MARGIN,
+          height:          TAB_H,
+          paddingBottom:   0,
           paddingTop:      0,
           backgroundColor: 'transparent',
           borderTopWidth:  0,
           elevation:       0,
+          borderRadius:    BORDER_RADIUS,
+          // Shadow Android
+          shadowColor:     '#000',
+          shadowOffset:    { width: 0, height: 8 },
+          shadowOpacity:   0.4,
+          shadowRadius:    20,
         },
         tabBarItemStyle: {
-          height:          58,
+          height:          TAB_H,
           paddingVertical: 0,
-          paddingTop:      0,
-          paddingBottom:   0,
-          marginTop:       0,
         },
         tabBarBackground:        () => <TabBarBackground />,
         tabBarShowLabel:         false,
@@ -180,15 +179,24 @@ const styles = StyleSheet.create({
     alignItems:     'center',
     justifyContent: 'center',
     width:          '100%',
-    height:         58,
-    gap:            4,
+    height:         TAB_H,
+    gap:            3,
     position:       'relative',
+  },
+  floatBg: {
+    borderRadius: BORDER_RADIUS,
+    overflow:     'hidden',
+    // Shadow iOS
+    shadowColor:  '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius:  16,
   },
   pill: {
     position:     'absolute',
     width:        48,
-    height:       48,
-    borderRadius: 14,
+    height:       40,
+    borderRadius: 12,
   },
   label: {
     fontSize:      9,
