@@ -1,165 +1,246 @@
+// app/(tabs)/_layout.tsx
+// ─────────────────────────────────────────────────────────────────────────────
+// Production-ready Floating Bottom Navigation untuk Expo Router.
+//
+// Arsitektur:
+//   TabBarBackground  → Visual-only: glassmorphism blur + border
+//   TabIcon           → Visual-only: mengonsumsi animasi dari useTabAnimation
+//   TabLayout         → Root: merakit semua komponen + konfigurasi Expo Router
+//
+// Semua logika animasi ada di hooks/useTabAnimation.ts
+// Semua konstanta ada di constants/tabConfig.ts
+// Semua token warna ada di hooks/theme.ts
+// ─────────────────────────────────────────────────────────────────────────────
+
+import React, { memo } from 'react';
+import { View, Text, StyleSheet, Platform } from 'react-native';
 import { Tabs } from 'expo-router';
-import { View, Text, StyleSheet } from 'react-native';
-import { useEffect } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withTiming,
-} from 'react-native-reanimated';
-import { useTheme } from '@/hooks/theme';
+import Animated from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
 
-const TABS = [
-  { name: 'index',    label: 'Home',     iconActive: 'home',      iconInactive: 'home-outline'      },
-  { name: 'explore',  label: 'Explore',  iconActive: 'compass',   iconInactive: 'compass-outline'   },
-  { name: 'news',     label: 'News',     iconActive: 'newspaper', iconInactive: 'newspaper-outline', badge: 'NEW' },
-  { name: 'schedule', label: 'Schedule', iconActive: 'calendar',  iconInactive: 'calendar-outline'  },
-  { name: 'profile',  label: 'Profile',  iconActive: 'person',    iconInactive: 'person-outline'    },
-] as const;
+import { useTheme, type ThemeTokens } from '@/hooks/theme';
+import { useTabAnimation } from '@/hooks/useTabAnimation';
+import { TABS, TAB_BAR, type TabConfig } from '@/constants/tabConfig';
 
-const FLOAT_MARGIN  = 16;
-const TAB_H         = 58;
-const BORDER_RADIUS = 22;
+// ─────────────────────────────────────────────────────────────────────────────
+// TabBarBackground
+// Komponen murni visual — tidak memiliki state apapun.
+// Menggunakan BlurView untuk efek glassmorphism + overlay warna dinamis.
+// ─────────────────────────────────────────────────────────────────────────────
 
-// ── Tab Icon ──────────────────────────────────────────────────────────────────
-function TabIcon({
-  focused, label, iconActive, iconInactive, badge, accent, accentDim, subtext,
-}: {
-  focused: boolean; label: string;
-  iconActive: string; iconInactive: string;
-  badge?: string; accent: string; accentDim: string; subtext: string;
-}) {
-  const iconScale      = useSharedValue(focused ? 1.08 : 1);
-  const labelOpacity   = useSharedValue(focused ? 1 : 0);
-  const labelTranslate = useSharedValue(focused ? 0 : 4);
-  const pillOpacity    = useSharedValue(focused ? 1 : 0);
-  const pillScale      = useSharedValue(focused ? 1 : 0.5);
+interface TabBarBackgroundProps {
+  cardColor: string;
+  borderColor: string;
+}
 
-  useEffect(() => {
-    const sp = { damping: 14, stiffness: 200 };
-    iconScale.value      = withSpring(focused ? 1.1 : 1, sp);
-    labelOpacity.value   = withTiming(focused ? 1 : 0, { duration: 150 });
-    labelTranslate.value = withSpring(focused ? 0 : 4, sp);
-    pillOpacity.value    = withTiming(focused ? 1 : 0, { duration: 180 });
-    pillScale.value      = withSpring(focused ? 1 : 0.5, sp);
-  }, [focused]);
+const TabBarBackground = memo<TabBarBackgroundProps>(({ cardColor, borderColor }) => (
+  <View style={[StyleSheet.absoluteFill, styles.tabBarBg]}>
+    {/*
+      BlurView hanya dirender di iOS karena di Android hasilnya tidak konsisten.
+      Di Android kita gantiakan dengan overlay semi-transparan yang cukup.
+    */}
+    {Platform.OS === 'ios' ? (
+      <BlurView intensity={55} tint="dark" style={StyleSheet.absoluteFill} />
+    ) : null}
 
-  const iconStyle  = useAnimatedStyle(() => ({ transform: [{ scale: iconScale.value }] }));
-  const labelStyle = useAnimatedStyle(() => ({
-    opacity: labelOpacity.value,
-    transform: [{ translateY: labelTranslate.value }],
-  }));
-  const pillStyle  = useAnimatedStyle(() => ({
-    opacity: pillOpacity.value,
-    transform: [{ scale: pillScale.value }],
-  }));
+    {/* Overlay warna + border — dirender di atas blur */}
+    <View
+      style={[
+        StyleSheet.absoluteFill,
+        styles.tabBarOverlay,
+        {
+          // Di Android, opacity lebih tinggi karena tidak ada blur di bawahnya
+          backgroundColor: Platform.OS === 'ios' ? cardColor + 'cc' : cardColor + 'f0',
+          borderColor,
+        },
+      ]}
+    />
+  </View>
+));
+
+TabBarBackground.displayName = 'TabBarBackground';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TabIcon
+// Komponen visual untuk satu item tab.
+// Menerima semua data sebagai props — tidak tahu tentang navigasi.
+// Animasi didelegasikan ke useTabAnimation hook.
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface TabIconProps
+  extends Pick<TabConfig, 'label' | 'iconActive' | 'iconInactive' | 'badge'> {
+  focused:   boolean;
+  accent:    string;
+  accentDim: string;
+  subtext:   string;
+}
+
+const TabIcon = memo<TabIconProps>(({
+  focused,
+  label,
+  iconActive,
+  iconInactive,
+  badge,
+  accent,
+  accentDim,
+  subtext,
+}) => {
+  // Semua logika animasi ada di hook — komponen ini hanya render
+  const { iconStyle, labelStyle, pillStyle } = useTabAnimation(focused);
 
   return (
     <View style={styles.tabItem}>
-      <Animated.View style={[styles.pill, { backgroundColor: accentDim }, pillStyle]} />
+      {/* Pill highlight di belakang ikon */}
+      <Animated.View
+        style={[
+          styles.pill,
+          { backgroundColor: accentDim },
+          pillStyle,
+        ]}
+      />
+
+      {/* Ikon dengan animasi scale */}
       <Animated.View style={iconStyle}>
         <View>
           <Ionicons
             name={(focused ? iconActive : iconInactive) as any}
             size={22}
             color={focused ? accent : subtext}
+            // accessibilityLabel untuk screen reader
+            accessibilityLabel={label}
           />
-          {badge && (
-            <View style={[styles.badge, { backgroundColor: accent }]}>
+
+          {/* Badge opsional — misalnya "NEW" atau angka notifikasi */}
+          {badge != null && (
+            <View
+              style={[styles.badge, { backgroundColor: accent }]}
+              accessibilityLabel={`${label}, ${badge}`}
+            >
               <Text style={styles.badgeText}>{badge}</Text>
             </View>
           )}
         </View>
       </Animated.View>
-      <Animated.Text style={[styles.label, { color: accent }, labelStyle]} numberOfLines={1}>
+
+      {/* Label — hanya muncul (fade in) saat tab aktif */}
+      <Animated.Text
+        style={[styles.label, { color: accent }, labelStyle]}
+        numberOfLines={1}
+        accessibilityElementsHidden={!focused} // sembunyikan dari a11y saat tidak aktif
+      >
         {label.toUpperCase()}
       </Animated.Text>
     </View>
   );
-}
+});
 
-// ── Floating Tab Bar Background ───────────────────────────────────────────────
-function TabBarBackground() {
-  const theme = useTheme();
-  return (
-    <View style={[StyleSheet.absoluteFill, { borderRadius: BORDER_RADIUS, overflow: 'hidden' }]}>
-      <BlurView
-        intensity={55}
-        tint="dark"
-        style={StyleSheet.absoluteFill}
-      />
-      <View style={[
-        StyleSheet.absoluteFill,
-        {
-          backgroundColor: theme.card + 'cc',
-          borderRadius: BORDER_RADIUS,
-          borderWidth: 1,
-          borderColor: theme.border,
-        }
-      ]} />
-    </View>
+TabIcon.displayName = 'TabIcon';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// buildTabBarBackground
+// Factory function untuk prop tabBarBackground — menggunakan closure
+// agar tidak membuat komponen baru setiap render TabLayout.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function buildTabBarBackground(theme: ThemeTokens) {
+  return () => (
+    <TabBarBackground cardColor={theme.card} borderColor={theme.border} />
   );
 }
 
-// ── Layout ────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// TabLayout (Root Export)
+// Merakit semua komponen dan mengkonfigurasi Expo Router Tabs.
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const theme  = useTheme();
 
+  // Pastikan bottom padding setidaknya 8px walau di perangkat tanpa notch
   const bottomPad = Math.max(insets.bottom, 8);
+
+  // Kalkulasi posisi bottom tab bar:
+  // posisi dari bawah = safe area bottom + margin melayang
+  const tabBarBottom = bottomPad + TAB_BAR.FLOAT_MARGIN;
+
+  // Memoize tab bar background factory agar tidak re-create saat re-render
+  // (tema berubah akan tetap trigger re-render yang benar karena closure)
+  const tabBarBackground = React.useMemo(
+    () => buildTabBarBackground(theme),
+    [theme.card, theme.border],
+  );
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        sceneStyle:  { backgroundColor: theme.bg },
-        animation:   'fade',
+
+        // Warna background scene — sesuai tema
+        sceneStyle: { backgroundColor: theme.bg },
+
+        // Animasi transisi antar halaman
+        animation: 'fade',
+
+        // ── Posisi & Ukuran Tab Bar ──────────────────────────────────────
         tabBarStyle: {
           position:        'absolute',
-          bottom:          bottomPad + FLOAT_MARGIN,
-          left:            FLOAT_MARGIN,
-          right:           FLOAT_MARGIN,
-          height:          TAB_H,
+          bottom:          tabBarBottom,
+          left:            TAB_BAR.FLOAT_MARGIN,
+          right:           TAB_BAR.FLOAT_MARGIN,
+          height:          TAB_BAR.HEIGHT,
+          // Reset padding default React Navigation
           paddingBottom:   0,
           paddingTop:      0,
+          // Transparan agar TabBarBackground yang handle visual
           backgroundColor: 'transparent',
           borderTopWidth:  0,
           elevation:       0,
-          borderRadius:    BORDER_RADIUS,
+          borderRadius:    TAB_BAR.BORDER_RADIUS,
+          // Shadow untuk iOS
           shadowColor:     '#000',
           shadowOffset:    { width: 0, height: 8 },
-          shadowOpacity:   0.4,
+          shadowOpacity:   0.35,
           shadowRadius:    20,
         },
+
+        // ── Per-Item Style ───────────────────────────────────────────────
         tabBarItemStyle: {
-          height:          TAB_H,
+          height:          TAB_BAR.HEIGHT,
           paddingVertical: 0,
           paddingTop:      0,
           paddingBottom:   0,
           marginTop:       0,
           flex:            1,
         },
-        tabBarBackground:        () => <TabBarBackground />,
-        tabBarShowLabel:         false,
+
+        // Render background glassmorphism
+        tabBarBackground,
+
+        // Sembunyikan label default React Navigation — kita render sendiri
+        tabBarShowLabel: false,
+
+        // Warna tint (meski label kita custom, ini tetap dibutuhkan RN Navigation)
         tabBarActiveTintColor:   theme.accent,
         tabBarInactiveTintColor: theme.subtext,
       }}
     >
+      {/* Render semua tab dari konfigurasi */}
       {TABS.map((tab) => (
         <Tabs.Screen
           key={tab.name}
           name={tab.name}
           options={{
+            // tabBarIcon menerima focused dari React Navigation
             tabBarIcon: ({ focused }) => (
               <TabIcon
                 focused={focused}
                 label={tab.label}
                 iconActive={tab.iconActive}
                 iconInactive={tab.iconInactive}
-                badge={(tab as any).badge}
+                badge={tab.badge}
                 accent={theme.accent}
                 accentDim={theme.accentDim}
                 subtext={theme.subtext}
@@ -169,27 +250,48 @@ export default function TabLayout() {
         />
       ))}
 
+      {/*
+        Route tersembunyi — tidak ditampilkan di tab bar.
+        Tetap terdaftar agar navigasi programatik ke route ini tidak error.
+      */}
       <Tabs.Screen name="ongoing" options={{ href: null }} />
       <Tabs.Screen name="history" options={{ href: null }} />
     </Tabs>
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Styles
+// ─────────────────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
+  // ── TabBarBackground ──────────────────────────────────────────────────────
+  tabBarBg: {
+    borderRadius: TAB_BAR.BORDER_RADIUS,
+    overflow:     'hidden',
+  },
+  tabBarOverlay: {
+    borderRadius: TAB_BAR.BORDER_RADIUS,
+    borderWidth:  1,
+    // inset agar tidak overlap dengan blur layer
+    ...StyleSheet.absoluteFillObject,
+  },
+
+  // ── TabIcon ───────────────────────────────────────────────────────────────
   tabItem: {
     alignItems:     'center',
     justifyContent: 'center',
     width:          '100%',
-    height:         TAB_H,
+    height:         TAB_BAR.HEIGHT,
     gap:            3,
+    // paddingTop sedikit mendorong konten ke tengah vertikal
     paddingTop:     12,
-    marginTop:      0,
   },
   pill: {
     position:     'absolute',
-    width:        48,
-    height:       38,
-    borderRadius: 12,
+    width:        TAB_BAR.PILL_WIDTH,
+    height:       TAB_BAR.PILL_HEIGHT,
+    borderRadius: TAB_BAR.PILL_RADIUS,
   },
   label: {
     fontSize:      9,
