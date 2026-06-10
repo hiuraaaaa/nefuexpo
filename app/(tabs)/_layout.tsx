@@ -160,11 +160,17 @@ export default function TabLayout() {
         tabBarStyle: {
           position:        'absolute',
           bottom:          bottomPad + FLOAT_MARGIN,
+          // marginHorizontal lebih reliable dari left/right di beberapa versi RN
           left:            FLOAT_MARGIN,
           right:           FLOAT_MARGIN,
+          width:           undefined,   // reset agar tidak override left/right
           height:          TAB_HEIGHT,
           paddingBottom:   0,
           paddingTop:      0,
+          paddingLeft:     0,
+          paddingRight:    0,
+          marginLeft:      FLOAT_MARGIN,
+          marginRight:     FLOAT_MARGIN,
           backgroundColor: 'transparent',
           borderTopWidth:  0,
           elevation:       0,
