@@ -1,23 +1,12 @@
 // app/(tabs)/_layout.tsx
 // ─────────────────────────────────────────────────────────────────────────────
-// Floating Bottom Navigation — style Fukunime
-//
-// Perubahan dari versi sebelumnya:
-//   • Label SELALU visible di semua tab (tidak fade in/out)
-//   • Tinggi tab bar lebih besar (64px) — lebih lega
-//   • Margin floating lebih kecil (12px) — tab bar lebih lebar
-//   • Ikon lebih besar (24px)
-//   • Label font lebih besar dan readable (10px)
-//   • Aktif: ikon filled + label bold + warna accent
-//   • Tidak aktif: ikon outline + label normal + warna subtext
-//   • Animasi: scale ikon saja — simpel & clean seperti Fukunime
+// Floating Bottom Navigation — Lucide Icons + Glassmorphism transparan
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { memo, useEffect } from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import { Tabs } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -27,34 +16,74 @@ import Animated, {
 } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
 
+// ── Lucide Icons — lebih modern & konsisten dari Ionicons ─────────────────────
+import {
+  Home,
+  Compass,
+  Newspaper,
+  Calendar,
+  User,
+  type LucideIcon,
+} from 'lucide-react-native';
+
 import { useTheme } from '@/hooks/theme';
 import { type Theme } from '@/constants';
-import { TABS, TAB_BAR, type TabConfig } from '@/constants/tabConfig';
 
 // ── Konstanta Layout ──────────────────────────────────────────────────────────
-const FLOAT_MARGIN  = 16;   // jarak dari tepi layar — seperti Fukunime
+const FLOAT_MARGIN  = 16;
 const TAB_HEIGHT    = 62;
 const BORDER_RADIUS = 36;
 const ICON_SIZE     = 23;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TabBarBackground — Glassmorphism background
+// Konfigurasi Tab — pakai LucideIcon langsung (bukan nama string)
+// ─────────────────────────────────────────────────────────────────────────────
+
+type TabName = 'index' | 'explore' | 'news' | 'schedule' | 'profile';
+
+interface TabConfig {
+  name:  TabName;
+  label: string;
+  Icon:  LucideIcon;   // komponen Lucide langsung
+  badge?: string;
+}
+
+const TABS: readonly TabConfig[] = [
+  { name: 'index',    label: 'Home',     Icon: Home      },
+  { name: 'explore',  label: 'Explore',  Icon: Compass   },
+  { name: 'news',     label: 'News',     Icon: Newspaper, badge: 'NEW' },
+  { name: 'schedule', label: 'Schedule', Icon: Calendar  },
+  { name: 'profile',  label: 'Profile',  Icon: User      },
+] as const;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TabBarBackground — Transparan + Blur kuat
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface TabBarBgProps { cardColor: string; borderColor: string; }
 
 const TabBarBackground = memo<TabBarBgProps>(({ cardColor, borderColor }) => (
   <View style={[StyleSheet.absoluteFill, { borderRadius: BORDER_RADIUS, overflow: 'hidden' }]}>
-    {Platform.OS === 'ios' && (
-      <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFill} />
+    {/* BlurView — iOS native blur, intensitas lebih tinggi */}
+    {Platform.OS === 'ios' ? (
+      <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+    ) : (
+      // Android: simulasi blur dengan layer gelap transparan berlapis
+      <>
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000000', opacity: 0.3 }]} />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: cardColor, opacity: 0.55 }]} />
+      </>
     )}
+
+    {/* Border tipis — hanya garis atas yang subtle */}
     <View style={[
       StyleSheet.absoluteFill,
       {
-        backgroundColor: Platform.OS === 'ios' ? cardColor + 'd0' : cardColor + 'f5',
         borderRadius:    BORDER_RADIUS,
-        borderWidth:     1,
-        borderColor,
+        borderWidth:     0.8,
+        borderColor:     borderColor,
+        // Overlay sangat tipis untuk "frosted" feel
+        backgroundColor: 'rgba(255,255,255,0.03)',
       }
     ]} />
   </View>
@@ -62,56 +91,61 @@ const TabBarBackground = memo<TabBarBgProps>(({ cardColor, borderColor }) => (
 TabBarBackground.displayName = 'TabBarBackground';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TabIcon — Satu item tab
-// Label SELALU visible, animasi hanya pada skala ikon
+// TabIcon — Lucide icon + label selalu visible
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface TabIconProps extends Pick<TabConfig, 'label' | 'iconActive' | 'iconInactive' | 'badge'> {
+interface TabIconProps {
   focused:   boolean;
+  label:     string;
+  Icon:      LucideIcon;
+  badge?:    string;
   accent:    string;
   accentDim: string;
   subtext:   string;
 }
 
 const TabIcon = memo<TabIconProps>(({
-  focused, label, iconActive, iconInactive, badge, accent, accentDim, subtext,
+  focused, label, Icon, badge, accent, accentDim, subtext,
 }) => {
-  // Animasi scale ikon — bounce saat diaktifkan
   const scale    = useSharedValue(focused ? 1.15 : 1);
-  // Animasi warna label via opacity dua layer (active/inactive overlay)
   const progress = useSharedValue(focused ? 1 : 0);
 
   useEffect(() => {
     scale.value    = withSpring(focused ? 1.15 : 1, { damping: 12, stiffness: 180 });
-    progress.value = withTiming(focused ? 1 : 0, { duration: 180 });
+    progress.value = withTiming(focused ? 1 : 0, { duration: 200 });
   }, [focused]);
 
   const iconAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
 
-  // Pill indicator di bawah ikon (subtle dot / underline effect)
+  // Pill underline aktif — slide in dari tengah
   const pillStyle = useAnimatedStyle(() => ({
     opacity:   interpolate(progress.value, [0, 1], [0, 1]),
-    transform: [{ scaleX: interpolate(progress.value, [0, 1], [0.3, 1]) }],
+    transform: [{ scaleX: interpolate(progress.value, [0, 1], [0.2, 1]) }],
   }));
 
-  const iconColor  = focused ? accent : subtext;
-  const labelColor = focused ? accent : subtext;
-  const labelWeight = focused ? '700' : '500';
+  const iconColor   = focused ? accent   : subtext;
+  const labelColor  = focused ? accent   : subtext;
+  const labelWeight = focused ? '700'    : '400';
+
+  // Lucide icons: filled look saat aktif via strokeWidth & fill
+  const strokeWidth = focused ? 2.2 : 1.8;
+  // Lucide mendukung fill color untuk ikon tertentu
+  const fillColor   = focused ? accent + '30' : 'transparent';
 
   return (
     <View style={styles.tabItem}>
-      {/* Ikon dengan animasi scale */}
+      {/* Ikon Lucide dengan animasi scale */}
       <Animated.View style={iconAnimStyle}>
         <View>
-          <Ionicons
-            name={(focused ? iconActive : iconInactive) as any}
+          <Icon
             size={ICON_SIZE}
             color={iconColor}
-            accessibilityLabel={label}
+            strokeWidth={strokeWidth}
+            fill={fillColor}
           />
-          {/* Badge (misalnya "NEW") */}
+          {/* Badge "NEW" dll */}
           {badge != null && (
             <View style={[styles.badge, { backgroundColor: accent }]}>
               <Text style={styles.badgeText}>{badge}</Text>
@@ -120,7 +154,7 @@ const TabIcon = memo<TabIconProps>(({
         </View>
       </Animated.View>
 
-      {/* Label — SELALU visible, hanya warna & weight yang berubah */}
+      {/* Label selalu visible */}
       <Text
         style={[styles.label, { color: labelColor, fontWeight: labelWeight }]}
         numberOfLines={1}
@@ -128,7 +162,7 @@ const TabIcon = memo<TabIconProps>(({
         {label}
       </Text>
 
-      {/* Pill indicator bawah ikon saat aktif */}
+      {/* Pill underline aktif */}
       <Animated.View style={[styles.activePill, { backgroundColor: accent }, pillStyle]} />
     </View>
   );
@@ -160,10 +194,9 @@ export default function TabLayout() {
         tabBarStyle: {
           position:        'absolute',
           bottom:          bottomPad + FLOAT_MARGIN,
-          // marginHorizontal lebih reliable dari left/right di beberapa versi RN
           left:            FLOAT_MARGIN,
           right:           FLOAT_MARGIN,
-          width:           undefined,   // reset agar tidak override left/right
+          width:           undefined,
           height:          TAB_HEIGHT,
           paddingBottom:   0,
           paddingTop:      0,
@@ -176,16 +209,16 @@ export default function TabLayout() {
           elevation:       0,
           borderRadius:    BORDER_RADIUS,
           shadowColor:     '#000',
-          shadowOffset:    { width: 0, height: 6 },
-          shadowOpacity:   0.3,
-          shadowRadius:    16,
+          shadowOffset:    { width: 0, height: 8 },
+          shadowOpacity:   0.4,
+          shadowRadius:    20,
         },
 
         tabBarItemStyle: {
-          height:        TAB_HEIGHT,
-          padding:       0,
-          margin:        0,
-          flex:          1,
+          height:  TAB_HEIGHT,
+          padding: 0,
+          margin:  0,
+          flex:    1,
         },
 
         tabBarBackground,
@@ -203,8 +236,7 @@ export default function TabLayout() {
               <TabIcon
                 focused={focused}
                 label={tab.label}
-                iconActive={tab.iconActive}
-                iconInactive={tab.iconInactive}
+                Icon={tab.Icon}
                 badge={tab.badge}
                 accent={theme.accent}
                 accentDim={theme.accentDim}
@@ -232,19 +264,18 @@ const styles = StyleSheet.create({
     width:          '100%',
     height:         TAB_HEIGHT,
     gap:            3,
-    paddingTop:     8,   // geser konten sedikit ke bawah agar terasa center visual
+    paddingTop:     14,
   },
   label: {
     fontSize:      10,
     letterSpacing: 0.2,
     lineHeight:    13,
   },
-  // Pill kecil di bawah label sebagai active indicator
   activePill: {
     position:     'absolute',
-    bottom:       4,
-    width:        20,
-    height:       3,
+    bottom:       5,
+    width:        18,
+    height:       2.5,
     borderRadius: 2,
   },
   badge: {
