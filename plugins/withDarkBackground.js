@@ -2,35 +2,20 @@ const { withAndroidStyles } = require('@expo/config-plugins');
 
 module.exports = function withDarkBackground(config) {
   return withAndroidStyles(config, (config) => {
-    config.modResults.resources.style =
-      config.modResults.resources.style?.map(style => {
-        if (style.$.name === 'AppTheme') {
-          // Pastikan parent = Theme.EdgeToEdge biar edge-to-edge aktif
-          style.$.parent = 'Theme.EdgeToEdge';
+    const styles = config.modResults.resources.style;
+    if (!Array.isArray(styles)) return config;
 
-          style.item = style.item || [];
+    const appTheme = styles.find(s => s?.$?.name === 'AppTheme');
+    if (!appTheme) return config;
 
-          // Hapus item duplikat kalau ada
-          style.item = style.item.filter(
-            (item) => ![
-              'android:windowBackground',
-              'android:navigationBarColor',
-              'android:statusBarColor',
-              'android:windowDrawsSystemBarBackgrounds',
-              'android:enforceNavigationBarContrast',
-            ].includes(item.$.name)
-          );
+    appTheme.item = appTheme.item || [];
+    appTheme.item = appTheme.item.filter(
+      item => item?.$?.name !== 'android:windowBackground'
+    );
+    appTheme.item.push(
+      { $: { name: 'android:windowBackground' }, _: '#08080a' },
+    );
 
-          style.item.push(
-            { $: { name: 'android:windowBackground' },              _: '#08080a'    },
-            { $: { name: 'android:navigationBarColor' },            _: '@android:color/transparent' },
-            { $: { name: 'android:statusBarColor' },                _: '@android:color/transparent' },
-            { $: { name: 'android:windowDrawsSystemBarBackgrounds' }, _: 'true'     },
-            { $: { name: 'android:enforceNavigationBarContrast' },  _: 'false'      },
-          );
-        }
-        return style;
-      });
     return config;
   });
 };
