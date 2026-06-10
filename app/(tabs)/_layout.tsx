@@ -39,7 +39,7 @@ interface TabBarBgProps { cardColor: string; borderColor: string; }
 const TabBarBackground = memo<TabBarBgProps>(({ cardColor, borderColor }) => (
   <View style={[StyleSheet.absoluteFill, { borderRadius: BORDER_RADIUS, overflow: 'hidden' }]}>
     <BlurView
-      intensity={80}
+      intensity={95}
       tint="dark"
       blurMethod="dimezisBlurViewSdk31Plus"
       style={StyleSheet.absoluteFill}
@@ -179,11 +179,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width:          '100%',
     height:         TAB_HEIGHT,
-    paddingTop:     18,
+    paddingTop:     20,
   },
   pill: {
     position:     'absolute',
-    top:          23,
+    top:          21,
     width:        69,
     height:       42,
     borderRadius: 21,
