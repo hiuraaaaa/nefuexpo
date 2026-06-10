@@ -12,6 +12,8 @@ import MaintenancePage from '@/components/MaintenancePage';
 import firestore from '@react-native-firebase/firestore';
 import { refreshDomain } from '@/hooks/scraper';
 import { SystemBars } from 'react-native-edge-to-edge';
+import { useRouter } from 'expo-router';
+import { rescheduleNotifs, useNotifTapHandler } from '@/hooks/notifications';
 import '../global.css';
 
 SplashScreen.preventAutoHideAsync();
@@ -52,11 +54,20 @@ interface MaintenanceData {
 
 // ─── AppLayout ────────────────────────────────────────────────────────────────
 function AppLayout() {
-  const theme = useTheme();
+  const theme  = useTheme();
+  const router = useRouter();
   const [maintenance, setMaintenance] = useState<MaintenanceData | null>(null);
   const [adminUser, setAdminUser]     = useState(false);
 
   useEffect(() => { loadSavedTheme(); refreshDomain(); }, []);
+
+  // Reschedule notif tiap app buka
+  useEffect(() => {
+    rescheduleNotifs();
+  }, []);
+
+  // Handle tap notif → navigate
+  useNotifTapHandler(router);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(() => { setAdminUser(isAdmin()); });
