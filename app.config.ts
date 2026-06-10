@@ -31,7 +31,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
     package: 'com.nefusoft.anime',
     googleServicesFile: './google-services.json',
-    permissions: [],
+    permissions: [
+      'NOTIFICATIONS',
+      'SCHEDULE_EXACT_ALARM',
+      'USE_EXACT_ALARM',
+    ],
     jsEngine: 'hermes',
     enableProguardInReleaseBuilds: true,
     enableShrinkResourcesInReleaseBuilds: true,
@@ -57,6 +61,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     '@react-native-firebase/auth',
     '@react-native-google-signin/google-signin',
     ['expo-font', { fonts: [] }],
+    ['expo-notifications', {
+      icon: './assets/icon.png',
+      color: '#F4CB7A',
+      androidMode: 'collapse',
+      androidCollapsedTitle: '%(count)s anime baru tersedia',
+    }],
   ],
   scheme: 'nefusoft',
   experiments: {
