@@ -38,14 +38,12 @@ interface TabBarBgProps { cardColor: string; borderColor: string; }
 
 const TabBarBackground = memo<TabBarBgProps>(({ cardColor, borderColor }) => (
   <View style={[StyleSheet.absoluteFill, { borderRadius: BORDER_RADIUS, overflow: 'hidden' }]}>
-    {Platform.OS === 'ios' ? (
-      <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
-    ) : (
-      <>
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000000', opacity: 0.3 }]} />
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: cardColor, opacity: 0.55 }]} />
-      </>
-    )}
+    <BlurView
+      intensity={80}
+      tint="dark"
+      blurMethod="dimezisBlurViewSdk31Plus"
+      style={StyleSheet.absoluteFill}
+    />
     <View style={[
       StyleSheet.absoluteFill,
       { borderRadius: BORDER_RADIUS, borderWidth: 0.8, borderColor, backgroundColor: 'rgba(255,255,255,0.03)' },
@@ -73,7 +71,6 @@ const TabIcon = memo<TabIconProps>(({ focused, Icon, badge, accent, accentDim, s
     transform: [{ scale: scale.value }],
   }));
 
-  // Pill background — fade + scale dari tengah
   const pillStyle = useAnimatedStyle(() => ({
     opacity:   interpolate(progress.value, [0, 1], [0, 1]),
     transform: [
@@ -84,10 +81,7 @@ const TabIcon = memo<TabIconProps>(({ focused, Icon, badge, accent, accentDim, s
 
   return (
     <View style={styles.tabItem}>
-      {/* Pill background bulat di belakang icon */}
       <Animated.View style={[styles.pill, { backgroundColor: accentDim }, pillStyle]} />
-
-      {/* Icon */}
       <Animated.View style={[iconAnimStyle, { zIndex: 1 }]}>
         <View>
           <Icon
@@ -189,7 +183,7 @@ const styles = StyleSheet.create({
   },
   pill: {
     position:     'absolute',
-    top:          23,  
+    top:          23,
     width:        69,
     height:       42,
     borderRadius: 21,
