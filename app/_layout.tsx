@@ -61,12 +61,10 @@ function AppLayout() {
 
   useEffect(() => { loadSavedTheme(); refreshDomain(); }, []);
 
-  // Reschedule notif tiap app buka
   useEffect(() => {
     rescheduleNotifs();
   }, []);
 
-  // Handle tap notif → navigate
   useNotifTapHandler(router);
 
   useEffect(() => {
@@ -86,11 +84,14 @@ function AppLayout() {
     return unsub;
   }, [adminUser]);
 
+  const statusBarStyle = theme.tint === 'light' ? 'dark' : 'light';
+  const systemBarsStyle = theme.tint === 'light' ? 'dark' : 'light';
+
   if (maintenance) {
     return (
       <>
-        <SystemBars style="light" />
-        <StatusBar style={theme.id === 'pure-white' ? 'dark' : 'light'} />
+        <SystemBars style={systemBarsStyle} />
+        <StatusBar style={statusBarStyle} />
         <MaintenancePage message={maintenance.message} estimasi={maintenance.estimasi} />
       </>
     );
@@ -98,8 +99,8 @@ function AppLayout() {
 
   return (
     <>
-      <SystemBars style="light" />
-      <StatusBar style={theme.id === 'pure-white' ? 'dark' : 'light'} />
+      <SystemBars style={systemBarsStyle} />
+      <StatusBar style={statusBarStyle} />
       <Stack screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: theme.bg },
