@@ -189,10 +189,10 @@ const styles = StyleSheet.create({
   },
   pill: {
     position:     'absolute',
-    top:          26,  
-    width:        92,
-    height:       56,
-    borderRadius: 28,
+    top:          39,  
+    width:        69,
+    height:       42,
+    borderRadius: 21,
   },
   badge: {
     position:          'absolute',
