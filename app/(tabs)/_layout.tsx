@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { useEffect } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,9 +20,9 @@ const TABS = [
   { name: 'profile',  label: 'Profile',  iconActive: 'person',    iconInactive: 'person-outline'    },
 ] as const;
 
-const FLOAT_MARGIN  = 12; // jarak dari kiri/kanan/bawah
-const TAB_H         = 62; // tinggi tab bar floating
-const BORDER_RADIUS = 24; // rounded
+const FLOAT_MARGIN  = 6;
+const TAB_H         = 58;
+const BORDER_RADIUS = 22;
 
 // ── Tab Icon ──────────────────────────────────────────────────────────────────
 function TabIcon({
@@ -85,19 +85,17 @@ function TabIcon({
 function TabBarBackground() {
   const theme = useTheme();
   return (
-    <View style={[StyleSheet.absoluteFill, styles.floatBg]}>
-      {/* Blur layer */}
+    <View style={[StyleSheet.absoluteFill, { borderRadius: BORDER_RADIUS, overflow: 'hidden' }]}>
       <BlurView
-        intensity={60}
+        intensity={55}
         tint="dark"
-        style={[StyleSheet.absoluteFill, { borderRadius: BORDER_RADIUS, overflow: 'hidden' }]}
+        style={StyleSheet.absoluteFill}
       />
-      {/* Solid overlay biar ga terlalu transparan */}
       <View style={[
         StyleSheet.absoluteFill,
         {
-          borderRadius: BORDER_RADIUS,
           backgroundColor: theme.card + 'cc',
+          borderRadius: BORDER_RADIUS,
           borderWidth: 1,
           borderColor: theme.border,
         }
@@ -131,7 +129,6 @@ export default function TabLayout() {
           borderTopWidth:  0,
           elevation:       0,
           borderRadius:    BORDER_RADIUS,
-          // Shadow Android
           shadowColor:     '#000',
           shadowOffset:    { width: 0, height: 8 },
           shadowOpacity:   0.4,
@@ -140,6 +137,10 @@ export default function TabLayout() {
         tabBarItemStyle: {
           height:          TAB_H,
           paddingVertical: 0,
+          paddingTop:      0,
+          paddingBottom:   0,
+          marginTop:       0,
+          flex:            1,
         },
         tabBarBackground:        () => <TabBarBackground />,
         tabBarShowLabel:         false,
@@ -181,21 +182,13 @@ const styles = StyleSheet.create({
     width:          '100%',
     height:         TAB_H,
     gap:            3,
-    position:       'relative',
-  },
-  floatBg: {
-    borderRadius: BORDER_RADIUS,
-    overflow:     'hidden',
-    // Shadow iOS
-    shadowColor:  '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius:  16,
+    paddingTop:     0,
+    marginTop:      0,
   },
   pill: {
     position:     'absolute',
     width:        48,
-    height:       40,
+    height:       38,
     borderRadius: 12,
   },
   label: {
