@@ -28,7 +28,6 @@ import { HeroSkeleton, HorizontalCardSkeleton, RankSkeleton } from '@/components
 
 const { width } = Dimensions.get('window');
 
-// Hero height: full bleed sampai status bar
 const HERO_HEIGHT = width * 0.85;
 
 const getTodayKey = (): string => {
@@ -116,7 +115,7 @@ function SectionHeader({ title, subtitle, onPress, theme }: {
 function MovieRankItem({ anime, index, onPress, theme }: {
   anime: Anime; index: number; onPress: () => void; theme: any;
 }) {
-  const scale    = useSharedValue(1);
+  const scale     = useSharedValue(1);
   const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
   return (
@@ -149,7 +148,12 @@ function MovieRankItem({ anime, index, onPress, theme }: {
           backgroundColor: index < 3 ? theme.accent : theme.border,
           borderWidth: index < 3 ? 0 : 1, borderColor: theme.border,
         }}>
-          <Text style={{ fontWeight: '900', fontSize: 14, color: index < 3 ? '#000' : theme.subtext }}>{index + 1}</Text>
+          <Text style={{
+            fontWeight: '900', fontSize: 14,
+            color: index < 3 ? (theme.tint === 'light' ? '#fff' : '#000') : theme.subtext,
+          }}>
+            {index + 1}
+          </Text>
         </View>
         <View style={{ flex: 1, zIndex: 1 }}>
           <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13 }} numberOfLines={1}>{anime.title}</Text>
@@ -187,7 +191,6 @@ export default function HomeScreen() {
 
   const carouselItems = ongoing.slice(0, 8);
 
-  // Fetch announcements aktif dari Firestore
   useEffect(() => {
     const unsub = firestore()
       .collection('announcements')
@@ -233,7 +236,6 @@ export default function HomeScreen() {
 
   useEffect(() => { fetchData(); }, []);
 
-  // Auto-advance carousel tiap 6 detik
   useEffect(() => {
     if (carouselItems.length === 0) return;
     const itv = setInterval(() => {
@@ -273,10 +275,16 @@ export default function HomeScreen() {
 
   const visibleAnnouncements = announcements.filter(a => !dismissedIds.has(a.id));
 
+  // Warna teks di atas accent button
+  const accentTextColor = theme.tint === 'light' ? '#fff' : '#000';
+
   return (
     <View style={{ flex: 1, backgroundColor: theme.bg }}>
-      {/* Status bar transparan biar hero full bleed */}
-      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle={theme.tint === 'light' ? 'dark-content' : 'light-content'}
+      />
 
       {/* Copy Toast */}
       {copyToast && (
@@ -289,7 +297,7 @@ export default function HomeScreen() {
             paddingHorizontal: 24, paddingVertical: 12, borderRadius: 999,
           }}
         >
-          <Text style={{ color: '#000', fontWeight: '900', fontSize: 12 }}>Tautan berhasil disalin!</Text>
+          <Text style={{ color: accentTextColor, fontWeight: '900', fontSize: 12 }}>Tautan berhasil disalin!</Text>
         </Animated.View>
       )}
 
@@ -300,15 +308,14 @@ export default function HomeScreen() {
         contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
       >
 
-        {/* ── Hero Carousel — full bleed, mulai dari top: 0 ── */}
+        {/* ── Hero Carousel ── */}
         <View style={{ width, height: HERO_HEIGHT, backgroundColor: theme.card }}>
 
-          {/* Navbar overlay — di atas hero, padding top dari insets */}
           <View style={{
             position: 'absolute', top: 0, left: 0, right: 0, zIndex: 30,
             flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
             paddingHorizontal: 20,
-            paddingTop: insets.top + 10,  // ← safe area top
+            paddingTop: insets.top + 10,
             paddingBottom: 10,
           }}>
             <Image
@@ -343,33 +350,25 @@ export default function HomeScreen() {
                     onPress={() => goToAnime(a)}
                     style={{ width, height: HERO_HEIGHT }}
                   >
-                    {/* Background cover — full bleed */}
                     <Image
                       source={{ uri: a.image_cover || a.image_poster }}
                       style={{ width: '100%', height: '100%', opacity: 0.65 }}
                       contentFit="cover"
                     />
-
-                    {/* Gradient fade ke bawah */}
                     <LinearGradient
                       colors={['transparent', `${theme.bg}88`, theme.bg]}
                       locations={[0.3, 0.65, 1]}
                       style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '70%' }}
                     />
-
-                    {/* Info di bawah */}
                     <View style={{
                       position: 'absolute', bottom: 28, left: 20, right: 20,
                       flexDirection: 'row', alignItems: 'flex-end', gap: 14,
                     }}>
-                      {/* Poster */}
                       <Image
                         source={{ uri: a.image_poster }}
                         style={{ width: 80, aspectRatio: 3 / 4.2, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}
                         contentFit="cover"
                       />
-
-                      {/* Text + tombol */}
                       <View style={{ flex: 1, marginBottom: 4, gap: 6 }}>
                         <Text style={{ color: '#fff', fontWeight: '900', fontSize: 17, lineHeight: 22 }} numberOfLines={2}>
                           {a.title}
@@ -388,8 +387,8 @@ export default function HomeScreen() {
                               borderRadius: 6,
                             }}
                           >
-                            <Ionicons name="play" size={11} color="#000" />
-                            <Text style={{ color: '#000', fontWeight: '900', fontSize: 11, letterSpacing: 0.5 }}>TONTON</Text>
+                            <Ionicons name="play" size={11} color={accentTextColor} />
+                            <Text style={{ color: accentTextColor, fontWeight: '900', fontSize: 11, letterSpacing: 0.5 }}>TONTON</Text>
                           </TouchableOpacity>
                         </View>
                       </View>
@@ -398,7 +397,6 @@ export default function HomeScreen() {
                 ))}
               </ScrollView>
 
-              {/* Counter + next arrow */}
               {carouselItems.length > 0 && (
                 <View style={{
                   position: 'absolute', bottom: 28, right: 20,
@@ -541,4 +539,4 @@ export default function HomeScreen() {
       <SearchModal visible={searchOpen} onClose={() => setSearchOpen(false)} />
     </View>
   );
-}
+          }
