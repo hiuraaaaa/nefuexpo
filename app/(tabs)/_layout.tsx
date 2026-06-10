@@ -20,7 +20,7 @@ const TABS = [
   { name: 'profile',  label: 'Profile',  iconActive: 'person',    iconInactive: 'person-outline'    },
 ] as const;
 
-const FLOAT_MARGIN  = 6;
+const FLOAT_MARGIN  = 16;
 const TAB_H         = 58;
 const BORDER_RADIUS = 22;
 
@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
     width:          '100%',
     height:         TAB_H,
     gap:            3,
-    paddingTop:     0,
+    paddingTop:     12,
     marginTop:      0,
   },
   pill: {
