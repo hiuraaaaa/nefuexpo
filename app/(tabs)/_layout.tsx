@@ -185,6 +185,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width:          '100%',
     height:         TAB_HEIGHT,
+    paddingTop:     10,
   },
   pill: {
     position:     'absolute',
