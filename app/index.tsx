@@ -13,7 +13,6 @@ import Animated, {
   useSharedValue, useAnimatedStyle,
   withTiming, withSpring, withRepeat, withSequence,
   cancelAnimation, runOnJS, Easing, FadeIn, FadeOut,
-  SlideInDown, SlideInRight,
 } from 'react-native-reanimated';
 import { COLORS, LOGO_URL } from '@/constants';
 import { api } from '@/hooks/api';
@@ -36,6 +35,7 @@ const REPEAT_COUNT  = 4;
 const COL_OFFSETS   = [0, -(STEP * 0.6), -(STEP * 0.2), -(STEP * 0.8)] as const;
 const COL_DURATIONS = [3800, 4400, 3400, 4800] as const;
 const DISCLAIMER_KEY = 'nefusoft_disclaimer_accepted';
+const MAX_LOAD_MS    = 5000; // max loading 5 detik
 
 // ── Step flow ─────────────────────────────────────────────────────────────────
 type Step = 'loading' | 'welcome' | 'disclaimer' | 'login';
@@ -150,7 +150,7 @@ function DisclaimerScreen({ onAccept, onDecline }: {
 
   return (
     <Animated.View
-      entering={SlideInRight.springify().damping(20)}
+      entering={FadeIn.duration(200)}
       exiting={FadeOut.duration(200)}
       style={{
         position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
@@ -238,9 +238,7 @@ function DisclaimerScreen({ onAccept, onDecline }: {
 }
 
 // ── Login Screen ──────────────────────────────────────────────────────────────
-function LoginScreen({ onSuccess }: {
-  onSuccess: () => void;
-}) {
+function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
   const [loading, setLoading] = useState(false);
 
   const handleGoogle = async () => {
@@ -255,7 +253,7 @@ function LoginScreen({ onSuccess }: {
 
   return (
     <Animated.View
-      entering={SlideInDown.springify().damping(20)}
+      entering={FadeIn.duration(200)}
       exiting={FadeOut.duration(200)}
       style={{
         position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
@@ -291,7 +289,6 @@ function LoginScreen({ onSuccess }: {
             Masuk untuk simpan progress,{'\n'}favorit, dan XP kamu.
           </Text>
 
-          {/* Google Button */}
           <TouchableOpacity
             onPress={handleGoogle}
             disabled={loading}
@@ -328,8 +325,8 @@ function LoginScreen({ onSuccess }: {
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function WelcomeScreen() {
   const router = useRouter();
-  const [step, setStep]         = useState<Step>('loading');
-  const [posters, setPosters]   = useState<Anime[]>([]);
+  const [step, setStep]       = useState<Step>('loading');
+  const [posters, setPosters] = useState<Anime[]>([]);
 
   const overlayOpacity = useSharedValue(1);
   const contentOpacity = useSharedValue(0);
@@ -340,26 +337,32 @@ export default function WelcomeScreen() {
     [posters]
   );
 
-  // ── Cek auth state ───────────────────────────────────────────────────────
+  // ── Cek auth state ──────────────────────────────────────────────────────
   useEffect(() => {
-    const unsub = onAuthStateChanged((user) => {
+    const unsub = onAuthStateChanged(async (user) => {
       if (user) {
         router.replace('/(tabs)');
-      } else {
-        // Mulai loading: prefetch + load posters
-        prefetchHome();
-        api.ongoing().then(r => {
-          setPosters(r.data?.slice(0, 32) || []);
-        }).catch(() => {});
-
-        // Simulasi loading 1.5 detik sambil API jalan di background
-        setTimeout(() => {
-          setStep('welcome');
-          overlayOpacity.value = withTiming(0, { duration: 400 });
-          contentOpacity.value = withTiming(1, { duration: 600 });
-          contentY.value       = withSpring(0, { damping: 16, stiffness: 100 });
-        }, 1500);
+        return;
       }
+
+      // Jalankan fetch parallel + timeout 5 detik
+      try {
+        const timeout = new Promise<void>(r => setTimeout(r, MAX_LOAD_MS));
+        const fetchAll = async () => {
+          const [postersRes] = await Promise.all([
+            api.ongoing(),
+            prefetchHome(),
+          ]);
+          setPosters(postersRes.data?.slice(0, 32) || []);
+        };
+        await Promise.race([fetchAll(), timeout]);
+      } catch {}
+
+      // Loading selesai → tampil welcome
+      setStep('welcome');
+      overlayOpacity.value = withTiming(0, { duration: 400 });
+      contentOpacity.value = withTiming(1, { duration: 600 });
+      contentY.value       = withSpring(0, { damping: 16, stiffness: 100 });
     });
     return unsub;
   }, []);
@@ -481,10 +484,10 @@ export default function WelcomeScreen() {
         backgroundColor: '#08080a', pointerEvents: 'none',
       }, overlayStyle]} />
 
-      {/* Loading screen — tampil saat step === 'loading' */}
+      {/* Loading screen */}
       {step === 'loading' && <LoadingScreen />}
 
-      {/* Disclaimer — slide dari kanan */}
+      {/* Disclaimer */}
       {step === 'disclaimer' && (
         <DisclaimerScreen
           onAccept={handleDisclaimerAccept}
@@ -492,11 +495,9 @@ export default function WelcomeScreen() {
         />
       )}
 
-      {/* Login — slide dari bawah */}
+      {/* Login */}
       {step === 'login' && (
-        <LoginScreen
-          onSuccess={handleLoginSuccess}
-        />
+        <LoginScreen onSuccess={handleLoginSuccess} />
       )}
     </View>
   );
