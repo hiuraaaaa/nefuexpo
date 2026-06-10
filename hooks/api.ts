@@ -220,13 +220,18 @@ const fetchSearch = async (q: string, page = 0): Promise<ApiResponse<Anime[]>> =
 
 // [6] Detail Series — /series.php
 const fetchDetail = async (id: string): Promise<ApiResponse<AnimeDetail>> => {
-  console.log('[DEBUG detail] id:', id);
-  const token   = await getToken();
-  const slug    = id.replace(/\/+$/, '');
-  console.log('[DEBUG detail] slug:', slug);
-  const payload = { get: 'top', post_type: '1', post_id: slug, token };
-  const json    = await safePost<any>(`/series.php?url=${slug}`, payload);
-  const raw     = json?.data?.[0];
+  const token = await getToken();
+  const slug  = id.replace(/\/+$/, '');
+
+  const tryFetch = async (s: string) => {
+    const payload = { get: 'top', post_type: '1', post_id: s, token };
+    const json    = await safePost<any>(`/series.php?url=${s}`, payload);
+    return json?.data?.[0];
+  };
+
+  let raw = await tryFetch(slug);
+  if (!raw?.series_id) raw = await tryFetch(slug + '/');
+
   if (!raw?.judul) return { status: false, data: null as any };
   return { status: true, data: mapAnimeDetail(raw) };
 };
