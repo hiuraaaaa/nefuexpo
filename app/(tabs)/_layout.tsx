@@ -32,10 +32,10 @@ import { type Theme } from '@/constants';
 import { TABS, TAB_BAR, type TabConfig } from '@/constants/tabConfig';
 
 // ── Konstanta Layout ──────────────────────────────────────────────────────────
-const FLOAT_MARGIN  = 10;   // lebih kecil → tab bar lebih lebar seperti Fukunime
-const TAB_HEIGHT    = 64;   // lebih tinggi → lebih lega
+const FLOAT_MARGIN  = 16;   // jarak dari tepi layar — seperti Fukunime
+const TAB_HEIGHT    = 62;
 const BORDER_RADIUS = 20;
-const ICON_SIZE     = 24;
+const ICON_SIZE     = 23;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TabBarBackground — Glassmorphism background
@@ -176,11 +176,10 @@ export default function TabLayout() {
         },
 
         tabBarItemStyle: {
-          height:          TAB_HEIGHT,
-          paddingVertical: 0,
-          paddingTop:      0,
-          paddingBottom:   0,
-          flex:            1,
+          height:        TAB_HEIGHT,
+          padding:       0,
+          margin:        0,
+          flex:          1,
         },
 
         tabBarBackground,
@@ -226,19 +225,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width:          '100%',
     height:         TAB_HEIGHT,
-    gap:            4,
-    paddingTop:     6,
-    paddingBottom:  8,
+    gap:            3,
+    // Tidak ada paddingTop/Bottom — biarkan justifyContent center yang bekerja
   },
   label: {
     fontSize:      10,
     letterSpacing: 0.2,
     lineHeight:    13,
   },
-  // Pill kecil di bawah ikon sebagai active indicator
+  // Pill kecil di bawah label sebagai active indicator
   activePill: {
     position:     'absolute',
-    bottom:       6,
+    bottom:       4,
     width:        20,
     height:       3,
     borderRadius: 2,
