@@ -20,7 +20,10 @@ import { Ionicons } from '@expo/vector-icons';
 import Animated from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
 
-import { useTheme, type ThemeTokens } from '@/hooks/theme';
+// ✅ Gunakan useTheme dari hooks Anda yang sudah ada (AsyncStorage + global listener)
+// Tipe Theme dari @/constants sudah punya semua field yang dibutuhkan tab bar
+import { useTheme } from '@/hooks/theme';
+import { type Theme } from '@/constants';
 import { useTabAnimation } from '@/hooks/useTabAnimation';
 import { TABS, TAB_BAR, type TabConfig } from '@/constants/tabConfig';
 
@@ -144,7 +147,7 @@ TabIcon.displayName = 'TabIcon';
 // agar tidak membuat komponen baru setiap render TabLayout.
 // ─────────────────────────────────────────────────────────────────────────────
 
-function buildTabBarBackground(theme: ThemeTokens) {
+function buildTabBarBackground(theme: Theme) {
   return () => (
     <TabBarBackground cardColor={theme.card} borderColor={theme.border} />
   );
