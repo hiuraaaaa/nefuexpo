@@ -185,13 +185,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width:          '100%',
     height:         TAB_HEIGHT,
-    paddingTop:     10,
+    paddingTop:     18,
   },
   pill: {
     position:     'absolute',
-    width:        46,
+    width:        56,
     height:       32,
-    borderRadius: 10,
+    borderRadius: 8,
   },
   badge: {
     position:          'absolute',
