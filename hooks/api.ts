@@ -238,33 +238,35 @@ const fetchDetail = async (id: string): Promise<ApiResponse<AnimeDetail>> => {
 
 // [7] Episode Stream — /series/episode/data.php
 const fetchEpisode = async (id: string): Promise<any> => {
-  console.log('[DEBUG episode] id:', id);
-  const token   = await getToken();
-  const epId    = id.replace(/\/+$/, '');
-  const parts   = epId.split('/').filter(Boolean);
+  const token = await getToken();
 
-  const seriesSlug = parts.length > 1
-    ? parts[0]
-    : (epId.split('-episode-')[0] ?? epId);
-
-  const epNum = (
-    epId.match(/\/episode-(\d+)/) ??
-    epId.match(/-episode-(\d+)/) ??
-    epId.match(/-(\d+)$/) ??
-    []
-  )[1] ?? '1';
-  console.log('[DEBUG episode] seriesSlug:', seriesSlug, '| epNum:', epNum);
-  const payload = {
-    post_type:  '2',
-    post_id:    epId,
-    series_id:  seriesSlug,
-    series_url: seriesSlug,
-    episode:    epNum,
-    token,
+  const tryFetch = async (epId: string) => {
+    const parts      = epId.split('/').filter(Boolean);
+    const seriesSlug = parts.length > 1
+      ? parts[0]
+      : (epId.split('-episode-')[0] ?? epId);
+    const epNum = (
+      epId.match(/\/episode-(\d+)/) ??
+      epId.match(/-episode-(\d+)/) ??
+      epId.match(/-(\d+)$/) ??
+      []
+    )[1] ?? '1';
+    const payload = {
+      post_type:  '2',
+      post_id:    epId,
+      series_id:  seriesSlug,
+      series_url: seriesSlug,
+      episode:    epNum,
+      token,
+    };
+    const json = await safePost<any>(`/series/episode/data.php?url=${epId}`, payload, true);
+    return json?.data?.[0];
   };
 
-  const json       = await safePost<any>(`/series/episode/data.php?url=${epId}`, payload, true);
-  const raw        = json?.data?.[0];
+  const slug = id.replace(/\/+$/, '');
+  let raw = await tryFetch(slug);
+  if (!raw?.episode_id) raw = await tryFetch(slug + '/');
+
   if (!raw) return { status: false, data: { server: [] } };
 
   const streamsObj: Record<string, any[]> = raw.streams ?? {};
