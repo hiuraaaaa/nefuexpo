@@ -220,8 +220,10 @@ const fetchSearch = async (q: string, page = 0): Promise<ApiResponse<Anime[]>> =
 
 // [6] Detail Series — /series.php
 const fetchDetail = async (id: string): Promise<ApiResponse<AnimeDetail>> => {
+  console.log('[DEBUG detail] id:', id);
   const token   = await getToken();
   const slug    = id.replace(/\/+$/, '');
+  console.log('[DEBUG detail] slug:', slug);
   const payload = { get: 'top', post_type: '1', post_id: slug, token };
   const json    = await safePost<any>(`/series.php?url=${slug}`, payload);
   const raw     = json?.data?.[0];
@@ -231,11 +233,22 @@ const fetchDetail = async (id: string): Promise<ApiResponse<AnimeDetail>> => {
 
 // [7] Episode Stream — /series/episode/data.php
 const fetchEpisode = async (id: string): Promise<any> => {
-  const token      = await getToken();
-  const epId       = id.replace(/\/+$/, '');
-  const seriesSlug = epId.split('/').filter(Boolean).pop() ?? epId;
-  const epNum      = (epId.match(/(?:episode-|-)(\d+)$/) ?? [])[1] ?? '1';
+  console.log('[DEBUG episode] id:', id);
+  const token   = await getToken();
+  const epId    = id.replace(/\/+$/, '');
+  const parts   = epId.split('/').filter(Boolean);
 
+  const seriesSlug = parts.length > 1
+    ? parts[0]
+    : (epId.split('-episode-')[0] ?? epId);
+
+  const epNum = (
+    epId.match(/\/episode-(\d+)/) ??
+    epId.match(/-episode-(\d+)/) ??
+    epId.match(/-(\d+)$/) ??
+    []
+  )[1] ?? '1';
+  console.log('[DEBUG episode] seriesSlug:', seriesSlug, '| epNum:', epNum);
   const payload = {
     post_type:  '2',
     post_id:    epId,
