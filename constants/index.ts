@@ -16,6 +16,7 @@ export type Theme = {
   border: string;
   text: string;
   subtext: string;
+  tint: 'dark' | 'light' | 'default';
 };
 
 export const THEMES: Theme[] = [
@@ -29,6 +30,7 @@ export const THEMES: Theme[] = [
     border: 'rgba(255,255,255,0.05)',
     text: '#ffffff',
     subtext: 'rgba(255,255,255,0.4)',
+    tint: 'dark',
   },
   {
     id: 'sakura',
@@ -40,6 +42,7 @@ export const THEMES: Theme[] = [
     border: 'rgba(255,107,157,0.08)',
     text: '#ffffff',
     subtext: 'rgba(255,255,255,0.4)',
+    tint: 'dark',
   },
   {
     id: 'abyss',
@@ -51,6 +54,7 @@ export const THEMES: Theme[] = [
     border: 'rgba(74,158,255,0.08)',
     text: '#ffffff',
     subtext: 'rgba(255,255,255,0.4)',
+    tint: 'dark',
   },
   {
     id: 'crimson',
@@ -62,6 +66,7 @@ export const THEMES: Theme[] = [
     border: 'rgba(230,57,70,0.08)',
     text: '#ffffff',
     subtext: 'rgba(255,255,255,0.4)',
+    tint: 'dark',
   },
   {
     id: 'emerald',
@@ -73,6 +78,7 @@ export const THEMES: Theme[] = [
     border: 'rgba(46,204,113,0.08)',
     text: '#ffffff',
     subtext: 'rgba(255,255,255,0.4)',
+    tint: 'dark',
   },
   {
     id: 'violet',
@@ -84,6 +90,7 @@ export const THEMES: Theme[] = [
     border: 'rgba(168,85,247,0.08)',
     text: '#ffffff',
     subtext: 'rgba(255,255,255,0.4)',
+    tint: 'dark',
   },
   {
     id: 'sunset',
@@ -95,6 +102,7 @@ export const THEMES: Theme[] = [
     border: 'rgba(255,140,66,0.08)',
     text: '#ffffff',
     subtext: 'rgba(255,255,255,0.4)',
+    tint: 'dark',
   },
   {
     id: 'ocean',
@@ -106,6 +114,7 @@ export const THEMES: Theme[] = [
     border: 'rgba(0,212,255,0.08)',
     text: '#ffffff',
     subtext: 'rgba(255,255,255,0.4)',
+    tint: 'dark',
   },
   {
     id: 'rose',
@@ -117,6 +126,7 @@ export const THEMES: Theme[] = [
     border: 'rgba(232,165,152,0.08)',
     text: '#ffffff',
     subtext: 'rgba(255,255,255,0.4)',
+    tint: 'dark',
   },
   {
     id: 'mint',
@@ -128,6 +138,7 @@ export const THEMES: Theme[] = [
     border: 'rgba(0,229,195,0.08)',
     text: '#ffffff',
     subtext: 'rgba(255,255,255,0.4)',
+    tint: 'dark',
   },
   {
     id: 'pure-white',
@@ -139,6 +150,7 @@ export const THEMES: Theme[] = [
     border: 'rgba(0,0,0,0.08)',
     text: '#111111',
     subtext: 'rgba(0,0,0,0.4)',
+    tint: 'light',
   },
   {
     id: 'pure-black',
@@ -150,6 +162,7 @@ export const THEMES: Theme[] = [
     border: 'rgba(255,255,255,0.05)',
     text: '#ffffff',
     subtext: 'rgba(255,255,255,0.4)',
+    tint: 'dark',
   },
 ];
 
