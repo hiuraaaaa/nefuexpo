@@ -1,4 +1,5 @@
 import { ExpoConfig, ConfigContext } from 'expo/config';
+import edgeToEdge from 'react-native-edge-to-edge/expo';
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
@@ -43,7 +44,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   androidTVBanner: './assets/tv-banner.png',
   plugins: [
-    'react-native-edge-to-edge',
+    edgeToEdge({
+      android: {
+        parentTheme: 'Default',
+        enforceNavigationBarContrast: false,
+      },
+    }),
     './plugins/withDarkBackground',
     'expo-router',
     ['expo-build-properties', {
