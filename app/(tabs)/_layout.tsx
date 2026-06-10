@@ -34,7 +34,7 @@ import { TABS, TAB_BAR, type TabConfig } from '@/constants/tabConfig';
 // ── Konstanta Layout ──────────────────────────────────────────────────────────
 const FLOAT_MARGIN  = 16;   // jarak dari tepi layar — seperti Fukunime
 const TAB_HEIGHT    = 62;
-const BORDER_RADIUS = 20;
+const BORDER_RADIUS = 36;
 const ICON_SIZE     = 23;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
     width:          '100%',
     height:         TAB_HEIGHT,
     gap:            3,
-    // Tidak ada paddingTop/Bottom — biarkan justifyContent center yang bekerja
+    paddingTop:     8,   // geser konten sedikit ke bawah agar terasa center visual
   },
   label: {
     fontSize:      10,
