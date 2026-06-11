@@ -6,7 +6,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { api, getAnimeSlug } from '@/hooks/api';
+import { api, getAnimeSlug } from '@/hooks/api/api';
 import { Anime, Genre } from '@/types';
 import { CardSkeleton } from '@/components/Skeleton';
 import { useTheme } from '@/hooks/theme';
