@@ -29,24 +29,39 @@ export const cancelScheduleNotifs = async (): Promise<void> => {
 
 export const sendTestNotif = async (): Promise<void> => {
   const granted = await requestNotifPermission();
+  console.log('[Notif] Permission:', granted);
   if (!granted) {
-    console.log('[Notif] Permission denied');
+    console.log('[Notif] Permission denied — notif tidak bisa dikirim');
     return;
   }
 
-  await Notifications.scheduleNotificationAsync({
-    content: {
-      title: '🎌 Test Notifikasi',
-      body:  'Kalau ini muncul, notif berfungsi dengan baik!',
-      data:  { group: NOTIF_GROUP, url: '/' },
-    },
-    trigger: {
-      type:    Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-      seconds: 5,
-    },
-  });
+  // Cek sebelum schedule
+  const before = await Notifications.getAllScheduledNotificationsAsync();
+  console.log('[Notif] Scheduled sebelum:', before.length);
 
-  console.log('[Notif] Test notif scheduled, tunggu 5 detik...');
+  try {
+    const id = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: '🎌 Test Notifikasi',
+        body:  'Kalau ini muncul, notif berfungsi dengan baik!',
+        data:  { group: NOTIF_GROUP, url: '/' },
+      },
+      trigger: {
+        type:    Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: 5,
+        repeats: false,
+      },
+    });
+
+    console.log('[Notif] Scheduled ID:', id);
+
+    // Cek setelah schedule
+    const after = await Notifications.getAllScheduledNotificationsAsync();
+    console.log('[Notif] Scheduled setelah:', after.length);
+    console.log('[Notif] Minimize app sekarang, tunggu 5 detik...');
+  } catch (e: any) {
+    console.warn('[Notif] ERROR saat schedule:', e?.message ?? e);
+  }
 };
 
 export const rescheduleNotifs = async (): Promise<void> => {
@@ -65,36 +80,42 @@ export const rescheduleNotifs = async (): Promise<void> => {
 
     for (const animeList of Object.values(res.data)) {
       for (const anime of animeList) {
-        const updated = (anime as any).updated;
-        if (!updated) {
-          console.log('[Notif] SKIP - no updated:', anime.title);
+        const date_ts = (anime as any).date_ts;
+        if (!date_ts) {
+          console.log('[Notif] SKIP - no date_ts:', anime.title);
           continue;
         }
 
-        const triggerDate = new Date(updated * 1000);
+        // Set jam 19.00 WIB (12.00 UTC) di hari jadwal
+        const triggerDate = new Date(date_ts * 1000);
+        triggerDate.setUTCHours(12, 0, 0, 0);
 
         if (triggerDate <= now) {
           console.log('[Notif] SKIP - sudah lewat:', anime.title, triggerDate.toISOString());
           continue;
         }
 
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: '🎌 Anime Baru Tersedia',
-            body:  `${anime.title} sudah bisa ditonton!`,
-            data:  {
-              group: NOTIF_GROUP,
-              url:   `/watch/${(anime as any).id}`,
+        try {
+          await Notifications.scheduleNotificationAsync({
+            content: {
+              title: '🎌 Anime Baru Tersedia',
+              body:  `${anime.title} sudah bisa ditonton!`,
+              data:  {
+                group: NOTIF_GROUP,
+                url:   `/watch/${(anime as any).id}`,
+              },
             },
-          },
-          trigger: {
-            type: Notifications.SchedulableTriggerInputTypes.DATE,
-            date: triggerDate,
-          },
-        });
+            trigger: {
+              type: Notifications.SchedulableTriggerInputTypes.DATE,
+              date: triggerDate,
+            },
+          });
 
-        console.log('[Notif] Scheduled:', anime.title, '->', triggerDate.toISOString());
-        count++;
+          console.log('[Notif] Scheduled:', anime.title, '->', triggerDate.toISOString());
+          count++;
+        } catch (e: any) {
+          console.warn('[Notif] ERROR schedule anime:', anime.title, e?.message ?? e);
+        }
       }
     }
 
