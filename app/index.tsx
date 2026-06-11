@@ -18,7 +18,7 @@ import { COLORS, LOGO_URL } from '@/constants';
 import { api } from '@/hooks/api/api';
 import { signInWithGoogle, onAuthStateChanged } from '@/hooks/auth';
 import { Anime } from '@/types';
-import { storageMain } from '@/hooks/storage';
+import { storageMain } from '@/hooks/storage/storage';
 import { prefetchHome } from '@/hooks/prefetch';
 
 const { width, height } = Dimensions.get('window');
