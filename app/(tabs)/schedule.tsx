@@ -28,7 +28,7 @@ import {
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { DAY_KEYS, DAY_NAMES } from '@/constants';
-import { api, getAnimeSlug } from '@/hooks/api';
+import { api, getAnimeSlug } from '@/hooks/api/api';
 import { Anime, ScheduleDay } from '@/types';
 import { ScheduleCardSkeleton } from '@/components/Skeleton';
 import { useTheme } from '@/hooks/theme';
