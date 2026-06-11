@@ -15,7 +15,7 @@ import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { COLORS, THEMES } from '@/constants';
 import { signInWithGoogle, signOut, onAuthStateChanged, isAdmin } from '@/hooks/auth';
 import { xpStorage, XPData, LEVELS } from '@/hooks/xp';
-import { historyStorage, favoritStorage, storageMain } from '@/hooks/storage';
+import { historyStorage, favoritStorage, storageMain } from '@/hooks/storage/storage';
 import { useTheme, setGlobalTheme } from '@/hooks/theme';
 import { XPBar } from '@/components/XPBar';
 import { LevelBadge } from '@/components/LevelBadge';
