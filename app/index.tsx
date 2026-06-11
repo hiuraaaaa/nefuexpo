@@ -15,7 +15,7 @@ import Animated, {
   cancelAnimation, runOnJS, Easing, FadeIn, FadeOut,
 } from 'react-native-reanimated';
 import { COLORS, LOGO_URL } from '@/constants';
-import { api } from '@/hooks/api';
+import { api } from '@/hooks/api/api';
 import { signInWithGoogle, onAuthStateChanged } from '@/hooks/auth';
 import { Anime } from '@/types';
 import { storageMain } from '@/hooks/storage';
