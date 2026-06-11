@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import * as Notifications from 'expo-notifications';
-import { api } from '@/hooks/api';
+import { api } from '@/hooks/api/api';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
