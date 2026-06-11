@@ -35,7 +35,6 @@ export const sendTestNotif = async (): Promise<void> => {
     return;
   }
 
-  // Cek sebelum schedule
   const before = await Notifications.getAllScheduledNotificationsAsync();
   console.log('[Notif] Scheduled sebelum:', before.length);
 
@@ -55,7 +54,6 @@ export const sendTestNotif = async (): Promise<void> => {
 
     console.log('[Notif] Scheduled ID:', id);
 
-    // Cek setelah schedule
     const after = await Notifications.getAllScheduledNotificationsAsync();
     console.log('[Notif] Scheduled setelah:', after.length);
     console.log('[Notif] Minimize app sekarang, tunggu 5 detik...');
@@ -80,18 +78,24 @@ export const rescheduleNotifs = async (): Promise<void> => {
 
     for (const animeList of Object.values(res.data)) {
       for (const anime of animeList) {
-        const date_ts = (anime as any).date_ts;
-        if (!date_ts) {
-          console.log('[Notif] SKIP - no date_ts:', anime.title);
+        const updated = (anime as any).updated;
+        if (!updated) {
+          console.log('[Notif] SKIP - no updated:', anime.title);
           continue;
         }
 
-        // Set jam 19.00 WIB (12.00 UTC) di hari jadwal
-        const triggerDate = new Date(date_ts * 1000);
-        triggerDate.setUTCHours(12, 0, 0, 0);
+        // Ambil jam asli dari updated (jam upload beneran)
+        const updatedDate = new Date(updated * 1000);
+        const triggerDate = new Date(updatedDate);
 
+        // Kalau sudah lewat, geser +7 hari (minggu depan jam yang sama)
         if (triggerDate <= now) {
-          console.log('[Notif] SKIP - sudah lewat:', anime.title, triggerDate.toISOString());
+          triggerDate.setDate(triggerDate.getDate() + 7);
+        }
+
+        // Kalau masih lewat juga (edge case), skip
+        if (triggerDate <= now) {
+          console.log('[Notif] SKIP - masih lewat:', anime.title);
           continue;
         }
 
