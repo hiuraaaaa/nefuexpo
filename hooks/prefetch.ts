@@ -4,7 +4,7 @@
  * Otomatis expired setelah 5 menit biar ga stale.
  */
 
-import { api } from '@/hooks/api';
+import { api } from '@/hooks/api/api';
 
 const TTL_MS = 5 * 60 * 1000; // 5 menit
 
