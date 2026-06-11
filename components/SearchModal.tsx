@@ -13,7 +13,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { COLORS } from '@/constants';
-import { api, getAnimeSlug } from '@/hooks/api';
+import { api, getAnimeSlug } from '@/hooks/api/api';
 import { Anime } from '@/types';
 import { getSearchHistory, addSearchHistory, clearSearchHistory } from '@/hooks/storage';
 import TraceMoeModal from '@/components/TraceMoeModal';
