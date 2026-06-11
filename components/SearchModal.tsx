@@ -15,7 +15,7 @@ import * as Haptics from 'expo-haptics';
 import { COLORS } from '@/constants';
 import { api, getAnimeSlug } from '@/hooks/api/api';
 import { Anime } from '@/types';
-import { getSearchHistory, addSearchHistory, clearSearchHistory } from '@/hooks/storage';
+import { getSearchHistory, addSearchHistory, clearSearchHistory } from '@/hooks/storage/storage';
 import TraceMoeModal from '@/components/TraceMoeModal';
 
 interface Props {
