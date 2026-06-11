@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, FlatList, Dimensions, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { api, getAnimeSlug } from '@/hooks/api';
+import { api, getAnimeSlug } from '@/hooks/api/api';
 import { useTheme } from '@/hooks/theme';
 import { Anime } from '@/types';
 import AnimeCard from '@/components/AnimeCard';
