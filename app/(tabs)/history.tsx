@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants';
-import { favoritStorage } from '@/hooks/storage';
+import { favoritStorage } from '@/hooks/storage/storage';
 import { getCurrentUser } from '@/hooks/auth';
 import { Anime } from '@/types';
 
