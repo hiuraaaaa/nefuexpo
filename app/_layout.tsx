@@ -15,6 +15,8 @@ import { SystemBars } from 'react-native-edge-to-edge';
 import { useRouter } from 'expo-router';
 import { rescheduleNotifs, useNotifTapHandler } from '@/hooks/notifications';
 import '../global.css';
+import { Text, ScrollView, TouchableOpacity } from 'react-native';  // ← tambah TouchableOpacity
+import { rescheduleNotifs, useNotifTapHandler, sendTestNotif } from '@/hooks/notifications';  // ← tambah sendTestNotif
 
 SplashScreen.preventAutoHideAsync();
 
@@ -114,6 +116,35 @@ function AppLayout() {
     </>
   );
 }
+
+return (
+  <>
+    <SystemBars style={systemBarsStyle} />
+    <StatusBar style={statusBarStyle} />
+    <Stack screenOptions={{
+      headerShown: false,
+      contentStyle: { backgroundColor: theme.bg },
+      animation: 'fade',
+    }}>
+      <Stack.Screen name="index" />
+      <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
+      <Stack.Screen name="watch/[slug]" options={{ animation: 'slide_from_bottom' }} />
+    </Stack>
+    <DebugOverlay />
+
+    {/* ── TOMBOL TEST — HAPUS SETELAH TEST ── */}
+    <TouchableOpacity
+      onPress={sendTestNotif}
+      style={{
+        position: 'absolute', bottom: 120, right: 16, zIndex: 9999,
+        backgroundColor: '#e63946', borderRadius: 999,
+        paddingHorizontal: 16, paddingVertical: 10,
+      }}
+    >
+      <Text style={{ color: '#fff', fontWeight: '900', fontSize: 12 }}>Test Notif</Text>
+    </TouchableOpacity>
+  </>
+);
 
 // ─── Root ─────────────────────────────────────────────────────────────────────
 export default function RootLayout() {
