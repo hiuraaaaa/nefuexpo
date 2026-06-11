@@ -21,7 +21,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useBatteryLevel, useBatteryState, BatteryState } from 'expo-battery';
 import { COLORS } from '@/constants';
-import { api, getAnimeSlug, decodeAnimeId, formatTime } from '@/hooks/api';
+import { api, getAnimeSlug, decodeAnimeId, formatTime } from '@/hooks/api/api';
 import { historyStorage, progressStorage, favoritStorage, storageMain } from '@/hooks/storage';
 import { xpStorage } from '@/hooks/xp';
 import { AnimeDetail, Episode, Server, Anime } from '@/types';
