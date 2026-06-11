@@ -16,7 +16,7 @@ import {
   searchByImageUri, TraceMoeResult,
   getBestTitle, formatTimestamp, formatSimilarity,
 } from '@/hooks/tracemoe';
-import { api, getAnimeSlug } from '@/hooks/api';
+import { api, getAnimeSlug } from '@/hooks/api/api';
 import { Anime } from '@/types';
 
 interface Props {
