@@ -1,9 +1,6 @@
 import { useEffect } from 'react';
 import * as Notifications from 'expo-notifications';
-import { api, getAnimeSlug } from '@/hooks/api';
-import { Anime } from '@/types';
-
-// ─── Config ───────────────────────────────────────────────────────────────────
+import { api } from '@/hooks/api';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -15,16 +12,12 @@ Notifications.setNotificationHandler({
 
 const NOTIF_GROUP = 'nefusoft-schedule';
 
-// ─── Permission ───────────────────────────────────────────────────────────────
-
 export const requestNotifPermission = async (): Promise<boolean> => {
   const { status: existing } = await Notifications.getPermissionsAsync();
   if (existing === 'granted') return true;
   const { status } = await Notifications.requestPermissionsAsync();
   return status === 'granted';
 };
-
-// ─── Cancel semua notif jadwal ────────────────────────────────────────────────
 
 export const cancelScheduleNotifs = async (): Promise<void> => {
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
@@ -34,38 +27,27 @@ export const cancelScheduleNotifs = async (): Promise<void> => {
   await Promise.all(ids.map(id => Notifications.cancelScheduledNotificationAsync(id)));
 };
 
-// ─── Schedule notif untuk satu anime ─────────────────────────────────────────
-
-const scheduleAnimeNotif = async (anime: Anime, triggerTs: number): Promise<void> => {
-  const triggerDate = new Date(triggerTs * 1000);
-  const now         = new Date();
-
-  if (triggerDate <= now) {
-    console.log('[Notif] SKIP - waktu sudah lewat:', anime.title, triggerDate.toISOString());
+export const sendTestNotif = async (): Promise<void> => {
+  const granted = await requestNotifPermission();
+  if (!granted) {
+    console.log('[Notif] Permission denied');
     return;
   }
 
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: '🎌 Anime Baru Tersedia',
-      body:  `${anime.title} sudah bisa ditonton!`,
-      data:  {
-        group: NOTIF_GROUP,
-        slug:  getAnimeSlug(anime),
-        url:   `/watch/${getAnimeSlug(anime)}`,
-      },
-      ...(({ categoryIdentifier: NOTIF_GROUP }) as any),
+      title: '🎌 Test Notifikasi',
+      body:  'Kalau ini muncul, notif berfungsi dengan baik!',
+      data:  { group: NOTIF_GROUP, url: '/' },
     },
     trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DATE,
-      date: triggerDate,
+      type:    Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+      seconds: 5,
     },
   });
 
-  console.log('[Notif] Scheduled:', anime.title, '->', triggerDate.toISOString());
+  console.log('[Notif] Test notif scheduled, tunggu 5 detik...');
 };
-
-// ─── Main: reschedule semua notif jadwal ──────────────────────────────────────
 
 export const rescheduleNotifs = async (): Promise<void> => {
   try {
@@ -76,49 +58,51 @@ export const rescheduleNotifs = async (): Promise<void> => {
     await cancelScheduleNotifs();
 
     const res = await api.schedule();
-    console.log('[Notif] Schedule data sample:', JSON.stringify(res.data).slice(0, 300));
     if (!res.data) return;
 
-    const now      = new Date();
-    const today    = now.toDateString();
-    const tomorrow = new Date(now.getTime() + 86400000).toDateString();
+    const now   = new Date();
+    let   count = 0;
 
-    console.log('[Notif] Today:', today, '| Tomorrow:', tomorrow);
-
-    const animeToSchedule: { anime: Anime; ts: number }[] = [];
-
-    for (const dayAnimes of Object.values(res.data)) {
-      for (const anime of dayAnimes) {
-        if (!anime.updated) {
-          console.log('[Notif] SKIP - no updated field:', anime.title);
+    for (const animeList of Object.values(res.data)) {
+      for (const anime of animeList) {
+        const updated = (anime as any).updated;
+        if (!updated) {
+          console.log('[Notif] SKIP - no updated:', anime.title);
           continue;
         }
 
-        const animeDate = new Date(anime.updated * 1000).toDateString();
+        const triggerDate = new Date(updated * 1000);
 
-        if (animeDate !== today && animeDate !== tomorrow) {
-          console.log('[Notif] SKIP - bukan hari ini/besok:', anime.title, animeDate);
+        if (triggerDate <= now) {
+          console.log('[Notif] SKIP - sudah lewat:', anime.title, triggerDate.toISOString());
           continue;
         }
 
-        console.log('[Notif] QUEUED:', anime.title, '->', animeDate);
-        animeToSchedule.push({ anime, ts: anime.updated });
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: '🎌 Anime Baru Tersedia',
+            body:  `${anime.title} sudah bisa ditonton!`,
+            data:  {
+              group: NOTIF_GROUP,
+              url:   `/watch/${(anime as any).id}`,
+            },
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: triggerDate,
+          },
+        });
+
+        console.log('[Notif] Scheduled:', anime.title, '->', triggerDate.toISOString());
+        count++;
       }
     }
 
-    console.log('[Notif] Total to schedule:', animeToSchedule.length);
-
-    await Promise.all(
-      animeToSchedule.map(({ anime, ts }) => scheduleAnimeNotif(anime, ts))
-    );
-
-    console.log('[Notif] Done scheduling', animeToSchedule.length, 'notifications');
+    console.log('[Notif] Done scheduling', count, 'notifications');
   } catch (e) {
     console.warn('[Notif] ERROR:', e);
   }
 };
-
-// ─── Handle tap notif → navigate ─────────────────────────────────────────────
 
 export const useNotifTapHandler = (router: any) => {
   useEffect(() => {
