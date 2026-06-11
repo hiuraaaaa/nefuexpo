@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import * as Notifications from 'expo-notifications';
 import { api, getAnimeSlug } from '@/hooks/api';
 import { Anime } from '@/types';
@@ -39,8 +40,10 @@ const scheduleAnimeNotif = async (anime: Anime, triggerTs: number): Promise<void
   const triggerDate = new Date(triggerTs * 1000);
   const now         = new Date();
 
-  // Skip kalau waktunya udah lewat
-  if (triggerDate <= now) return;
+  if (triggerDate <= now) {
+    console.log('[Notif] SKIP - waktu sudah lewat:', anime.title, triggerDate.toISOString());
+    return;
+  }
 
   await Notifications.scheduleNotificationAsync({
     content: {
@@ -51,7 +54,6 @@ const scheduleAnimeNotif = async (anime: Anime, triggerTs: number): Promise<void
         slug:  getAnimeSlug(anime),
         url:   `/watch/${getAnimeSlug(anime)}`,
       },
-      // Group notif per hari di Android
       ...(({ categoryIdentifier: NOTIF_GROUP }) as any),
     },
     trigger: {
@@ -59,61 +61,72 @@ const scheduleAnimeNotif = async (anime: Anime, triggerTs: number): Promise<void
       date: triggerDate,
     },
   });
+
+  console.log('[Notif] Scheduled:', anime.title, '->', triggerDate.toISOString());
 };
 
 // ─── Main: reschedule semua notif jadwal ──────────────────────────────────────
-// Dipanggil tiap app buka
-// Fetch jadwal → filter hari ini + besok → schedule notif per anime
 
 export const rescheduleNotifs = async (): Promise<void> => {
   try {
     const granted = await requestNotifPermission();
+    console.log('[Notif] Permission granted:', granted);
     if (!granted) return;
 
-    // Cancel semua notif lama dulu
     await cancelScheduleNotifs();
 
-    // Fetch jadwal
     const res = await api.schedule();
+    console.log('[Notif] Schedule data sample:', JSON.stringify(res.data).slice(0, 300));
     if (!res.data) return;
 
-    const now       = new Date();
-    const today     = now.toDateString();
-    const tomorrow  = new Date(now.getTime() + 86400000).toDateString();
+    const now      = new Date();
+    const today    = now.toDateString();
+    const tomorrow = new Date(now.getTime() + 86400000).toDateString();
+
+    console.log('[Notif] Today:', today, '| Tomorrow:', tomorrow);
 
     const animeToSchedule: { anime: Anime; ts: number }[] = [];
 
     for (const dayAnimes of Object.values(res.data)) {
       for (const anime of dayAnimes) {
-        if (!anime.updated) continue;
+        if (!anime.updated) {
+          console.log('[Notif] SKIP - no updated field:', anime.title);
+          continue;
+        }
 
         const animeDate = new Date(anime.updated * 1000).toDateString();
 
-        // Hanya hari ini + besok
-        if (animeDate !== today && animeDate !== tomorrow) continue;
+        if (animeDate !== today && animeDate !== tomorrow) {
+          console.log('[Notif] SKIP - bukan hari ini/besok:', anime.title, animeDate);
+          continue;
+        }
 
+        console.log('[Notif] QUEUED:', anime.title, '->', animeDate);
         animeToSchedule.push({ anime, ts: anime.updated });
       }
     }
 
-    // Schedule semua
+    console.log('[Notif] Total to schedule:', animeToSchedule.length);
+
     await Promise.all(
       animeToSchedule.map(({ anime, ts }) => scheduleAnimeNotif(anime, ts))
     );
 
-    console.log(`[Notif] Scheduled ${animeToSchedule.length} notifications`);
+    console.log('[Notif] Done scheduling', animeToSchedule.length, 'notifications');
   } catch (e) {
-    console.warn('[Notif] rescheduleNotifs error:', e);
+    console.warn('[Notif] ERROR:', e);
   }
 };
 
 // ─── Handle tap notif → navigate ─────────────────────────────────────────────
-// Pasang listener ini di _layout.tsx
 
 export const useNotifTapHandler = (router: any) => {
-  Notifications.addNotificationResponseReceivedListener(response => {
-    const url = response.notification.request.content.data?.url as string | undefined;
-    if (url) router.push(url);
-  });
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener(response => {
+      const url = response.notification.request.content.data?.url as string | undefined;
+      console.log('[Notif] Tap received, url:', url);
+      if (url) router.push(url);
+    });
+    return () => sub.remove();
+  }, []);
 };
-
