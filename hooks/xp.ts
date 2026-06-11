@@ -1,4 +1,4 @@
-import { storageMain } from '@/hooks/storage';
+import { storageMain } from '@/hooks/storage/storage';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type XPData = {
