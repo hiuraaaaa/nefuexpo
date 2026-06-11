@@ -3,7 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useEffect, useState, Component, ReactNode } from 'react';
-import { Text, ScrollView } from 'react-native';
+import { Text, ScrollView, TouchableOpacity } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { loadSavedTheme, useTheme } from '@/hooks/theme';
 import { isAdmin, onAuthStateChanged } from '@/hooks/auth';
@@ -13,10 +13,8 @@ import firestore from '@react-native-firebase/firestore';
 import { refreshDomain } from '@/hooks/scraper';
 import { SystemBars } from 'react-native-edge-to-edge';
 import { useRouter } from 'expo-router';
-import { rescheduleNotifs, useNotifTapHandler } from '@/hooks/notifications';
+import { rescheduleNotifs, useNotifTapHandler, sendTestNotif } from '@/hooks/notifications';
 import '../global.css';
-import { Text, ScrollView, TouchableOpacity } from 'react-native';  // ← tambah TouchableOpacity
-import { rescheduleNotifs, useNotifTapHandler, sendTestNotif } from '@/hooks/notifications';  // ← tambah sendTestNotif
 
 SplashScreen.preventAutoHideAsync();
 
