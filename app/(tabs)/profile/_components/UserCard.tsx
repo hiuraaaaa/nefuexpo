@@ -1,3 +1,4 @@
+// UserCard.tsx
 import React from 'react';
 import { View, Text, TouchableOpacity, Alert } from 'react-native';
 import { Image } from 'expo-image';
@@ -8,14 +9,18 @@ import * as Haptics from 'expo-haptics';
 import { signOut } from '@/hooks/auth';
 import { useTheme } from '@/hooks/theme';
 import { LevelBadge } from '@/components/LevelBadge';
+import { XPData } from '@/hooks/xp';
 
 interface Props {
-  user: any;
-  admin: boolean;
+  user:    any;
+  admin:   boolean;
+  xpData:  XPData;
 }
 
-export function UserCard({ user, admin }: Props) {
+export function UserCard({ user, admin, xpData }: Props) {
   const theme = useTheme();
+
+  if (!user) return null;  // ← guard, jangan render kalau user null
 
   const handleLogout = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -47,7 +52,7 @@ export function UserCard({ user, admin }: Props) {
         <View style={{ flex: 1, gap: 3 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Text style={{ color: theme.text, fontSize: 15, fontWeight: '800' }} numberOfLines={1}>
-              {user.displayName}
+              {user.displayName ?? 'User'}
             </Text>
             {admin && (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: theme.accent, paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 }}>
@@ -56,8 +61,10 @@ export function UserCard({ user, admin }: Props) {
               </View>
             )}
           </View>
-          <Text style={{ color: theme.subtext, fontSize: 11 }} numberOfLines={1}>{user.email}</Text>
-          <LevelBadge xp={0} size="sm" />
+          <Text style={{ color: theme.subtext, fontSize: 11 }} numberOfLines={1}>
+            {user.email ?? ''}
+          </Text>
+          <LevelBadge xp={xpData.xp} size="sm" />
         </View>
         <TouchableOpacity
           onPress={handleLogout}
