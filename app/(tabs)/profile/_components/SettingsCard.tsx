@@ -4,7 +4,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/hooks/theme';
 import { THEMES } from '@/constants';
-import { storageMain } from '@/hooks/storage';
+import { storageMain } from '@/hooks/storage/storage';
 import { SectionLabel, SettingRow, Card } from './shared';
 
 const PIP_KEY  = 'nefusoft_pip';
