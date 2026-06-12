@@ -1,6 +1,6 @@
 // app/(tabs)/_layout.tsx
 import React, { memo, useEffect } from 'react';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { Tabs } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
@@ -11,11 +11,8 @@ import Animated, {
   interpolate,
 } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
-import {
-  Home, Compass, Newspaper, Calendar, User, type LucideIcon,
-} from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/theme';
-import { type Theme } from '@/constants';
 
 const FLOAT_MARGIN  = 16;
 const TAB_HEIGHT    = 62;
@@ -23,14 +20,20 @@ const BORDER_RADIUS = 36;
 const ICON_SIZE     = 23;
 
 type TabName = 'index' | 'explore' | 'news' | 'schedule' | 'profile';
-interface TabConfig { name: TabName; label: string; Icon: LucideIcon; badge?: string; }
+interface TabConfig {
+  name: TabName;
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  iconFocused: keyof typeof Ionicons.glyphMap;
+  badge?: string;
+}
 
 const TABS: readonly TabConfig[] = [
-  { name: 'index',    label: 'Home',     Icon: Home      },
-  { name: 'explore',  label: 'Explore',  Icon: Compass   },
-  { name: 'news',     label: 'News',     Icon: Newspaper, badge: 'NEW' },
-  { name: 'schedule', label: 'Schedule', Icon: Calendar  },
-  { name: 'profile',  label: 'Profile',  Icon: User      },
+  { name: 'index',    label: 'Home',     icon: 'home-outline',     iconFocused: 'home'          },
+  { name: 'explore',  label: 'Explore',  icon: 'compass-outline',  iconFocused: 'compass'       },
+  { name: 'news',     label: 'News',     icon: 'newspaper-outline', iconFocused: 'newspaper',   badge: 'NEW' },
+  { name: 'schedule', label: 'Schedule', icon: 'calendar-outline', iconFocused: 'calendar'      },
+  { name: 'profile',  label: 'Profile',  icon: 'person-outline',   iconFocused: 'person'        },
 ] as const;
 
 // ── Background ────────────────────────────────────────────────────────────────
@@ -54,11 +57,16 @@ TabBarBackground.displayName = 'TabBarBackground';
 
 // ── Tab Icon ──────────────────────────────────────────────────────────────────
 interface TabIconProps {
-  focused: boolean; Icon: LucideIcon; badge?: string;
-  accent: string; accentDim: string; subtext: string;
+  focused: boolean;
+  icon: keyof typeof Ionicons.glyphMap;
+  iconFocused: keyof typeof Ionicons.glyphMap;
+  badge?: string;
+  accent: string;
+  accentDim: string;
+  subtext: string;
 }
 
-const TabIcon = memo<TabIconProps>(({ focused, Icon, badge, accent, accentDim, subtext }) => {
+const TabIcon = memo<TabIconProps>(({ focused, icon, iconFocused, badge, accent, accentDim, subtext }) => {
   const scale    = useSharedValue(focused ? 1.1 : 1);
   const progress = useSharedValue(focused ? 1 : 0);
 
@@ -84,11 +92,10 @@ const TabIcon = memo<TabIconProps>(({ focused, Icon, badge, accent, accentDim, s
       <Animated.View style={[styles.pill, { backgroundColor: accentDim }, pillStyle]} />
       <Animated.View style={[iconAnimStyle, { zIndex: 1 }]}>
         <View>
-          <Icon
+          <Ionicons
+            name={focused ? iconFocused : icon}
             size={ICON_SIZE}
             color={focused ? accent : subtext}
-            strokeWidth={focused ? 2.2 : 1.8}
-            fill={focused ? accent + '30' : 'transparent'}
           />
           {badge != null && (
             <View style={[styles.badge, { backgroundColor: accent }]}>
@@ -125,14 +132,11 @@ export default function TabLayout() {
           bottom:          bottomPad + FLOAT_MARGIN,
           left:            FLOAT_MARGIN,
           right:           FLOAT_MARGIN,
-          width:           undefined,
           height:          TAB_HEIGHT,
           paddingBottom:   0,
           paddingTop:      0,
           paddingLeft:     0,
           paddingRight:    0,
-          marginLeft:      FLOAT_MARGIN,
-          marginRight:     FLOAT_MARGIN,
           backgroundColor: 'transparent',
           borderTopWidth:  0,
           elevation:       0,
@@ -157,7 +161,8 @@ export default function TabLayout() {
             tabBarIcon: ({ focused }) => (
               <TabIcon
                 focused={focused}
-                Icon={tab.Icon}
+                icon={tab.icon}
+                iconFocused={tab.iconFocused}
                 badge={tab.badge}
                 accent={theme.accent}
                 accentDim={theme.accentDim}
