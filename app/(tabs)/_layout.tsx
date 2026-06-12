@@ -185,6 +185,7 @@ const styles = StyleSheet.create({
     width:          '100%',
     height:         TAB_HEIGHT,
     paddingTop:     20,
+    backgroundColor: 'red', // temporary debug
   },
   pill: {
     position:     'absolute',
