@@ -1,9 +1,8 @@
+// index.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, TouchableOpacity, ScrollView,
-  Alert,
+  View, Text, TouchableOpacity, ScrollView, Alert,
 } from 'react-native';
-import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,14 +17,14 @@ import { xpStorage, XPData } from '@/hooks/xp';
 import { historyStorage, favoritStorage, storageMain } from '@/hooks/storage/storage';
 import { HistoryItem, Anime } from '@/types';
 
-import { UserCard }          from './_components/UserCard';
-import { XPCard }            from './_components/XPCard';
-import { HistoryCard }       from './_components/HistoryCard';
-import { FavoritCard }       from './_components/FavoritCard';
-import { SettingsCard }      from './_components/SettingsCard';
-import { ThemePickerModal }  from './_components/ThemePickerModal';
-import { TentangModal }      from './_components/TentangModal';
-import { AdminPanel }        from './_components/admin/AdminPanel';
+import { UserCard }         from './_components/UserCard';
+import { XPCard }           from './_components/XPCard';
+import { HistoryCard }      from './_components/HistoryCard';
+import { FavoritCard }      from './_components/FavoritCard';
+import { SettingsCard }     from './_components/SettingsCard';
+import { ThemePickerModal } from './_components/ThemePickerModal';
+import { TentangModal }     from './_components/TentangModal';
+import { AdminPanel }       from './_components/admin/AdminPanel';
 import { SectionLabel, Card, SettingRow } from './_components/shared';
 
 const PIP_KEY  = 'nefusoft_pip';
@@ -34,6 +33,7 @@ const INFO_KEY = 'nefusoft_info';
 export default function ProfileScreen() {
   const theme = useTheme();
 
+  const [authReady, setAuthReady] = useState(false);
   const [user, setUser]           = useState<any>(null);
   const [xpData, setXpData]       = useState<XPData>({ xp: 0, level: 1, streak: 0, lastWatchDate: '', _todayXP: 0 });
   const [history, setHistory]     = useState<HistoryItem[]>([]);
@@ -46,14 +46,15 @@ export default function ProfileScreen() {
   const [pip, setPip]   = useState(() => storageMain.getBoolean(PIP_KEY)  ?? false);
   const [info, setInfo] = useState(() => storageMain.getBoolean(INFO_KEY) ?? false);
 
-  const [showTheme, setShowTheme]       = useState(false);
-  const [showTentang, setShowTentang]   = useState(false);
-  const [showAdmin, setShowAdmin]       = useState(false);
+  const [showTheme, setShowTheme]     = useState(false);
+  const [showTentang, setShowTentang] = useState(false);
+  const [showAdmin, setShowAdmin]     = useState(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged((u: any) => {
-      setUser(u);
+      setUser(u ?? null);
       setAdmin(isAdmin());
+      setAuthReady(true);  // ← auth state sudah resolved
     });
     return unsub;
   }, []);
@@ -94,6 +95,9 @@ export default function ProfileScreen() {
     loadAllUsers();
   };
 
+  // Tunggu auth state resolved dulu sebelum render
+  if (!authReady) return null;
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
@@ -114,7 +118,7 @@ export default function ProfileScreen() {
 
         {user ? (
           <Animated.View entering={FadeIn.duration(300)}>
-            <UserCard user={user} admin={admin} />
+            <UserCard user={user} admin={admin} xpData={xpData} />
             <XPCard xpData={xpData} />
             <FavoritCard favorites={favorites} />
             <HistoryCard history={history} />
@@ -127,7 +131,6 @@ export default function ProfileScreen() {
           </Animated.View>
         ) : (
           <>
-            {/* Login card */}
             <Animated.View
               entering={FadeInDown.delay(60).springify()}
               style={{
@@ -156,7 +159,6 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             </Animated.View>
 
-            {/* Tentang tanpa login */}
             <Animated.View entering={FadeInDown.delay(120).springify()}>
               <SectionLabel label="Tentang" />
               <Card>
@@ -184,4 +186,4 @@ export default function ProfileScreen() {
       />
     </SafeAreaView>
   );
-}
+              }
