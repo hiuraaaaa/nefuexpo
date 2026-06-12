@@ -1,7 +1,6 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useEffect, useState, Component, ReactNode } from 'react';
 import { Text, ScrollView, TouchableOpacity } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
@@ -137,9 +136,7 @@ export default function RootLayout() {
   return (
     <RootErrorBoundary>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <SafeAreaProvider>
-          <AppLayout />
-        </SafeAreaProvider>
+        <AppLayout />
       </GestureHandlerRootView>
     </RootErrorBoundary>
   );
