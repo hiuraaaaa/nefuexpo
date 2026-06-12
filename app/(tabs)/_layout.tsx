@@ -22,7 +22,7 @@ const TAB_HEIGHT    = 62;
 const BORDER_RADIUS = 36;
 const ICON_SIZE     = 23;
 
-type TabName = 'index' | 'explore' | 'news' | 'schedule' | 'profile';
+type TabName = 'index' | 'explore' | 'news' | 'schedule' | 'profile/index';
 interface TabConfig { name: TabName; label: string; Icon: LucideIcon; badge?: string; }
 
 const TABS: readonly TabConfig[] = [
@@ -30,7 +30,7 @@ const TABS: readonly TabConfig[] = [
   { name: 'explore',  label: 'Explore',  Icon: Compass   },
   { name: 'news',     label: 'News',     Icon: Newspaper, badge: 'NEW' },
   { name: 'schedule', label: 'Schedule', Icon: Calendar  },
-  { name: 'profile',  label: 'Profile',  Icon: User      },
+  { name: 'profile/index', label: 'Profile', Icon: User },
 ] as const;
 
 // ── Background ────────────────────────────────────────────────────────────────
