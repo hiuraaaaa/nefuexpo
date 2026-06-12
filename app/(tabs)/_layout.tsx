@@ -168,7 +168,6 @@ export default function TabLayout() {
         />
       ))}
       <Tabs.Screen name="ongoing" options={{ href: null }} />
-      <Tabs.Screen name="profile/_components" options={{ href: null }} />
       <Tabs.Screen name="history" options={{ href: null }} />
     </Tabs>
   );
