@@ -1,172 +1,241 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import firestore, { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
-import { getCurrentUser } from '@/hooks/auth';
+import auth from '@react-native-firebase/auth';
 
 export interface RoomMember {
+  uid: string;
   display_name: string;
   avatar: string | null;
   joined_at: number;
+  is_host: boolean;
 }
 
-export interface RoomData {
+export interface ChatMessage {
+  id: string;
+  uid: string;
+  display_name: string;
+  avatar: string | null;
+  text: string;
+  sent_at: number;
+}
+
+export interface RoomState {
+  code: string;
   anime_id: string;
+  anime_title: string;
+  anime_poster: string;
   episode_id: string;
+  episode_num: number;
   host_uid: string;
   is_playing: boolean;
   position: number;
-  updated_at: FirebaseFirestoreTypes.Timestamp | null;
-  members: Record<string, RoomMember>;
+  updated_at: number;
 }
 
-const generateCode = () =>
-  Math.random().toString(36).substring(2, 8).toUpperCase();
+function generateCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
 
 export function useRoom() {
-  const [roomCode, setRoomCode]   = useState<string | null>(null);
-  const [roomData, setRoomData]   = useState<RoomData | null>(null);
-  const [isHost, setIsHost]       = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError]         = useState<string | null>(null);
+  const [roomCode, setRoomCode]       = useState<string | null>(null);
+  const [room, setRoom]               = useState<RoomState | null>(null);
+  const [members, setMembers]         = useState<RoomMember[]>([]);
+  const [messages, setMessages]       = useState<ChatMessage[]>([]);
+  const [isHost, setIsHost]           = useState(false);
+  const [loading, setLoading]         = useState(false);
+  const [error, setError]             = useState<string | null>(null);
 
-  const unsubRef = useRef<(() => void) | null>(null);
+  const unsubRoom     = useRef<(() => void) | null>(null);
+  const unsubMembers  = useRef<(() => void) | null>(null);
+  const unsubMessages = useRef<(() => void) | null>(null);
 
-  // Subscribe ke room realtime
-  const subscribeRoom = useCallback((code: string) => {
-    unsubRef.current?.();
-    unsubRef.current = firestore()
+  const currentUser = auth().currentUser;
+
+  const cleanup = useCallback(() => {
+    unsubRoom.current?.();
+    unsubMembers.current?.();
+    unsubMessages.current?.();
+    unsubRoom.current = null;
+    unsubMembers.current = null;
+    unsubMessages.current = null;
+  }, []);
+
+  const subscribeToRoom = useCallback((code: string) => {
+    cleanup();
+
+    // Subscribe room state
+    unsubRoom.current = firestore()
       .collection('rooms')
       .doc(code)
-      .onSnapshot(
-        snap => {
-          if (snap.exists) {
-            setRoomData(snap.data() as RoomData);
-          } else {
-            // Room dihapus (host keluar)
-            setRoomCode(null);
-            setRoomData(null);
-            setIsHost(false);
-          }
-        },
-        err => console.warn('[useRoom] snapshot error:', err),
-      );
-  }, []);
+      .onSnapshot(snap => {
+        if (!snap.exists) { setRoom(null); setRoomCode(null); return; }
+        setRoom(snap.data() as RoomState);
+      });
 
-  const createRoom = useCallback(
-    async (anime_id: string, episode_id: string): Promise<string | null> => {
-      const user = getCurrentUser();
-      if (!user) { setError('Login dulu untuk buat room'); return null; }
+    // Subscribe members
+    unsubMembers.current = firestore()
+      .collection('rooms').doc(code)
+      .collection('members')
+      .orderBy('joined_at', 'asc')
+      .onSnapshot(snap => {
+        setMembers(snap.docs.map(d => ({ uid: d.id, ...d.data() } as RoomMember)));
+      });
 
-      setIsLoading(true);
-      setError(null);
-      try {
-        const code: string = generateCode();
-        const member: RoomMember = {
-          display_name: user.displayName ?? 'User',
-          avatar:       user.photoURL ?? null,
-          joined_at:    Date.now(),
-        };
-        const data: RoomData = {
-          anime_id,
-          episode_id,
-          host_uid:   user.uid,
-          is_playing: false,
-          position:   0,
-          updated_at: null,
-          members:    { [user.uid]: member },
-        };
-        await firestore().collection('rooms').doc(code).set(data);
-        setRoomCode(code);
-        setIsHost(true);
-        subscribeRoom(code);
-        return code;
-      } catch (e: any) {
-        setError('Gagal buat room');
-        console.warn('[useRoom] createRoom error:', e);
-        return null;
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [subscribeRoom],
-  );
+    // Subscribe chat (last 50 messages)
+    unsubMessages.current = firestore()
+      .collection('rooms').doc(code)
+      .collection('messages')
+      .orderBy('sent_at', 'asc')
+      .limitToLast(50)
+      .onSnapshot(snap => {
+        setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() } as ChatMessage)));
+      });
+  }, [cleanup]);
 
-  const joinRoom = useCallback(
-    async (code: string): Promise<boolean> => {
-      const user = getCurrentUser();
-      if (!user) { setError('Login dulu untuk join room'); return false; }
-
-      setIsLoading(true);
-      setError(null);
-      try {
-        const snap = await firestore().collection('rooms').doc(code).get();
-        if (!snap.exists) { setError('Room tidak ditemukan'); return false; }
-
-        const member: RoomMember = {
-          display_name: user.displayName ?? 'User',
-          avatar:       user.photoURL ?? null,
-          joined_at:    Date.now(),
-        };
-        await firestore()
-          .collection('rooms')
-          .doc(code)
-          .update({ [`members.${user.uid}`]: member });
-
-        setRoomCode(code);
-        setIsHost(false);
-        subscribeRoom(code);
-        return true;
-      } catch (e: any) {
-        setError('Gagal join room');
-        console.warn('[useRoom] joinRoom error:', e);
-        return false;
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [subscribeRoom],
-  );
-
-  const leaveRoom = useCallback(async () => {
-    const user = getCurrentUser();
-    if (!roomCode || !user) return;
+  // Create room
+  const createRoom = useCallback(async (params: {
+    anime_id: string;
+    anime_title: string;
+    anime_poster: string;
+    episode_id: string;
+    episode_num: number;
+  }) => {
+    if (!currentUser) { setError('Login dulu untuk membuat room'); return null; }
+    setLoading(true);
+    setError(null);
 
     try {
-      if (isHost) {
-        // Host keluar → hapus room
-        await firestore().collection('rooms').doc(roomCode).delete();
-      } else {
-        // Member keluar → remove dari members map
-        await firestore()
-          .collection('rooms')
-          .doc(roomCode)
-          .update({
-            [`members.${user.uid}`]: firestore.FieldValue.delete(),
-          });
-      }
-    } catch (e) {
-      console.warn('[useRoom] leaveRoom error:', e);
-    } finally {
-      unsubRef.current?.();
-      unsubRef.current = null;
-      setRoomCode(null);
-      setRoomData(null);
-      setIsHost(false);
-    }
-  }, [roomCode, isHost]);
+      const code = generateCode();
+      const now  = Date.now();
 
-  useEffect(() => {
-    return () => { unsubRef.current?.(); };
-  }, []);
+      const roomData: RoomState = {
+        code,
+        ...params,
+        host_uid:   currentUser.uid,
+        is_playing: false,
+        position:   0,
+        updated_at: now,
+      };
+
+      const batch = firestore().batch();
+      const roomRef   = firestore().collection('rooms').doc(code);
+      const memberRef = roomRef.collection('members').doc(currentUser.uid);
+
+      batch.set(roomRef, roomData);
+      batch.set(memberRef, {
+        display_name: currentUser.displayName || 'User',
+        avatar:       currentUser.photoURL || null,
+        joined_at:    now,
+        is_host:      true,
+      });
+
+      await batch.commit();
+
+      setRoomCode(code);
+      setIsHost(true);
+      subscribeToRoom(code);
+      return code;
+    } catch (e: any) {
+      setError(e.message || 'Gagal membuat room');
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [currentUser, subscribeToRoom]);
+
+  // Join room
+  const joinRoom = useCallback(async (code: string) => {
+    if (!currentUser) { setError('Login dulu untuk bergabung'); return false; }
+    setLoading(true);
+    setError(null);
+
+    try {
+      const snap = await firestore().collection('rooms').doc(code.toUpperCase()).get();
+      if (!snap.exists) { setError('Room tidak ditemukan'); return false; }
+
+      const now = Date.now();
+      await firestore()
+        .collection('rooms').doc(code.toUpperCase())
+        .collection('members').doc(currentUser.uid)
+        .set({
+          display_name: currentUser.displayName || 'User',
+          avatar:       currentUser.photoURL || null,
+          joined_at:    now,
+          is_host:      false,
+        });
+
+      const isHostUser = (snap.data() as RoomState).host_uid === currentUser.uid;
+      setRoomCode(code.toUpperCase());
+      setIsHost(isHostUser);
+      subscribeToRoom(code.toUpperCase());
+      return true;
+    } catch (e: any) {
+      setError(e.message || 'Gagal bergabung ke room');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [currentUser, subscribeToRoom]);
+
+  // Leave room
+  const leaveRoom = useCallback(async () => {
+    if (!currentUser || !roomCode) return;
+    try {
+      await firestore()
+        .collection('rooms').doc(roomCode)
+        .collection('members').doc(currentUser.uid)
+        .delete();
+
+      // If host, delete room
+      if (isHost) {
+        await firestore().collection('rooms').doc(roomCode).delete();
+      }
+    } catch {}
+    cleanup();
+    setRoomCode(null);
+    setRoom(null);
+    setMembers([]);
+    setMessages([]);
+    setIsHost(false);
+  }, [currentUser, roomCode, isHost, cleanup]);
+
+  // Send chat message
+  const sendMessage = useCallback(async (text: string) => {
+    if (!currentUser || !roomCode || !text.trim()) return;
+    try {
+      await firestore()
+        .collection('rooms').doc(roomCode)
+        .collection('messages')
+        .add({
+          uid:          currentUser.uid,
+          display_name: currentUser.displayName || 'User',
+          avatar:       currentUser.photoURL || null,
+          text:         text.trim(),
+          sent_at:      Date.now(),
+        });
+    } catch {}
+  }, [currentUser, roomCode]);
+
+  // Host: update playback state
+  const updatePlayback = useCallback(async (update: Partial<Pick<RoomState, 'is_playing' | 'position' | 'episode_id' | 'episode_num'>>) => {
+    if (!isHost || !roomCode) return;
+    try {
+      await firestore().collection('rooms').doc(roomCode).update({
+        ...update,
+        updated_at: Date.now(),
+      });
+    } catch {}
+  }, [isHost, roomCode]);
+
+  useEffect(() => () => cleanup(), [cleanup]);
 
   return {
-    roomCode,
-    roomData,
-    isHost,
-    isLoading,
-    error,
-    createRoom,
-    joinRoom,
-    leaveRoom,
-    setError,
+    roomCode, room, members, messages,
+    isHost, loading, error,
+    createRoom, joinRoom, leaveRoom,
+    sendMessage, updatePlayback,
   };
 }
