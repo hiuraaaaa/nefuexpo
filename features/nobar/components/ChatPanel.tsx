@@ -5,7 +5,8 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';\nimport { COLORS } from '@/constants';
+import * as Haptics from 'expo-haptics';
+import { COLORS } from '@/constants';
 import type { ChatMessage } from '../hooks/useRoom';
 
 interface Props {
