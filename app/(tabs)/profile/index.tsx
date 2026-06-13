@@ -17,15 +17,15 @@ import { xpStorage, XPData } from '@/hooks/xp';
 import { historyStorage, favoritStorage, storageMain } from '@/hooks/storage/storage';
 import { HistoryItem, Anime } from '@/types';
 
-import { UserCard }         from '@/components/profile/UserCard';
-import { XPCard }           from '@/components/profile/XPCard';
-import { HistoryCard }      from '@/components/profile/HistoryCard';
-import { FavoritCard }      from '@/components/profile/FavoritCard';
-import { SettingsCard }     from '@/components/profile/SettingsCard';
-import { ThemePickerModal } from '@/components/profile/ThemePickerModal';
-import { TentangModal }     from '@/components/profile/TentangModal';
-import { AdminPanel }       from '@/components/profile/admin/AdminPanel';
-import { SectionLabel, Card, SettingRow } from '@/components/profile/shared';
+import { UserCard }         from '@/features/profile/components/UserCard';
+import { XPCard }           from '@/features/profile/components/XPCard';
+import { HistoryCard }      from '@/features/profile/components/HistoryCard';
+import { FavoritCard }      from '@/features/profile/components/FavoritCard';
+import { SettingsCard }     from '@/features/profile/components/SettingsCard';
+import { ThemePickerModal } from '@/features/profile/components/ThemePickerModal';
+import { TentangModal }     from '@/features/profile/components/TentangModal';
+import { AdminPanel }       from '@/features/profile/components/admin/AdminPanel';
+import { SectionLabel, Card, SettingRow } from '@/features/profile/components/shared';
 
 const PIP_KEY  = 'nefusoft_pip';
 const INFO_KEY = 'nefusoft_info';
