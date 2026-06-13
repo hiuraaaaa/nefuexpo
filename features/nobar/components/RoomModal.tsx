@@ -7,6 +7,7 @@ import {
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { Keyboard } from 'react-native';
 import { COLORS } from '@/constants';
 
 interface Props {
@@ -131,7 +132,7 @@ export function RoomModal({
                   {(['create', 'join'] as const).map(t => (
                     <TouchableOpacity
                       key={t}
-                      onPress={() => { Haptics.selectionAsync(); setTab(t); }}
+                      onPress={() => { Haptics.selectionAsync(); Keyboard.dismiss(); setTab(t); }}
                       style={{
                         flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center',
                         backgroundColor: tab === t ? COLORS.gold : 'transparent',
@@ -181,7 +182,6 @@ export function RoomModal({
                       placeholderTextColor="rgba(255,255,255,0.2)"
                       autoCapitalize="characters"
                       maxLength={6}
-                      autoFocus
                       style={{
                         backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 12,
                         paddingHorizontal: 16, paddingVertical: 16,
