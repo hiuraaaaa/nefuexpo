@@ -37,6 +37,7 @@ interface Props {
   canGoPrev: boolean;
   canGoNext: boolean;
   resetControlsTimer: () => void;
+  toggleControls: () => void;
   togglePlayPause: () => void;
   toggleFullscreen: () => void;
   handleTapLeft: () => void;
@@ -55,7 +56,7 @@ export function VideoPlayer({
   position, duration, selectedQuality, pipEnabled, infoEnabled,
   insetTop, title, currentEpNum, isFavorited,
   canGoPrev, canGoNext,
-  resetControlsTimer, togglePlayPause, toggleFullscreen,
+  resetControlsTimer, togglePlayPause, toggleFullscreen, toggleControls,
   handleTapLeft, handleTapRight, handlePrev, handleNext,
   onBack, onBookmark, onQualityPress, onSlidingComplete,
 }: Props) {
@@ -92,7 +93,7 @@ export function VideoPlayer({
       )}
 
       <TouchableOpacity activeOpacity={1} onPress={handleTapLeft}      style={{ position: 'absolute', top: 0, left: 0, width: '40%', bottom: 0 }} />
-      <TouchableOpacity activeOpacity={1} onPress={resetControlsTimer} style={{ position: 'absolute', top: 0, left: '40%', width: '20%', bottom: 0 }} />
+      <TouchableOpacity activeOpacity={1} onPress={toggleControls} style={{ position: 'absolute', top: 0, left: '40%', width: '20%', bottom: 0 }} />
       <TouchableOpacity activeOpacity={1} onPress={handleTapRight}     style={{ position: 'absolute', top: 0, right: 0, width: '40%', bottom: 0 }} />
 
       <SeekToast direction="left"  visible={seekLeft}  />
