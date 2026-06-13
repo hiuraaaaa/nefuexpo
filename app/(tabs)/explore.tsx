@@ -1,67 +1,149 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  FlatList, ScrollView, Dimensions, ActivityIndicator,
+  FlatList, ScrollView, ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { api, getAnimeSlug } from '@/hooks/api/api';
 import { Anime, Genre } from '@/types';
-import { CardSkeleton } from '@/components/Skeleton';
 import { useTheme } from '@/hooks/theme';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 
-const { width } = Dimensions.get('window');
-const NUM_COLUMNS = 3;
-const H_PAD = 12;
-const GAP = 8;
-const CARD_WIDTH = (width - H_PAD * 2 - GAP * (NUM_COLUMNS - 1)) / NUM_COLUMNS;
-
-const AnimeGridCard = React.memo(({ item, index, onPress, theme }: {
+// ── List Card (horizontal, detail lengkap) ────────────────────────────────────
+const AnimeListCard = React.memo(({ item, index, onPress, theme }: {
   item: Anime; index: number; onPress: () => void; theme: any;
-}) => (
-  <Animated.View
-    entering={FadeInDown.delay(Math.min(index * 25, 250)).springify()}
-    style={{ width: CARD_WIDTH }}
-  >
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={0.82}
-      style={{
-        borderRadius: 12, overflow: 'hidden',
-        backgroundColor: theme.card,
-        borderWidth: 1, borderColor: theme.border,
-      }}
-    >
-      <Image
-        source={{ uri: item.image_poster, priority: "normal" }}
-        style={{ width: '100%', aspectRatio: 2 / 3 }}
-        contentFit="cover"
-      />
-      <View style={{ padding: 7 }}>
-        <Text style={{ color: theme.text, fontSize: 10, fontWeight: '700', lineHeight: 14 }}
-          numberOfLines={2}>
-          {item.title}
-        </Text>
-        {item.type ? (
-          <View style={{
-            marginTop: 4, alignSelf: 'flex-start',
-            backgroundColor: theme.accentDim, paddingHorizontal: 6,
-            paddingVertical: 2, borderRadius: 4,
-          }}>
-            <Text style={{ color: theme.accent, fontSize: 8, fontWeight: '900' }}>
-              {item.type}
-            </Text>
-          </View>
-        ) : null}
-      </View>
-    </TouchableOpacity>
-  </Animated.View>
-));
+}) => {
+  const genres = item.genre
+    ? item.genre.split(',').map(g => g.trim()).filter(Boolean)
+    : [];
+  const visibleGenres = genres.slice(0, 3);
+  const extraGenres   = genres.length - visibleGenres.length;
 
+  return (
+    <Animated.View entering={FadeInDown.delay(Math.min(index * 30, 300)).springify()}>
+      <TouchableOpacity
+        onPress={onPress}
+        activeOpacity={0.82}
+        style={{
+          flexDirection: 'row',
+          backgroundColor: theme.card,
+          borderRadius: 14,
+          borderWidth: 1,
+          borderColor: theme.border,
+          overflow: 'hidden',
+          marginBottom: 10,
+        }}
+      >
+        {/* Poster */}
+        <Image
+          source={{ uri: item.image_poster, priority: 'normal' }}
+          style={{ width: 100, aspectRatio: 2 / 3 }}
+          contentFit="cover"
+        />
+
+        {/* Detail */}
+        <View style={{ flex: 1, padding: 10, justifyContent: 'space-between' }}>
+
+          {/* Baris atas: eps + status + tanggal */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+            <View style={{ flexDirection: 'row', gap: 6 }}>
+              {item.total_episode != null && (
+                <View style={{
+                  backgroundColor: theme.accentDim, borderRadius: 6,
+                  paddingHorizontal: 6, paddingVertical: 2,
+                }}>
+                  <Text style={{ color: theme.accent, fontSize: 9, fontWeight: '800' }}>
+                    {item.total_episode} Eps
+                  </Text>
+                </View>
+              )}
+              {item.status ? (
+                <View style={{
+                  backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 6,
+                  paddingHorizontal: 6, paddingVertical: 2,
+                }}>
+                  <Text style={{ color: theme.subtext, fontSize: 9, fontWeight: '700' }}>
+                    {item.status}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+            {item.year ? (
+              <Text style={{ color: theme.subtext, fontSize: 9, fontWeight: '600' }}>
+                {item.year}
+              </Text>
+            ) : null}
+          </View>
+
+          {/* Judul */}
+          <Text
+            style={{ color: theme.text, fontSize: 13, fontWeight: '800', lineHeight: 18, marginBottom: 4 }}
+            numberOfLines={2}
+          >
+            {item.title}
+          </Text>
+
+          {/* Genre tags */}
+          {genres.length > 0 && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginBottom: 5 }}>
+              {visibleGenres.map(g => (
+                <View key={g} style={{
+                  backgroundColor: 'rgba(255,255,255,0.05)',
+                  borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2,
+                  borderWidth: 1, borderColor: theme.border,
+                }}>
+                  <Text style={{ color: theme.subtext, fontSize: 8, fontWeight: '700' }}>{g}</Text>
+                </View>
+              ))}
+              {extraGenres > 0 && (
+                <View style={{
+                  backgroundColor: 'rgba(255,255,255,0.05)',
+                  borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2,
+                  borderWidth: 1, borderColor: theme.border,
+                }}>
+                  <Text style={{ color: theme.subtext, fontSize: 8, fontWeight: '700' }}>+{extraGenres}</Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Studio + score */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            {item.studio ? (
+              <Text style={{ color: theme.subtext, fontSize: 9, fontWeight: '600', flex: 1 }} numberOfLines={1}>
+                {item.studio}
+              </Text>
+            ) : null}
+            {item.score != null && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                <Ionicons name="star" size={9} color={theme.accent} />
+                <Text style={{ color: theme.accent, fontSize: 9, fontWeight: '800' }}>
+                  {item.score}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Synopsis preview */}
+          {item.synopsis ? (
+            <Text
+              style={{ color: theme.subtext, fontSize: 10, lineHeight: 14, marginTop: 5 }}
+              numberOfLines={3}
+            >
+              {item.synopsis}
+            </Text>
+          ) : null}
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+});
+
+// ── Load More Footer ──────────────────────────────────────────────────────────
 const LoadMoreFooter = ({ loading, onLoadMore, hasMore, theme }: {
   loading: boolean; onLoadMore: () => void; hasMore: boolean; theme: any;
 }) => {
@@ -77,7 +159,7 @@ const LoadMoreFooter = ({ loading, onLoadMore, hasMore, theme }: {
       onPress={onLoadMore}
       disabled={loading}
       style={{
-        marginHorizontal: 16, marginVertical: 16,
+        marginVertical: 16,
         paddingVertical: 14, borderRadius: 12,
         backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border,
         alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8,
@@ -96,6 +178,29 @@ const LoadMoreFooter = ({ loading, onLoadMore, hasMore, theme }: {
   );
 };
 
+// ── Skeleton ──────────────────────────────────────────────────────────────────
+const ListCardSkeleton = ({ theme }: { theme: any }) => (
+  <View style={{
+    flexDirection: 'row', backgroundColor: theme.card,
+    borderRadius: 14, borderWidth: 1, borderColor: theme.border,
+    overflow: 'hidden', marginBottom: 10, height: 130,
+  }}>
+    <View style={{ width: 100, backgroundColor: theme.border }} />
+    <View style={{ flex: 1, padding: 10, gap: 8 }}>
+      <View style={{ height: 10, width: '60%', backgroundColor: theme.border, borderRadius: 6 }} />
+      <View style={{ height: 14, width: '90%', backgroundColor: theme.border, borderRadius: 6 }} />
+      <View style={{ height: 14, width: '70%', backgroundColor: theme.border, borderRadius: 6 }} />
+      <View style={{ flexDirection: 'row', gap: 6 }}>
+        {[40, 50, 35].map((w, i) => (
+          <View key={i} style={{ height: 16, width: w, backgroundColor: theme.border, borderRadius: 5 }} />
+        ))}
+      </View>
+      <View style={{ height: 10, width: '80%', backgroundColor: theme.border, borderRadius: 6 }} />
+    </View>
+  </View>
+);
+
+// ── Main ──────────────────────────────────────────────────────────────────────
 export default function ExploreScreen() {
   const params = useLocalSearchParams<{ q?: string }>();
   const router = useRouter();
@@ -132,7 +237,7 @@ export default function ExploreScreen() {
 
       try {
         let res;
-        if (query)                          res = await api.searchLocal(query);
+        if (query)                          res = await api.search(query, page);
         else if (selectedGenres.length > 0) res = await api.genreFilter(selectedGenres, page);
         else                                res = await api.animeList(page);
 
@@ -140,9 +245,7 @@ export default function ExploreScreen() {
         if (mounted) {
           if (page === 0) setResults(newData);
           else setResults(prev => [...prev, ...newData]);
-          // Search local return semua sekaligus, ga perlu load more
-          if (query) setHasMore(false);
-          else setHasMore(newData.length >= 12);
+          setHasMore(newData.length >= 12);
         }
       } catch {
         if (mounted) {
@@ -179,24 +282,17 @@ export default function ExploreScreen() {
     setSelectedGenres([]);
   }, []);
 
-  const renderItem = useCallback(({ item, index }: { item: Anime | null; index: number }) => {
-    if (!item) return <View style={{ width: CARD_WIDTH }} />;
-    return (
-      <AnimeGridCard
-        item={item}
-        index={index}
-        theme={theme}
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          router.push(`/watch/${getAnimeSlug(item)}`);
-        }}
-      />
-    );
-  }, [theme, router]);
-
-  const paddedResults = results.length % NUM_COLUMNS === 0
-    ? results
-    : [...results, ...Array(NUM_COLUMNS - (results.length % NUM_COLUMNS)).fill(null)];
+  const renderItem = useCallback(({ item, index }: { item: Anime; index: number }) => (
+    <AnimeListCard
+      item={item}
+      index={index}
+      theme={theme}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        router.push(`/watch/${getAnimeSlug(item)}`);
+      }}
+    />
+  ), [theme, router]);
 
   const ListHeader = (
     <View>
@@ -245,7 +341,7 @@ export default function ExploreScreen() {
       )}
 
       {query.length > 0 && (
-        <View style={{ paddingHorizontal: 16, marginBottom: 14 }}>
+        <View style={{ marginBottom: 14 }}>
           <Text style={{
             color: theme.subtext, fontSize: 10, fontWeight: '700',
             letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 2,
@@ -257,7 +353,7 @@ export default function ExploreScreen() {
       )}
 
       {!query && selectedGenres.length === 0 && (
-        <View style={{ paddingHorizontal: 16, marginBottom: 10 }}>
+        <View style={{ marginBottom: 10 }}>
           <Text style={{
             color: theme.subtext, fontSize: 10, fontWeight: '800',
             letterSpacing: 1.5, textTransform: 'uppercase',
@@ -303,12 +399,10 @@ export default function ExploreScreen() {
 
       {isLoading ? (
         <FlatList
-          data={[...Array(12)]}
+          data={[...Array(8)]}
           keyExtractor={(_, i) => String(i)}
-          numColumns={NUM_COLUMNS}
-          contentContainerStyle={{ paddingHorizontal: H_PAD, paddingBottom: 100 }}
-          columnWrapperStyle={{ gap: GAP, marginBottom: GAP }}
-          renderItem={() => <View style={{ width: CARD_WIDTH }}><CardSkeleton /></View>}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
+          renderItem={() => <ListCardSkeleton theme={theme} />}
           scrollEnabled={false}
           ListHeaderComponent={ListHeader}
         />
@@ -335,16 +429,14 @@ export default function ExploreScreen() {
         </View>
       ) : (
         <FlatList
-          data={paddedResults as (Anime | null)[]}
-          keyExtractor={(item, i) => item?.id ?? `empty-${i}`}
-          numColumns={NUM_COLUMNS}
-          contentContainerStyle={{ paddingHorizontal: H_PAD, paddingBottom: 120 }}
-          columnWrapperStyle={{ gap: GAP, marginBottom: GAP }}
+          data={results}
+          keyExtractor={item => item.id}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 120 }}
           renderItem={renderItem}
           removeClippedSubviews
-          maxToRenderPerBatch={12}
+          maxToRenderPerBatch={10}
           windowSize={5}
-          initialNumToRender={12}
+          initialNumToRender={10}
           ListHeaderComponent={ListHeader}
           ListFooterComponent={
             <LoadMoreFooter
