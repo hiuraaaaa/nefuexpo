@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, StatusBar, Share, Alert } fro
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import auth from '@react-native-firebase/auth';
 import { COLORS } from '@/constants';
 import { decodeAnimeId } from '@/hooks/api/api';
 import { historyStorage, favoritStorage, storageMain } from '@/hooks/storage/storage';
@@ -21,6 +22,8 @@ import { AnimeInfo }          from './components/AnimeInfo';
 import { ServerModal }        from './components/ServerModal';
 import { RecommendationList } from './components/RecommendationList';
 
+import { useRoom, useSync, RoomModal, NobarBar } from '@/features/nobar';
+
 export default function WatchScreen() {
   const { slug }  = useLocalSearchParams<{ slug: string }>();
   const epParam   = useLocalSearchParams<{ ep?: string }>().ep;
@@ -29,10 +32,13 @@ export default function WatchScreen() {
   const animeId   = decodeAnimeId(slug ?? '');
 
   const [showServerModal, setShowServerModal] = useState(false);
+  const [showRoomModal, setShowRoomModal]     = useState(false);
   const [isFavorited, setIsFavorited]         = useState(false);
   const [autoNext, setAutoNext]               = useState(() => historyStorage.getAutoNext());
   const [pipEnabled, setPipEnabled]           = useState(() => storageMain.getBoolean('nefusoft_pip')  ?? false);
   const [infoEnabled, setInfoEnabled]         = useState(() => storageMain.getBoolean('nefusoft_info') ?? false);
+
+  const currentUid = auth().currentUser?.uid ?? '';
 
   useFocusEffect(useCallback(() => {
     setPipEnabled(storageMain.getBoolean('nefusoft_pip')   ?? false);
@@ -48,6 +54,47 @@ export default function WatchScreen() {
   }, [epNav]);
 
   const playerSync = usePlayerSync(epLoader.player, () => { if (autoNext) handleAutoNext(); });
+
+  // ── Nobar ──────────────────────────────────────────────────────────────────
+  const {
+    roomCode, room, members, messages,
+    isHost, loading: roomLoading, error: roomError,
+    createRoom, joinRoom, leaveRoom,
+    sendMessage, updatePlayback,
+  } = useRoom();
+
+  const { hostTogglePlay, hostSeek } = useSync({
+    room,
+    isHost,
+    player:    epLoader.player,
+    isPlaying: playerSync.isPlaying,
+    position:  playerSync.position,
+    updatePlayback,
+    onEpisodeChange: (episodeId) => {
+      const ep = watchData.episodes.find(e => e.id === episodeId);
+      if (ep) epNav.changeEpisode(ep);
+    },
+  });
+
+  // Wrap togglePlayPause — host sync ke room
+  const handleTogglePlay = useCallback(() => {
+    playerSync.togglePlayPause();
+    if (isHost && roomCode) {
+      hostTogglePlay(!playerSync.isPlaying);
+    }
+  }, [playerSync, isHost, roomCode, hostTogglePlay]);
+
+  // Wrap onSlidingComplete — host sync seek ke room
+  const handleSlidingComplete = useCallback((val: number) => {
+    if (epLoader.player) {
+      epLoader.player.seekBy(val - (epLoader.player.currentTime ?? 0));
+    }
+    if (isHost && roomCode) {
+      hostSeek(val);
+    }
+  }, [epLoader.player, isHost, roomCode, hostSeek]);
+
+  // ──────────────────────────────────────────────────────────────────────────
 
   useProgressTracker({
     currentEpId: watchData.currentEpId,
@@ -69,6 +116,16 @@ export default function WatchScreen() {
     if (!watchData.anime) return;
     setIsFavorited(favoritStorage.isFavorited(watchData.anime.id));
   }, [watchData.anime]);
+
+  // Host: sync episode ke room saat ganti episode
+  React.useEffect(() => {
+    if (!isHost || !roomCode || !watchData.currentEpId) return;
+    updatePlayback({
+      episode_id:  watchData.currentEpId,
+      episode_num: epNav.currentEpNum,
+      position:    0,
+    });
+  }, [watchData.currentEpId]);
 
   const handleBack = useCallback(() => {
     if (playerSync.isFullscreen) playerSync.toggleFullscreen();
@@ -110,6 +167,24 @@ export default function WatchScreen() {
         onSelect={(q, s) => { epLoader.selectQualityAndServer(q, s, playerSync.position); setShowServerModal(false); }}
       />
 
+      <RoomModal
+        visible={showRoomModal}
+        loading={roomLoading}
+        error={roomError}
+        currentRoomCode={roomCode}
+        animeTitle={watchData.anime?.title ?? ''}
+        onClose={() => setShowRoomModal(false)}
+        onCreate={() => createRoom({
+          anime_id:     watchData.anime?.id ?? '',
+          anime_title:  watchData.anime?.title ?? '',
+          anime_poster: watchData.anime?.image_poster ?? '',
+          episode_id:   watchData.currentEpId ?? '',
+          episode_num:  epNav.currentEpNum,
+        })}
+        onJoin={code => joinRoom(code)}
+        onLeave={leaveRoom}
+      />
+
       <VideoPlayer
         player={epLoader.player}
         selectedServer={epLoader.selectedServer}
@@ -134,8 +209,10 @@ export default function WatchScreen() {
         episodesLength={watchData.episodes.length}
         canGoPrev={epNav.canGoPrev}
         canGoNext={epNav.canGoNext}
+        isInRoom={!!roomCode}
         resetControlsTimer={playerSync.resetControlsTimer}
-        togglePlayPause={playerSync.togglePlayPause}
+        toggleControls={playerSync.toggleControls}
+        togglePlayPause={handleTogglePlay}
         toggleFullscreen={playerSync.toggleFullscreen}
         handleTapLeft={playerSync.handleTapLeft}
         handleTapRight={playerSync.handleTapRight}
@@ -143,12 +220,26 @@ export default function WatchScreen() {
         handleNext={epNav.handleNext}
         onBack={handleBack}
         onBookmark={handleBookmark}
+        onNobar={() => setShowRoomModal(true)}
         onQualityPress={() => setShowServerModal(true)}
-        onSlidingComplete={val => { if (epLoader.player) epLoader.player.seekBy(val - (epLoader.player.currentTime ?? 0)); }}
+        onSlidingComplete={handleSlidingComplete}
       />
 
       {!playerSync.isFullscreen && (
         <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+
+          {/* Nobar bar — muncul kalau lagi di room */}
+          {roomCode && (
+            <NobarBar
+              roomCode={roomCode}
+              isHost={isHost}
+              members={members}
+              messages={messages}
+              currentUid={currentUid}
+              onOpenRoomModal={() => setShowRoomModal(true)}
+              onSend={sendMessage}
+            />
+          )}
 
           <View style={{ flexDirection: 'row', gap: 12, padding: 16 }}>
             <TouchableOpacity onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); epNav.handlePrev(); }}
