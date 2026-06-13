@@ -126,37 +126,55 @@ export function usePlayerSync(player: VideoPlayer | null, onPlayToEnd: () => voi
     }
   }, [isFullscreen]);
 
+  const toggleControls = useCallback(() => {
+    setShowControls(prev => {
+      if (controlsTimer.current) clearTimeout(controlsTimer.current);
+      if (!prev) {
+        controlsTimer.current = setTimeout(() => setShowControls(false), 3500);
+      }
+      return !prev;
+    });
+  }, []);
+
   const handleTapLeft = useCallback(() => {
     const now = Date.now();
     if (now - lastTapLeft.current < 300) {
+      // double tap: seek back
       if (player) player.seekBy(-SEEK_SEC);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       setSeekLeft(true);
       if (seekLeftTimer.current) clearTimeout(seekLeftTimer.current);
       seekLeftTimer.current = setTimeout(() => setSeekLeft(false), 800);
       resetControlsTimer();
-    } else { resetControlsTimer(); }
+    } else {
+      // single tap: toggle controls
+      toggleControls();
+    }
     lastTapLeft.current = now;
-  }, [player, resetControlsTimer]);
+  }, [player, resetControlsTimer, toggleControls]);
 
   const handleTapRight = useCallback(() => {
     const now = Date.now();
     if (now - lastTapRight.current < 300) {
+      // double tap: seek forward
       if (player) player.seekBy(SEEK_SEC);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       setSeekRight(true);
       if (seekRightTimer.current) clearTimeout(seekRightTimer.current);
       seekRightTimer.current = setTimeout(() => setSeekRight(false), 800);
       resetControlsTimer();
-    } else { resetControlsTimer(); }
+    } else {
+      // single tap: toggle controls
+      toggleControls();
+    }
     lastTapRight.current = now;
-  }, [player, resetControlsTimer]);
+  }, [player, resetControlsTimer, toggleControls]);
 
   return {
     isPlaying, position, duration, isBuffering,
     isFullscreen, showControls, seekLeft, seekRight,
     controlsStyle, resetControlsTimer,
-    togglePlayPause, toggleFullscreen,
+    togglePlayPause, toggleFullscreen, toggleControls,
     handleTapLeft, handleTapRight,
   };
 }
