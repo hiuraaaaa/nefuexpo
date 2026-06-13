@@ -1,244 +1,175 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
-  View, Text, Modal, TouchableOpacity, TextInput,
-  ActivityIndicator, Share, StyleSheet, KeyboardAvoidingView, Platform,
+  View, Text, TouchableOpacity, TextInput,
+  Modal, ActivityIndicator, Share, Clipboard,
 } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
+import { BlurView } from 'expo-blur';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { COLORS } from '@/constants';
-import { getCurrentUser } from '@/hooks/auth';
 
 interface Props {
-  visible:      boolean;
-  isInRoom:     boolean;
-  isHost:       boolean;
-  roomCode:     string | null;
-  memberCount:  number;
-  isLoading:    boolean;
-  error:        string | null;
-  onCreateRoom: () => void;
-  onJoinRoom:   (code: string) => void;
-  onLeaveRoom:  () => void;
-  onClose:      () => void;
+  visible: boolean;
+  loading: boolean;
+  error: string | null;
+  currentRoomCode: string | null;
+  animeTitle: string;
+  onClose: () => void;
+  onCreate: () => void;
+  onJoin: (code: string) => void;
+  onLeave: () => void;
 }
 
 export function RoomModal({
-  visible, isInRoom, isHost, roomCode, memberCount,
-  isLoading, error, onCreateRoom, onJoinRoom, onLeaveRoom, onClose,
+  visible, loading, error, currentRoomCode,
+  animeTitle, onClose, onCreate, onJoin, onLeave,
 }: Props) {
-  const [inputCode, setInputCode] = useState('');
-  const user = getCurrentUser();
+  const [tab, setTab]       = useState<'create' | 'join'>('create');
+  const [joinCode, setJoinCode] = useState('');
+  const [copied, setCopied] = useState(false);
 
-  const handleJoin = useCallback(() => {
-    if (inputCode.trim().length < 4) return;
-    onJoinRoom(inputCode.trim().toUpperCase());
-    setInputCode('');
-  }, [inputCode, onJoinRoom]);
-
-  const handleShare = useCallback(async () => {
-    if (!roomCode) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await Share.share({ message: `Gabung nobar sama gue! Kode room: ${roomCode}` });
-  }, [roomCode]);
-
-  const handleCopy = useCallback(async () => {
-    if (!roomCode) return;
-    await Clipboard.setStringAsync(roomCode);
+  const handleCopy = () => {
+    if (!currentRoomCode) return;
+    Clipboard.setString(currentRoomCode);
+    setCopied(true);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  }, [roomCode]);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleShare = async () => {
+    if (!currentRoomCode) return;
+    await Share.share({
+      message: `Yuk nobar "${animeTitle}" bareng di NefuSoft!\nKode room: ${currentRoomCode}`,
+    });
+  };
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.overlay}
-      >
-        <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} activeOpacity={1} />
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose}>
+        <BlurView intensity={40} tint="dark" style={{ flex: 1 }}>
+          <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+            <View style={{
+              position: 'absolute', bottom: 0, left: 0, right: 0,
+              backgroundColor: '#111', borderTopLeftRadius: 24, borderTopRightRadius: 24,
+              padding: 24, paddingBottom: 40,
+              borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+            }}>
+              <View style={{ width: 40, height: 4, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 2, alignSelf: 'center', marginBottom: 20 }} />
 
-        <View style={styles.sheet}>
-          {/* Handle */}
-          <View style={styles.handle} />
+              {/* Jika sudah di room */}
+              {currentRoomCode ? (
+                <View style={{ gap: 16 }}>
+                  <Text style={{ color: '#fff', fontWeight: '900', fontSize: 18, textAlign: 'center' }}>Room Aktif 🎬</Text>
 
-          <Text style={styles.title}>🍿 Nobar Room</Text>
+                  <View style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16, padding: 20, alignItems: 'center', gap: 8, borderWidth: 1, borderColor: `${COLORS.gold}40` }}>
+                    <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: '700', letterSpacing: 2, textTransform: 'uppercase' }}>Kode Room</Text>
+                    <Text style={{ color: COLORS.gold, fontSize: 36, fontWeight: '900', letterSpacing: 8 }}>{currentRoomCode}</Text>
+                    <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11 }}>Bagikan ke teman untuk nobar bareng</Text>
+                  </View>
 
-          {!user ? (
-            <Text style={styles.hint}>Login dulu untuk buat / join room.</Text>
-          ) : isInRoom ? (
-            /* ── Sudah di dalam room ── */
-            <View style={styles.section}>
-              <Text style={styles.label}>{isHost ? '👑 Kamu Host' : '🎬 Kamu Member'}</Text>
+                  <View style={{ flexDirection: 'row', gap: 12 }}>
+                    <TouchableOpacity onPress={handleCopy} style={{
+                      flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                      gap: 8, paddingVertical: 14, borderRadius: 12,
+                      backgroundColor: copied ? '#4ade8020' : 'rgba(255,255,255,0.07)',
+                      borderWidth: 1, borderColor: copied ? '#4ade80' : 'rgba(255,255,255,0.1)',
+                    }}>
+                      <Ionicons name={copied ? 'checkmark' : 'copy-outline'} size={18} color={copied ? '#4ade80' : '#fff'} />
+                      <Text style={{ color: copied ? '#4ade80' : '#fff', fontWeight: '700' }}>{copied ? 'Tersalin!' : 'Salin'}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={handleShare} style={{
+                      flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                      gap: 8, paddingVertical: 14, borderRadius: 12,
+                      backgroundColor: `${COLORS.gold}15`, borderWidth: 1, borderColor: `${COLORS.gold}50`,
+                    }}>
+                      <Ionicons name="share-outline" size={18} color={COLORS.gold} />
+                      <Text style={{ color: COLORS.gold, fontWeight: '700' }}>Bagikan</Text>
+                    </TouchableOpacity>
+                  </View>
 
-              {/* Kode room */}
-              <View style={styles.codeRow}>
-                <Text style={styles.codeText}>{roomCode}</Text>
-                <TouchableOpacity onPress={handleCopy} style={styles.codeBtn}>
-                  <Text style={styles.codeBtnText}>Copy</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={handleShare} style={styles.codeBtn}>
-                  <Text style={styles.codeBtnText}>Share</Text>
-                </TouchableOpacity>
-              </View>
+                  <TouchableOpacity onPress={onLeave} style={{
+                    paddingVertical: 14, borderRadius: 12, alignItems: 'center',
+                    backgroundColor: '#e6394620', borderWidth: 1, borderColor: '#e6394660',
+                  }}>
+                    <Text style={{ color: '#e63946', fontWeight: '900' }}>Keluar dari Room</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={{ gap: 16 }}>
+                  <Text style={{ color: '#fff', fontWeight: '900', fontSize: 18, textAlign: 'center' }}>Nobar Bareng 🍿</Text>
 
-              <Text style={styles.hint}>
-                {memberCount} orang lagi nonton bareng
-              </Text>
+                  {/* Tab */}
+                  <View style={{ flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 4 }}>
+                    {(['create', 'join'] as const).map(t => (
+                      <TouchableOpacity key={t} onPress={() => setTab(t)} style={{
+                        flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center',
+                        backgroundColor: tab === t ? COLORS.gold : 'transparent',
+                      }}>
+                        <Text style={{ color: tab === t ? '#000' : 'rgba(255,255,255,0.5)', fontWeight: '900', fontSize: 13 }}>
+                          {t === 'create' ? 'Buat Room' : 'Join Room'}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
 
-              {!isHost && (
-                <Text style={styles.hint}>Host yang kontrol play/pause/seek.</Text>
+                  {error && (
+                    <View style={{ backgroundColor: '#e6394620', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: '#e6394660' }}>
+                      <Text style={{ color: '#e63946', fontSize: 12, fontWeight: '700', textAlign: 'center' }}>{error}</Text>
+                    </View>
+                  )}
+
+                  {tab === 'create' ? (
+                    <View style={{ gap: 12 }}>
+                      <View style={{ backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' }}>
+                        <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, marginBottom: 4 }}>Anime yang ditonton</Text>
+                        <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }} numberOfLines={1}>{animeTitle}</Text>
+                      </View>
+                      <TouchableOpacity onPress={onCreate} disabled={loading} style={{
+                        paddingVertical: 16, borderRadius: 12, alignItems: 'center',
+                        backgroundColor: COLORS.gold, opacity: loading ? 0.6 : 1,
+                      }}>
+                        {loading
+                          ? <ActivityIndicator color="#000" />
+                          : <Text style={{ color: '#000', fontWeight: '900', fontSize: 15 }}>Buat Room Sekarang</Text>}
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={{ gap: 12 }}>
+                      <TextInput
+                        value={joinCode}
+                        onChangeText={t => setJoinCode(t.toUpperCase().slice(0, 6))}
+                        placeholder="Masukkan kode room (6 huruf)"
+                        placeholderTextColor="rgba(255,255,255,0.25)"
+                        autoCapitalize="characters"
+                        maxLength={6}
+                        style={{
+                          backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 12,
+                          paddingHorizontal: 16, paddingVertical: 14,
+                          color: COLORS.gold, fontSize: 22, fontWeight: '900',
+                          letterSpacing: 8, textAlign: 'center',
+                          borderWidth: 1, borderColor: joinCode.length === 6 ? `${COLORS.gold}60` : 'rgba(255,255,255,0.08)',
+                        }}
+                      />
+                      <TouchableOpacity
+                        onPress={() => onJoin(joinCode)}
+                        disabled={loading || joinCode.length < 6}
+                        style={{
+                          paddingVertical: 16, borderRadius: 12, alignItems: 'center',
+                          backgroundColor: joinCode.length === 6 ? COLORS.gold : 'rgba(255,255,255,0.07)',
+                          opacity: loading ? 0.6 : 1,
+                        }}>
+                        {loading
+                          ? <ActivityIndicator color="#000" />
+                          : <Text style={{ color: joinCode.length === 6 ? '#000' : 'rgba(255,255,255,0.3)', fontWeight: '900', fontSize: 15 }}>Gabung Sekarang</Text>}
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
               )}
-
-              <TouchableOpacity
-                style={[styles.btn, styles.btnDanger]}
-                onPress={onLeaveRoom}
-              >
-                <Text style={styles.btnText}>
-                  {isHost ? 'Tutup Room' : 'Keluar Room'}
-                </Text>
-              </TouchableOpacity>
             </View>
-          ) : (
-            /* ── Belum di room ── */
-            <View style={styles.section}>
-              {error ? (
-                <Text style={styles.error}>{error}</Text>
-              ) : null}
-
-              {/* Buat room baru */}
-              <TouchableOpacity
-                style={[styles.btn, styles.btnAccent, isLoading && styles.btnDisabled]}
-                onPress={onCreateRoom}
-                disabled={isLoading}
-              >
-                {isLoading
-                  ? <ActivityIndicator color="#000" size="small" />
-                  : <Text style={[styles.btnText, { color: '#000' }]}>Buat Room Baru</Text>
-                }
-              </TouchableOpacity>
-
-              <Text style={styles.orText}>— atau —</Text>
-
-              {/* Join room */}
-              <TextInput
-                style={styles.input}
-                placeholder="Masukkan kode room (6 digit)"
-                placeholderTextColor={COLORS.whiteDim}
-                value={inputCode}
-                onChangeText={t => setInputCode(t.toUpperCase())}
-                autoCapitalize="characters"
-                maxLength={8}
-              />
-              <TouchableOpacity
-                style={[styles.btn, inputCode.length < 4 && styles.btnDisabled]}
-                onPress={handleJoin}
-                disabled={inputCode.length < 4 || isLoading}
-              >
-                {isLoading
-                  ? <ActivityIndicator color={COLORS.gold} size="small" />
-                  : <Text style={styles.btnText}>Join Room</Text>
-                }
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-      </KeyboardAvoidingView>
+          </TouchableOpacity>
+        </BlurView>
+      </TouchableOpacity>
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.6)',
-  },
-  sheet: {
-    backgroundColor: COLORS.card,
-    borderTopLeftRadius:  20,
-    borderTopRightRadius: 20,
-    padding: 24,
-    paddingBottom: 40,
-  },
-  handle: {
-    width: 40, height: 4,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: 20,
-  },
-  title: {
-    color: COLORS.white,
-    fontSize: 18,
-    fontWeight: '700',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  section: { gap: 12 },
-  label: {
-    color: COLORS.gold,
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  codeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 12,
-    padding: 12,
-  },
-  codeText: {
-    color: COLORS.gold,
-    fontSize: 28,
-    fontWeight: '800',
-    letterSpacing: 6,
-    flex: 1,
-    textAlign: 'center',
-  },
-  codeBtn: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  codeBtnText: { color: COLORS.white, fontSize: 12, fontWeight: '600' },
-  hint: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  orText: {
-    color: 'rgba(255,255,255,0.3)',
-    textAlign: 'center',
-    fontSize: 12,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 12,
-    color: COLORS.white,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    letterSpacing: 3,
-    textAlign: 'center',
-    backgroundColor: 'rgba(255,255,255,0.04)',
-  },
-  btn: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  btnAccent: { backgroundColor: COLORS.gold },
-  btnDanger: { backgroundColor: 'rgba(230,57,70,0.2)', borderWidth: 1, borderColor: 'rgba(230,57,70,0.4)' },
-  btnDisabled: { opacity: 0.4 },
-  btnText: { color: COLORS.white, fontWeight: '700', fontSize: 15 },
-  error: { color: '#e63946', fontSize: 13, textAlign: 'center' },
-});
