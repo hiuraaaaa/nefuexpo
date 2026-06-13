@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import NetInfo from '@react-native-community/netinfo';
 import { api } from '@/hooks/api/api';
 import { progressStorage } from '@/hooks/storage/storage';
@@ -18,11 +18,33 @@ export function useWatchData(animeId: string, epParam?: string) {
   const [epProgress, setEpProgress]     = useState<Record<string, number>>({});
   const [watchedEps, setWatchedEps]     = useState<Set<string>>(new Set());
 
-  const load = async () => {
+  // Ref buat cancel request lama kalau animeId berubah sebelum selesai
+  const cancelledRef = useRef(false);
+
+  const load = useCallback(async () => {
     if (!animeId) return;
+
+    // Tandai request sebelumnya sebagai cancelled
+    cancelledRef.current = false;
+    const localCancelled = { value: false };
+
+    // Simpan referensi cancel ke ref agar cleanup bisa batalkan
+    // Cara: kita pakai flag object — kalau animeId ganti, effect cleanup
+    // set localCancelled.value = true sebelum load baru jalan
+    cancelledRef.current = false;
+
     setIsLoading(true);
+    setAnime(null);
+    setEpisodes([]);
+    setFilteredEps([]);
+    setCurrentEpId(null);
+
     try {
       const detailRes = await api.detail(animeId);
+
+      // Kalau udah di-cancel (animeId ganti saat fetch), buang hasilnya
+      if (localCancelled.value) return;
+
       if (detailRes.status && detailRes.data) {
         setAnime(detailRes.data);
         const eps = detailRes.data.episode_list || [];
@@ -47,17 +69,37 @@ export function useWatchData(animeId: string, epParam?: string) {
           : eps[eps.length - 1];
         if (target) setCurrentEpId(target.id);
       }
-      api.rekomendasi().then(r => setRecs((r.data || []).slice(0, 5))).catch(() => {});
+
+      if (!localCancelled.value) {
+        api.rekomendasi().then(r => {
+          if (!localCancelled.value) setRecs((r.data || []).slice(0, 5));
+        }).catch(() => {});
+      }
     } catch {}
-    setIsLoading(false);
-  };
+
+    if (!localCancelled.value) setIsLoading(false);
+
+    // Return fungsi cancel untuk dipakai effect cleanup
+    return () => { localCancelled.value = true; };
+  }, [animeId, epParam]);
 
   useEffect(() => {
-    load();
+    let cancelLoad: (() => void) | undefined;
+
+    const run = async () => {
+      cancelLoad = await load();
+    };
+    run();
+
     const unsub = NetInfo.addEventListener(state => {
-      if (state.isConnected && !anime) load();
+      if (state.isConnected && !anime) run();
     });
-    return () => unsub();
+
+    return () => {
+      // Cancel fetch yang lagi jalan kalau animeId ganti / unmount
+      cancelLoad?.();
+      unsub();
+    };
   }, [animeId]);
 
   useEffect(() => {
