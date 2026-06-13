@@ -32,6 +32,7 @@ interface Props {
   title: string;
   currentEpNum: number;
   isFavorited: boolean;
+  isInRoom: boolean;
   epIndex: number;
   episodesLength: number;
   canGoPrev: boolean;
@@ -46,6 +47,7 @@ interface Props {
   handleNext: () => void;
   onBack: () => void;
   onBookmark: () => void;
+  onNobar: () => void;
   onQualityPress: () => void;
   onSlidingComplete: (val: number) => void;
 }
@@ -54,11 +56,11 @@ export function VideoPlayer({
   player, selectedServer, isEpLoading, isBuffering, isPlaying,
   isFullscreen, showControls, seekLeft, seekRight, controlsStyle,
   position, duration, selectedQuality, pipEnabled, infoEnabled,
-  insetTop, title, currentEpNum, isFavorited,
+  insetTop, title, currentEpNum, isFavorited, isInRoom,
   canGoPrev, canGoNext,
-  resetControlsTimer, togglePlayPause, toggleFullscreen, toggleControls,
+  resetControlsTimer, toggleControls, togglePlayPause, toggleFullscreen,
   handleTapLeft, handleTapRight, handlePrev, handleNext,
-  onBack, onBookmark, onQualityPress, onSlidingComplete,
+  onBack, onBookmark, onNobar, onQualityPress, onSlidingComplete,
 }: Props) {
   const videoRef    = useRef<VideoView>(null);
   const pipSupported = isPictureInPictureSupported();
@@ -92,9 +94,10 @@ export function VideoPlayer({
         </View>
       )}
 
-      <TouchableOpacity activeOpacity={1} onPress={handleTapLeft}      style={{ position: 'absolute', top: 0, left: 0, width: '40%', bottom: 0 }} />
-      <TouchableOpacity activeOpacity={1} onPress={toggleControls} style={{ position: 'absolute', top: 0, left: '40%', width: '20%', bottom: 0 }} />
-      <TouchableOpacity activeOpacity={1} onPress={handleTapRight}     style={{ position: 'absolute', top: 0, right: 0, width: '40%', bottom: 0 }} />
+      {/* Tap zones — single tap toggle controls, double tap seek */}
+      <TouchableOpacity activeOpacity={1} onPress={handleTapLeft}     style={{ position: 'absolute', top: 0, left: 0, width: '40%', bottom: 0 }} />
+      <TouchableOpacity activeOpacity={1} onPress={toggleControls}    style={{ position: 'absolute', top: 0, left: '40%', width: '20%', bottom: 0 }} />
+      <TouchableOpacity activeOpacity={1} onPress={handleTapRight}    style={{ position: 'absolute', top: 0, right: 0, width: '40%', bottom: 0 }} />
 
       <SeekToast direction="left"  visible={seekLeft}  />
       <SeekToast direction="right" visible={seekRight} />
@@ -110,8 +113,10 @@ export function VideoPlayer({
             isFullscreen={isFullscreen}
             isFavorited={isFavorited}
             infoEnabled={infoEnabled}
+            isInRoom={isInRoom}
             onBack={onBack}
             onBookmark={onBookmark}
+            onNobar={onNobar}
           />
 
           {/* Center controls */}
