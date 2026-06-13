@@ -1,52 +1,51 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, ScrollView } from 'react-native';
 import { Image } from 'expo-image';
+import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants';
 import type { RoomMember } from '../hooks/useRoom';
-import { getCurrentUser } from '@/hooks/auth';
 
 interface Props {
-  members: Record<string, RoomMember>;
-  hostUid: string;
-  visible: boolean;
+  members: RoomMember[];
+  currentUid: string;
 }
 
-export function MemberList({ members, hostUid, visible }: Props) {
-  if (!visible) return null;
-
-  const myUid  = getCurrentUser()?.uid;
-  const entries = Object.entries(members).sort(([, a], [, b]) => a.joined_at - b.joined_at);
-
+export function MemberList({ members, currentUid }: Props) {
   return (
-    <View style={styles.container}>
-      <Text style={styles.header}>🍿 {entries.length} nonton bareng</Text>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.list}
-      >
-        {entries.map(([uid, member]) => (
-          <View key={uid} style={styles.item}>
-            {member.avatar ? (
-              <Image
-                source={{ uri: member.avatar }}
-                style={[styles.avatar, uid === hostUid && styles.avatarHost]}
-                contentFit="cover"
-              />
-            ) : (
-              <View style={[styles.avatarPlaceholder, uid === hostUid && styles.avatarHost]}>
-                <Text style={styles.avatarInitial}>
-                  {member.display_name?.[0]?.toUpperCase() ?? '?'}
-                </Text>
-              </View>
-            )}
-            {uid === hostUid && (
-              <View style={styles.hostBadge}>
-                <Text style={styles.hostBadgeText}>👑</Text>
-              </View>
-            )}
-            <Text style={styles.name} numberOfLines={1}>
-              {uid === myUid ? 'Kamu' : member.display_name}
+    <View style={{ paddingHorizontal: 16, marginBottom: 8 }}>
+      <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>
+        {members.length} Penonton
+      </Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
+        {members.map(m => (
+          <View key={m.uid} style={{ alignItems: 'center', gap: 4 }}>
+            <View style={{ position: 'relative' }}>
+              {m.avatar ? (
+                <Image
+                  source={{ uri: m.avatar }}
+                  style={{ width: 38, height: 38, borderRadius: 19, borderWidth: 2, borderColor: m.uid === currentUid ? COLORS.gold : m.is_host ? '#4ade80' : 'transparent' }}
+                  contentFit="cover"
+                />
+              ) : (
+                <View style={{
+                  width: 38, height: 38, borderRadius: 19,
+                  backgroundColor: m.is_host ? '#4ade8030' : 'rgba(255,255,255,0.1)',
+                  alignItems: 'center', justifyContent: 'center',
+                  borderWidth: 2, borderColor: m.uid === currentUid ? COLORS.gold : m.is_host ? '#4ade80' : 'transparent',
+                }}>
+                  <Text style={{ color: '#fff', fontWeight: '900', fontSize: 14 }}>
+                    {m.display_name.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+              )}
+              {m.is_host && (
+                <View style={{ position: 'absolute', bottom: -2, right: -2, backgroundColor: '#4ade80', borderRadius: 8, width: 16, height: 16, alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="star" size={9} color="#000" />
+                </View>
+              )}
+            </View>
+            <Text style={{ color: m.uid === currentUid ? COLORS.gold : 'rgba(255,255,255,0.6)', fontSize: 10, fontWeight: '700', maxWidth: 50 }} numberOfLines={1}>
+              {m.uid === currentUid ? 'Kamu' : m.display_name}
             </Text>
           </View>
         ))}
@@ -54,45 +53,3 @@ export function MemberList({ members, hostUid, visible }: Props) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-  },
-  header: {
-    color: COLORS.gold,
-    fontSize: 11,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  list: { gap: 12, paddingBottom: 4 },
-  item: { alignItems: 'center', position: 'relative', width: 52 },
-  avatar: {
-    width: 40, height: 40, borderRadius: 20,
-    borderWidth: 2, borderColor: 'rgba(255,255,255,0.1)',
-  },
-  avatarHost: { borderColor: COLORS.gold },
-  avatarPlaceholder: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: COLORS.card,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: 'rgba(255,255,255,0.1)',
-  },
-  avatarInitial: { color: COLORS.white, fontSize: 16, fontWeight: '700' },
-  hostBadge: {
-    position: 'absolute', top: -4, right: 2,
-    width: 18, height: 18, borderRadius: 9,
-    backgroundColor: COLORS.bg,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  hostBadgeText: { fontSize: 10 },
-  name: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 10,
-    marginTop: 4,
-    maxWidth: 52,
-    textAlign: 'center',
-  },
-});
