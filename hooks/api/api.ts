@@ -1,5 +1,4 @@
 import { ApiResponse, Anime, AnimeDetail, ScheduleDay, Genre } from '@/types';
-const uid = Math.random().toString(36).substring(2, 7);
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -16,34 +15,59 @@ const HEADERS = (isFlutter = false, isPost = false) => ({
 // ─── Session token (guest login) ──────────────────────────────────────────────
 
 let _token: string | null = null;
+let _tokenInflight: Promise<string> | null = null;
 
 const getToken = async (): Promise<string> => {
   if (_token) return _token;
-  const uid = Math.random().toString(36).substring(2, 7);
-  const payload = {
-    user:   `Guest_${uid}`,
-    email:  `gienetic_${uid}@gmail.com`,
-    profil: 'https://lh3.googleusercontent.com/a/default',
-  };
-  const res = await fetch(`${API}/model/login.php`, {
-    method:  'POST',
-    headers: HEADERS(false, true),
-    body:    JSON.stringify(payload),
-  });
-  const json = await res.json();
-  _token = json?.data?.[0]?.token ?? '';
-  return _token!;
+  // deduplicate concurrent calls — hanya 1 login request yang jalan
+  if (_tokenInflight) return _tokenInflight;
+
+  _tokenInflight = (async () => {
+    try {
+      const uid     = Math.random().toString(36).substring(2, 7);
+      const payload = {
+        user:   `Guest_${uid}`,
+        email:  `gienetic_${uid}@gmail.com`,
+        profil: 'https://lh3.googleusercontent.com/a/default',
+      };
+      const res  = await fetchWithTimeout(`${API}/model/login.php`, {
+        method:  'POST',
+        headers: HEADERS(false, true),
+        body:    JSON.stringify(payload),
+      }, 10_000);
+      const json = await res.json();
+      _token = json?.data?.[0]?.token ?? '';
+      return _token!;
+    } finally {
+      _tokenInflight = null;
+    }
+  })();
+
+  return _tokenInflight;
 };
 
 export const initSession = async (): Promise<void> => { await getToken(); };
 
+/** Reset token — dipanggil kalau dapat 401 dari server */
+export const resetToken = (): void => { _token = null; };
+
 // ─── HTTP helpers ─────────────────────────────────────────────────────────────
 
-const safeGet = async <T>(path: string, params?: Record<string, any>): Promise<T | null> => {
+const fetchWithTimeout = (url: RequestInfo, init: RequestInit, ms = 15_000): Promise<Response> => {
+  const controller = new AbortController();
+  const timer      = setTimeout(() => controller.abort(), ms);
+  return fetch(url, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer));
+};
+
+const safeGet = async <T>(path: string, params?: Record<string, string | number>): Promise<T | null> => {
   try {
     const url = new URL(`${API}${path}`);
     if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, String(v)));
-    const res  = await fetch(url.toString(), { headers: HEADERS() });
+    const res  = await fetchWithTimeout(url.toString(), { headers: HEADERS() });
+    if (!res.ok) {
+      console.warn(`[API] safeGet HTTP ${res.status}: ${path}`);
+      return null;
+    }
     const text = await res.text();
     const t    = text.trim();
     if (!t || (!t.startsWith('{') && !t.startsWith('['))) {
@@ -52,18 +76,22 @@ const safeGet = async <T>(path: string, params?: Record<string, any>): Promise<T
     }
     return JSON.parse(t);
   } catch (e: any) {
-    console.warn(`[API] safeGet failed: ${path} —`, e?.message);
+    if (e?.name !== 'AbortError') console.warn(`[API] safeGet failed: ${path} —`, e?.message);
     return null;
   }
 };
 
 const safePost = async <T>(path: string, body: object | string, flutter = false): Promise<T | null> => {
   try {
-    const res  = await fetch(`${API}${path}`, {
+    const res  = await fetchWithTimeout(`${API}${path}`, {
       method:  'POST',
       headers: HEADERS(flutter, true),
       body:    typeof body === 'string' ? body : JSON.stringify(body),
     });
+    if (!res.ok) {
+      console.warn(`[API] safePost HTTP ${res.status}: ${path}`);
+      return null;
+    }
     const text = await res.text();
     const t    = text.trim();
     if (!t || (!t.startsWith('{') && !t.startsWith('['))) {
@@ -72,7 +100,7 @@ const safePost = async <T>(path: string, body: object | string, flutter = false)
     }
     return JSON.parse(t);
   } catch (e: any) {
-    console.warn(`[API] safePost failed: ${path} —`, e?.message);
+    if (e?.name !== 'AbortError') console.warn(`[API] safePost failed: ${path} —`, e?.message);
     return null;
   }
 };
@@ -108,7 +136,6 @@ function mapAnime(raw: any): Anime {
     day:           raw.day ?? '',
     time:          raw.time ?? '',
     key_time:      (raw.day ?? '').toUpperCase(),
-    // field tambahan
     score:         raw.score ?? null,
     total_episode: raw.total_episode ?? null,
     last_chapter:  raw.lastch ?? null,
@@ -171,9 +198,9 @@ function mapSchedule(raw: any[]): ScheduleDay {
       synopsis: '', type: '', status: 'ONGOING',
       year: '', aired_start: '', studio: '', genre: '',
       day:      item.day ?? '',
-      date:     item.date ?? '',        // ← tanggal "16"
-      date_ts:  item.date_ts ?? null,   // ← unix timestamp
-      updated:  a.updated ?? null,   // ← tambah ini
+      date:     item.date ?? '',
+      date_ts:  item.date_ts ?? null,
+      updated:  a.updated ?? null,
       time:     a.time ?? '',
       key_time: (item.day ?? '').toUpperCase(),
     }));
@@ -183,42 +210,40 @@ function mapSchedule(raw: any[]): ScheduleDay {
 
 // ─── Endpoints ────────────────────────────────────────────────────────────────
 
-// [1] Rekomendasi — /rekomendasi.php
 const fetchRekomendasi = async (): Promise<ApiResponse<Anime[]>> => {
   const json = await safeGet<any>('/rekomendasi.php');
   const list: any[] = Array.isArray(json) ? json : (json?.data ?? []);
   return { status: true, data: list.map(mapAnime) };
 };
 
-// [2] Ongoing — /home/ongoing.php
 const fetchComplete = async (page = 0): Promise<ApiResponse<Anime[]>> => {
   const json = await safeGet<any>('/home/ongoing.php', { page: page + 1, type: 'all' });
   const list: any[] = Array.isArray(json) ? json : (json?.data ?? []);
   return { status: true, data: list.map(mapAnime) };
 };
 
-// [3] Baru Upload — /baruupload.php
 const fetchOngoing = async (page = 0): Promise<ApiResponse<Anime[]>> => {
   const json = await safeGet<any>('/baruupload.php', { page: page + 1 });
   const list: any[] = Array.isArray(json) ? json : (json?.data ?? []);
   return { status: true, data: list.map(mapAnime) };
 };
 
-// [4] Movie — /movie.php
 const fetchMovie = async (page = 0): Promise<ApiResponse<Anime[]>> => {
   const json = await safeGet<any>('/movie.php', { page: page + 1 });
   const list: any[] = Array.isArray(json) ? json : (json?.data ?? []);
   return { status: true, data: list.map(mapAnime) };
 };
 
-// [5] Search — /search.php
 const fetchSearch = async (q: string, page = 0): Promise<ApiResponse<Anime[]>> => {
   const json = await safeGet<any>('/search.php', { keyword: q, page: page + 1, per_page: 20 });
-  const result: any[] = json?.data?.[0]?.result ?? [];
+  // Response bisa: array langsung, atau { data: [...] }, atau { data: [{ result: [...] }] }
+  const result: any[] =
+    Array.isArray(json)              ? json :
+    Array.isArray(json?.data)        ? json.data :
+    json?.data?.[0]?.result          ?? [];
   return { status: true, data: result.map(mapAnime) };
 };
 
-// [6] Detail Series — /series.php
 const fetchDetail = async (id: string): Promise<ApiResponse<AnimeDetail>> => {
   const token = await getToken();
   const slug  = id.replace(/\/+$/, '');
@@ -236,7 +261,6 @@ const fetchDetail = async (id: string): Promise<ApiResponse<AnimeDetail>> => {
   return { status: true, data: mapAnimeDetail(raw) };
 };
 
-// [7] Episode Stream — /series/episode/data.php
 const fetchEpisode = async (id: string): Promise<any> => {
   const token = await getToken();
 
@@ -269,9 +293,9 @@ const fetchEpisode = async (id: string): Promise<any> => {
 
   if (!raw) return { status: false, data: { server: [] } };
 
-  const streamsObj: Record<string, any[]> = raw.streams ?? {};
-  const resoSize:   Record<string, string> = raw.resoSize   ?? {};
-  const resoSizeKb: Record<string, number> = raw.resoSizeKb ?? {};
+  const streamsObj: Record<string, any[]>   = raw.streams    ?? {};
+  const resoSize:   Record<string, string>  = raw.resoSize   ?? {};
+  const resoSizeKb: Record<string, number>  = raw.resoSizeKb ?? {};
 
   const server: any[] = [];
 
@@ -281,13 +305,13 @@ const fetchEpisode = async (id: string): Promise<any> => {
       if (isPixeldrainDownload) continue;
       const isM3u8 = s.link?.includes('.m3u8');
       server.push({
-        id:       String(s.id),
+        id:      String(s.id),
         quality,
-        link:     s.link,
-        type:     isM3u8 ? 'hls' : 'direct',
-        provide:  s.provide ?? null,
-        size_kb:  s.size_kb ?? resoSizeKb[quality] ?? null,
-        size:     resoSize[quality] ?? null,
+        link:    s.link,
+        type:    isM3u8 ? 'hls' : 'direct',
+        provide: s.provide ?? null,
+        size_kb: s.size_kb ?? resoSizeKb[quality] ?? null,
+        size:    resoSize[quality] ?? null,
       });
     }
   }
@@ -309,7 +333,6 @@ const fetchEpisode = async (id: string): Promise<any> => {
   };
 };
 
-// [8] Jadwal — /jadwal.php
 const fetchSchedule = async (): Promise<ApiResponse<ScheduleDay>> => {
   const json = await safePost<any>('/jadwal.php', '');
   const raw: any[] = json?.data ?? (Array.isArray(json) ? json : []);
@@ -318,20 +341,15 @@ const fetchSchedule = async (): Promise<ApiResponse<ScheduleDay>> => {
 
 // ─── Explore helpers ──────────────────────────────────────────────────────────
 
-const fetchAnimeList = async (page = 0): Promise<ApiResponse<Anime[]>> => {
-  return fetchOngoing(page);
-};
+const fetchAnimeList = async (page = 0): Promise<ApiResponse<Anime[]>> => fetchOngoing(page);
 
 const fetchAnimeListSearch = async (q: string): Promise<ApiResponse<Anime[]>> => {
   const res   = await fetchOngoing(0);
   const lower = q.toLowerCase();
-  return {
-    status: true,
-    data:   res.data.filter(a => a.title.toLowerCase().includes(lower)),
-  };
+  return { status: true, data: res.data.filter(a => a.title.toLowerCase().includes(lower)) };
 };
 
-const fetchGenre = async (): Promise<ApiResponse<Genre[]>> => ({ status: true, data: [] });
+const fetchGenre       = async (): Promise<ApiResponse<Genre[]>>              => ({ status: true, data: [] });
 const fetchGenreFilter = async (_ids: string[], _page = 0): Promise<ApiResponse<Anime[]>> => ({ status: true, data: [] });
 
 // ─── Public API ───────────────────────────────────────────────────────────────
@@ -403,26 +421,22 @@ export const shuffleArray = <T>(array: T[]): T[] => {
 };
 
 export const formatTime = (seconds: number): string => {
-  if (isNaN(seconds)) return '00:00';
-  const m = Math.floor(seconds / 60).toString().padStart(2, '0');
-  const s = Math.floor(seconds % 60).toString().padStart(2, '0');
-  return `${m}:${s}`;
+  if (!isFinite(seconds) || isNaN(seconds)) return '00:00';
+  const total = Math.max(0, Math.floor(seconds));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60).toString().padStart(2, '0');
+  const s = (total % 60).toString().padStart(2, '0');
+  return h > 0 ? `${h}:${m}:${s}` : `${m}:${s}`;
 };
 
 // ─── Schedule Helpers ─────────────────────────────────────────────────────────
 
 export const formatScheduleDate = (date_ts: number): string =>
   new Date(date_ts * 1000).toLocaleDateString('id-ID', {
-    weekday: 'long',
-    day:     'numeric',
-    month:   'long',
-    year:    'numeric',
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
   });
-// → "Selasa, 16 Juni 2026"
 
 export const formatScheduleTime = (date_ts: number): string =>
   new Date(date_ts * 1000).toLocaleTimeString('id-ID', {
-    hour:   '2-digit',
-    minute: '2-digit',
+    hour: '2-digit', minute: '2-digit',
   });
-// → "05.30"
