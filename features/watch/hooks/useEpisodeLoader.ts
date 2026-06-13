@@ -12,11 +12,23 @@ export function useEpisodeLoader(currentEpId: string | null) {
   const [selectedServer, setSelectedServer]   = useState<Server | null>(null);
   const [isEpLoading, setIsEpLoading]         = useState(false);
 
-  const player = useVideoPlayer(
-    selectedServer?.link ? { uri: selectedServer.link } : null,
-    p => { p.pause(); }
-  );
+  // ── Player init sekali dengan source kosong ──────────────────────────────
+  // JANGAN pakai selectedServer?.link sebagai source langsung —
+  // itu bikin useVideoPlayer re-init tiap render → FC + layar hitam
+  const player = useVideoPlayer(null, p => {
+    p.pause();
+  });
 
+  // ── Ganti source via player.replace() bukan re-init ──────────────────────
+  useEffect(() => {
+    if (!selectedServer?.link) return;
+    try {
+      player.replace({ uri: selectedServer.link });
+      player.pause();
+    } catch {}
+  }, [selectedServer?.link]);
+
+  // ── Load servers saat episode berubah ────────────────────────────────────
   useEffect(() => {
     if (!currentEpId) return;
     const load = async () => {
@@ -40,11 +52,15 @@ export function useEpisodeLoader(currentEpId: string | null) {
           if (bestQ && group[bestQ]?.length > 0) {
             setSelectedQuality(bestQ);
             setSelectedServer(group[bestQ][0]);
+            // Restore progress setelah player replace (delay biar buffering dulu)
             const saved = progressStorage.get(currentEpId);
             if (saved && saved.position > 5) {
               setTimeout(() => {
-                if (player) player.seekBy(saved.position - (player.currentTime ?? 0));
-              }, 800);
+                try {
+                  const diff = saved.position - (player.currentTime ?? 0);
+                  if (Math.abs(diff) > 2) player.seekBy(diff);
+                } catch {}
+              }, 1500);
             }
           }
         }
@@ -57,9 +73,13 @@ export function useEpisodeLoader(currentEpId: string | null) {
   const selectQualityAndServer = (quality: string, server: Server, currentPosition: number) => {
     setSelectedQuality(quality);
     setSelectedServer(server);
+    // Restore posisi setelah ganti server
     setTimeout(() => {
-      if (player) player.seekBy(currentPosition - (player.currentTime ?? 0));
-    }, 300);
+      try {
+        const diff = currentPosition - (player.currentTime ?? 0);
+        if (Math.abs(diff) > 2) player.seekBy(diff);
+      } catch {}
+    }, 800);
   };
 
   const availableQualities = Object.keys(serverGroup).filter(q => serverGroup[q]?.length > 0);
