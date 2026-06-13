@@ -9,26 +9,27 @@ import type { VideoPlayer } from 'expo-video';
 const SEEK_SEC = 10;
 
 export function usePlayerSync(player: VideoPlayer | null, onPlayToEnd: () => void) {
-  const [isPlaying, setIsPlaying]     = useState(false);
-  const [position, setPosition]       = useState(0);
-  const [duration, setDuration]       = useState(0);
-  const [isBuffering, setIsBuffering] = useState(false);
+  const [isPlaying, setIsPlaying]       = useState(false);
+  const [position, setPosition]         = useState(0);
+  const [duration, setDuration]         = useState(0);
+  const [isBuffering, setIsBuffering]   = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
-  const [seekLeft, setSeekLeft]       = useState(false);
-  const [seekRight, setSeekRight]     = useState(false);
+  const [seekLeft, setSeekLeft]         = useState(false);
+  const [seekRight, setSeekRight]       = useState(false);
 
-  const controlsTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const seekLeftTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const seekRightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastTapLeft    = useRef(0);
-  const lastTapRight   = useRef(0);
+  const controlsTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const seekLeftTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const seekRightTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTapLeft     = useRef(0);
+  const lastTapRight    = useRef(0);
   const durationPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const positionPollRef = useRef<ReturnType<typeof setInterval> | null>(null); // ← fallback poll
 
   const controlsOpacity = useSharedValue(1);
   const controlsStyle   = useAnimatedStyle(() => ({ opacity: controlsOpacity.value }));
 
-  // Poll duration
+  // ── Poll duration sampai dapat nilai valid ────────────────────────────────
   useEffect(() => {
     if (durationPollRef.current) clearInterval(durationPollRef.current);
     if (!player) return;
@@ -43,14 +44,27 @@ export function usePlayerSync(player: VideoPlayer | null, onPlayToEnd: () => voi
     return () => { if (durationPollRef.current) clearInterval(durationPollRef.current); };
   }, [player]);
 
-  // Reset duration when player changes
+  // ── Poll position tiap 500ms sebagai fallback timeUpdate ─────────────────
+  useEffect(() => {
+    if (positionPollRef.current) clearInterval(positionPollRef.current);
+    if (!player) return;
+    positionPollRef.current = setInterval(() => {
+      const cur = player.currentTime ?? 0;
+      if (cur > 0) setPosition(cur);
+      const dur = player.duration ?? 0;
+      if (dur > 0 && isFinite(dur)) setDuration(dur);
+    }, 500);
+    return () => { if (positionPollRef.current) clearInterval(positionPollRef.current); };
+  }, [player]);
+
+  // ── Reset saat player ganti ───────────────────────────────────────────────
   useEffect(() => {
     setDuration(0);
     setPosition(0);
     setIsPlaying(false);
   }, [player]);
 
-  // Player listeners
+  // ── Player event listeners ────────────────────────────────────────────────
   useEffect(() => {
     if (!player) return;
     const statusSub   = player.addListener('statusChange', ({ status }) => setIsBuffering(status === 'loading'));
@@ -78,10 +92,11 @@ export function usePlayerSync(player: VideoPlayer | null, onPlayToEnd: () => voi
 
   useEffect(() => {
     return () => {
-      if (controlsTimer.current)  clearTimeout(controlsTimer.current);
-      if (seekLeftTimer.current)  clearTimeout(seekLeftTimer.current);
-      if (seekRightTimer.current) clearTimeout(seekRightTimer.current);
+      if (controlsTimer.current)   clearTimeout(controlsTimer.current);
+      if (seekLeftTimer.current)   clearTimeout(seekLeftTimer.current);
+      if (seekRightTimer.current)  clearTimeout(seekRightTimer.current);
       if (durationPollRef.current) clearInterval(durationPollRef.current);
+      if (positionPollRef.current) clearInterval(positionPollRef.current);
       deactivateKeepAwake();
     };
   }, []);
