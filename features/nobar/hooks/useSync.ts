@@ -1,108 +1,82 @@
 import { useEffect, useRef, useCallback } from 'react';
-import firestore from '@react-native-firebase/firestore';
-import type { VideoPlayer } from 'expo-video';
-import type { RoomData } from './useRoom';
+import type { RoomState } from './useRoom';
 
-const SYNC_INTERVAL_MS = 3000;   // push ke Firestore tiap 3 detik (host)
-const DRIFT_THRESHOLD  = 3;      // detik — kalau beda > 3 detik, auto-seek
+const SYNC_THRESHOLD = 3;    // detik — kalau beda lebih dari ini, auto-seek
+const PUSH_INTERVAL  = 3000; // ms — host push posisi tiap 3 detik
 
-interface UseSyncOptions {
-  player:    VideoPlayer | null;
-  roomCode:  string | null;
-  roomData:  RoomData | null;
-  isHost:    boolean;
+interface SyncDeps {
+  room: RoomState | null;
+  isHost: boolean;
+  player: any | null;
   isPlaying: boolean;
-  position:  number;
+  position: number;
+  updatePlayback: (update: any) => Promise<void>;
+  onEpisodeChange?: (episodeId: string, episodeNum: number) => void;
 }
 
 export function useSync({
-  player, roomCode, roomData, isHost, isPlaying, position,
-}: UseSyncOptions) {
-  const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const lastPushedPos   = useRef<number>(0);
-  const isSeeking       = useRef(false);
+  room, isHost, player, isPlaying, position, updatePlayback, onEpisodeChange,
+}: SyncDeps) {
+  const pushIntervalRef    = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastSyncedEpisode  = useRef<string | null>(null);
+  const isSeeking          = useRef(false);
 
-  // HOST: push state ke Firestore tiap SYNC_INTERVAL_MS
+  // ── HOST: push posisi ke Firestore tiap 3 detik ──────────────────────────
   useEffect(() => {
-    if (!isHost || !roomCode) return;
+    if (!isHost || !room) return;
+    if (pushIntervalRef.current) clearInterval(pushIntervalRef.current);
 
-    syncIntervalRef.current = setInterval(() => {
-      if (!player) return;
-      const pos = player.currentTime ?? 0;
-      // Hanya push kalau ada perubahan bermakna (> 0.5 detik)
-      if (Math.abs(pos - lastPushedPos.current) > 0.5 || isPlaying !== undefined) {
-        firestore()
-          .collection('rooms')
-          .doc(roomCode)
-          .update({
-            position:   pos,
-            is_playing: isPlaying,
-            updated_at: firestore.FieldValue.serverTimestamp(),
-          })
-          .catch(e => console.warn('[useSync] push error:', e));
-        lastPushedPos.current = pos;
+    pushIntervalRef.current = setInterval(() => {
+      if (player) {
+        updatePlayback({
+          position:   player.currentTime ?? 0,
+          is_playing: isPlaying,
+        });
       }
-    }, SYNC_INTERVAL_MS);
+    }, PUSH_INTERVAL);
 
-    return () => {
-      if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
-    };
-  }, [isHost, roomCode, isPlaying, player]);
+    return () => { if (pushIntervalRef.current) clearInterval(pushIntervalRef.current); };
+  }, [isHost, room, isPlaying, player, updatePlayback]);
 
-  // MEMBER: sync dari roomData (Firestore onSnapshot sudah jalan di useRoom)
+  // ── HOST: push play/pause langsung (bukan tunggu interval) ───────────────
+  const hostTogglePlay = useCallback(async (playing: boolean) => {
+    if (!isHost) return;
+    await updatePlayback({ is_playing: playing, position: player?.currentTime ?? 0 });
+  }, [isHost, player, updatePlayback]);
+
+  // ── HOST: push seek langsung ──────────────────────────────────────────────
+  const hostSeek = useCallback(async (pos: number) => {
+    if (!isHost) return;
+    await updatePlayback({ position: pos });
+  }, [isHost, updatePlayback]);
+
+  // ── MEMBER: sync dari Firestore ───────────────────────────────────────────
   useEffect(() => {
-    if (isHost || !player || !roomData) return;
+    if (isHost || !room || !player) return;
+
+    // Episode berubah
+    if (room.episode_id !== lastSyncedEpisode.current) {
+      lastSyncedEpisode.current = room.episode_id;
+      onEpisodeChange?.(room.episode_id, room.episode_num);
+      return;
+    }
 
     // Sync play/pause
-    const hostPlaying = roomData.is_playing;
-    if (hostPlaying && !player.playing) {
+    if (room.is_playing && !isPlaying) {
       player.play();
-    } else if (!hostPlaying && player.playing) {
+    } else if (!room.is_playing && isPlaying) {
       player.pause();
     }
 
-    // Sync position — kalau drift > DRIFT_THRESHOLD
-    const hostPos  = roomData.position ?? 0;
-    const localPos = player.currentTime ?? 0;
-    if (Math.abs(hostPos - localPos) > DRIFT_THRESHOLD && !isSeeking.current) {
+    // Sync posisi kalau beda > threshold
+    const currentPos = player.currentTime ?? 0;
+    const diff = Math.abs(currentPos - room.position);
+    if (diff > SYNC_THRESHOLD && !isSeeking.current) {
       isSeeking.current = true;
-      player.seekBy(hostPos - localPos);
-      setTimeout(() => { isSeeking.current = false; }, 1500);
+      player.seekBy(room.position - currentPos);
+      setTimeout(() => { isSeeking.current = false; }, 1000);
     }
-  }, [roomData, isHost, player]);
+  }, [room?.is_playing, room?.position, room?.episode_id]);
 
-  // HOST: push segera ketika play/pause berubah (bukan nunggu interval)
-  const pushPlayPause = useCallback(
-    (playing: boolean) => {
-      if (!isHost || !roomCode || !player) return;
-      firestore()
-        .collection('rooms')
-        .doc(roomCode)
-        .update({
-          is_playing: playing,
-          position:   player.currentTime ?? 0,
-          updated_at: firestore.FieldValue.serverTimestamp(),
-        })
-        .catch(e => console.warn('[useSync] pushPlayPause error:', e));
-    },
-    [isHost, roomCode, player],
-  );
-
-  // HOST: push segera ketika seek
-  const pushSeek = useCallback(
-    (newPos: number) => {
-      if (!isHost || !roomCode) return;
-      firestore()
-        .collection('rooms')
-        .doc(roomCode)
-        .update({
-          position:   newPos,
-          updated_at: firestore.FieldValue.serverTimestamp(),
-        })
-        .catch(e => console.warn('[useSync] pushSeek error:', e));
-    },
-    [isHost, roomCode],
-  );
-
-  return { pushPlayPause, pushSeek };
+  return { hostTogglePlay, hostSeek };
 }
