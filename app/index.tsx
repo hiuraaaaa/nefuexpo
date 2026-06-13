@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, Dimensions,
   StatusBar, ScrollView, BackHandler,
@@ -35,9 +35,8 @@ const REPEAT_COUNT  = 4;
 const COL_OFFSETS   = [0, -(STEP * 0.6), -(STEP * 0.2), -(STEP * 0.8)] as const;
 const COL_DURATIONS = [3800, 4400, 3400, 4800] as const;
 const DISCLAIMER_KEY = 'nefusoft_disclaimer_accepted';
-const MAX_LOAD_MS    = 5000; // max loading 5 detik
+const MAX_LOAD_MS    = 5000;
 
-// ── Step flow ─────────────────────────────────────────────────────────────────
 type Step = 'loading' | 'welcome' | 'disclaimer' | 'login';
 
 // ── Poster components ─────────────────────────────────────────────────────────
@@ -91,11 +90,14 @@ const PosterColumn = React.memo(({ items, offsetY, duration }: {
 });
 
 // ── Loading Screen ─────────────────────────────────────────────────────────────
-function LoadingScreen() {
+// Logo di-preload via expo-image sebelum screen ini render,
+// jadi ga ada flash hitam antara splash → loading icon.
+function LoadingScreen({ logoReady }: { logoReady: boolean }) {
   const scale   = useSharedValue(1);
   const opacity = useSharedValue(0.6);
 
   useEffect(() => {
+    if (!logoReady) return;
     scale.value   = withRepeat(withSequence(
       withTiming(1.08, { duration: 700, easing: Easing.inOut(Easing.ease) }),
       withTiming(1,    { duration: 700, easing: Easing.inOut(Easing.ease) }),
@@ -104,37 +106,46 @@ function LoadingScreen() {
       withTiming(1,   { duration: 700 }),
       withTiming(0.6, { duration: 700 }),
     ), -1, false);
-  }, []);
+  }, [logoReady]);
 
   const logoStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
-    opacity:   opacity.value,
+    opacity:   logoReady ? opacity.value : 0, // sembunyikan sampai ready
   }));
 
   return (
-    <Animated.View
-      entering={FadeIn.duration(200)}
-      exiting={FadeOut.duration(300)}
+    // Tidak pakai FadeIn di sini — biarkan langsung visible supaya
+    // background hitam langsung ada sejak frame pertama (= extended splash).
+    // Yang di-fade-in cuma logo-nya, setelah image preload selesai.
+    <View
       style={{
         position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
         backgroundColor: '#08080a',
         alignItems: 'center', justifyContent: 'center', zIndex: 100,
       }}
     >
-      <Animated.View style={logoStyle}>
+      <Animated.View
+        style={logoStyle}
+        entering={logoReady ? FadeIn.duration(300) : undefined}
+      >
         <Image
           source={{ uri: LOGO_URL }}
           style={{ width: 72, height: 72, borderRadius: 18 }}
           contentFit="contain"
         />
       </Animated.View>
-      <Text style={{
-        color: 'rgba(255,255,255,0.2)', fontSize: 11,
-        marginTop: 24, fontWeight: '600', letterSpacing: 1,
-      }}>
-        NefuSoft v{APP_VERSION}
-      </Text>
-    </Animated.View>
+      {logoReady && (
+        <Animated.Text
+          entering={FadeIn.duration(400).delay(150)}
+          style={{
+            color: 'rgba(255,255,255,0.2)', fontSize: 11,
+            marginTop: 24, fontWeight: '600', letterSpacing: 1,
+          }}
+        >
+          NefuSoft v{APP_VERSION}
+        </Animated.Text>
+      )}
+    </View>
   );
 }
 
@@ -160,7 +171,6 @@ function DisclaimerScreen({ onAccept, onDecline }: {
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
         <View style={{ flex: 1, padding: 24 }}>
-          {/* Header */}
           <View style={{ marginBottom: 24 }}>
             <Image
               source={{ uri: LOGO_URL }}
@@ -175,7 +185,6 @@ function DisclaimerScreen({ onAccept, onDecline }: {
             </Text>
           </View>
 
-          {/* Konten */}
           <ScrollView
             style={{ flex: 1 }}
             showsVerticalScrollIndicator={false}
@@ -207,7 +216,6 @@ function DisclaimerScreen({ onAccept, onDecline }: {
             </Text>
           </ScrollView>
 
-          {/* Buttons */}
           <View style={{ gap: 8, paddingTop: 16 }}>
             <TouchableOpacity
               onPress={onAccept}
@@ -263,8 +271,6 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
         <View style={{ flex: 1, padding: 28, justifyContent: 'flex-end', paddingBottom: 40 }}>
-
-          {/* Blob decorasi */}
           <View style={{
             position: 'absolute', top: height * 0.1, right: -60,
             width: 240, height: 240, borderRadius: 120,
@@ -281,7 +287,6 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
             style={{ width: 56, height: 56, borderRadius: 14, marginBottom: 24 }}
             contentFit="contain"
           />
-
           <Text style={{ color: '#fff', fontSize: 32, fontWeight: '900', letterSpacing: -1, marginBottom: 6 }}>
             Selamat datang
           </Text>
@@ -325,8 +330,11 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function WelcomeScreen() {
   const router = useRouter();
-  const [step, setStep]       = useState<Step>('loading');
-  const [posters, setPosters] = useState<Anime[]>([]);
+  const [step, setStep]           = useState<Step>('loading');
+  const [posters, setPosters]     = useState<Anime[]>([]);
+  // State ini true setelah logo image selesai di-prefetch ke cache expo-image.
+  // Mencegah flash hitam antara splash screen → loading icon muncul.
+  const [logoReady, setLogoReady] = useState(false);
 
   const overlayOpacity = useSharedValue(1);
   const contentOpacity = useSharedValue(0);
@@ -337,6 +345,14 @@ export default function WelcomeScreen() {
     [posters]
   );
 
+  // Prefetch logo ke cache expo-image segera saat mount.
+  // Setelah ready, baru munculkan logo dengan fade-in yang mulus.
+  useEffect(() => {
+    Image.prefetch(LOGO_URL)
+      .then(() => setLogoReady(true))
+      .catch(() => setLogoReady(true)); // fallback: tetap tampil meski gagal
+  }, []);
+
   // ── Cek auth state ──────────────────────────────────────────────────────
   useEffect(() => {
     const unsub = onAuthStateChanged(async (user) => {
@@ -345,9 +361,8 @@ export default function WelcomeScreen() {
         return;
       }
 
-      // Jalankan fetch parallel + timeout 5 detik
       try {
-        const timeout = new Promise<void>(r => setTimeout(r, MAX_LOAD_MS));
+        const timeout  = new Promise<void>(r => setTimeout(r, MAX_LOAD_MS));
         const fetchAll = async () => {
           const [postersRes] = await Promise.all([
             api.ongoing(),
@@ -358,7 +373,6 @@ export default function WelcomeScreen() {
         await Promise.race([fetchAll(), timeout]);
       } catch {}
 
-      // Loading selesai → tampil welcome
       setStep('welcome');
       overlayOpacity.value = withTiming(0, { duration: 400 });
       contentOpacity.value = withTiming(1, { duration: 600 });
@@ -484,10 +498,10 @@ export default function WelcomeScreen() {
         backgroundColor: '#08080a', pointerEvents: 'none',
       }, overlayStyle]} />
 
-      {/* Loading screen */}
-      {step === 'loading' && <LoadingScreen />}
+      {/* Loading screen — selalu render saat step === 'loading',
+          tapi logonya baru muncul setelah preload selesai */}
+      {step === 'loading' && <LoadingScreen logoReady={logoReady} />}
 
-      {/* Disclaimer */}
       {step === 'disclaimer' && (
         <DisclaimerScreen
           onAccept={handleDisclaimerAccept}
@@ -495,7 +509,6 @@ export default function WelcomeScreen() {
         />
       )}
 
-      {/* Login */}
       {step === 'login' && (
         <LoginScreen onSuccess={handleLoginSuccess} />
       )}
