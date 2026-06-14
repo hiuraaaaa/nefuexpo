@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/hooks/theme';
 import { Anime } from '@/types';
+import { useNavigateAnime } from '@/hooks/useNavigateAnime';
 
 import { useExplore } from './hooks/useExplore';
 import SearchBar from './components/SearchBar';
@@ -17,6 +18,7 @@ import LoadMoreFooter from './components/LoadMoreFooter';
 export default function ExploreScreen() {
   const params = useLocalSearchParams<{ q?: string }>();
   const router = useRouter();
+  const { goToAnime } = useNavigateAnime();
   const theme  = useTheme();
 
   const {
