@@ -6,29 +6,28 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, {
-  useSharedValue, useAnimatedStyle,
-  withSpring, FadeIn, FadeOut,
+  useSharedValue, useAnimatedStyle, withSpring,
 } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
 import { COLORS } from '@/constants';
-
-const { height: SCREEN_H } = Dimensions.get('window');
+import { useRoomContext } from '@/contexts/RoomContext';
 
 interface Props {
-  activeRoomCode?: string | null;
   insetBottom: number;
 }
 
-export function NobarFAB({ activeRoomCode, insetBottom }: Props) {
-  const router  = useRouter();
-  const [open, setOpen]         = useState(false);
-  const [code, setCode]         = useState('');
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState<string | null>(null);
+export function NobarFAB({ insetBottom }: Props) {
+  const router = useRouter();
+  const { roomCode: activeRoomCode } = useRoomContext();
 
-  const scale = useSharedValue(1);
+  const [open, setOpen]       = useState(false);
+  const [code, setCode]       = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState<string | null>(null);
+
+  const scale    = useSharedValue(1);
   const fabStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
   const isInRoom = !!activeRoomCode;
@@ -36,13 +35,7 @@ export function NobarFAB({ activeRoomCode, insetBottom }: Props) {
   const handlePress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     scale.value = withSpring(0.9, { damping: 10 }, () => { scale.value = withSpring(1); });
-    if (isInRoom) {
-      // Kalau udah di room, langsung ke watch anime yang lagi diputar
-      // (akan di-handle sama useRoom listener)
-      setOpen(true);
-    } else {
-      setOpen(true);
-    }
+    setOpen(true);
   };
 
   const handleJoin = async () => {
@@ -56,7 +49,6 @@ export function NobarFAB({ activeRoomCode, insetBottom }: Props) {
 
       const roomData = snap.data() as any;
 
-      // Join member
       await firestore()
         .collection('rooms').doc(code.toUpperCase())
         .collection('members').doc(auth().currentUser!.uid)
@@ -69,8 +61,6 @@ export function NobarFAB({ activeRoomCode, insetBottom }: Props) {
 
       setOpen(false);
       setCode('');
-
-      // Navigate ke anime host
       router.push(`/watch/${roomData.anime_id}`);
     } catch (e: any) {
       setError(e.message || 'Gagal bergabung');
@@ -83,9 +73,9 @@ export function NobarFAB({ activeRoomCode, insetBottom }: Props) {
       {/* FAB */}
       <Animated.View style={[fabStyle, {
         position: 'absolute',
-        bottom:   insetBottom + 90, // di atas tab bar
-        right:    20,
-        zIndex:   999,
+        bottom: insetBottom + 90,
+        right: 20,
+        zIndex: 999,
       }]}>
         <TouchableOpacity
           onPress={handlePress}
@@ -103,11 +93,7 @@ export function NobarFAB({ activeRoomCode, insetBottom }: Props) {
             elevation: 8,
           }}
         >
-          <Ionicons
-            name={isInRoom ? 'people' : 'people-outline'}
-            size={20}
-            color="#000"
-          />
+          <Ionicons name={isInRoom ? 'people' : 'people-outline'} size={20} color="#000" />
           {isInRoom ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#000' }} />
@@ -119,7 +105,7 @@ export function NobarFAB({ activeRoomCode, insetBottom }: Props) {
         </TouchableOpacity>
       </Animated.View>
 
-      {/* Modal join room */}
+      {/* Modal */}
       <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
         <View style={{ flex: 1 }}>
           <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }} activeOpacity={1} onPress={() => setOpen(false)} />
@@ -132,7 +118,6 @@ export function NobarFAB({ activeRoomCode, insetBottom }: Props) {
             <View style={{ width: 40, height: 4, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 2, alignSelf: 'center', marginBottom: 20 }} />
 
             {isInRoom ? (
-              // Sudah di room — tampilkan kode aktif
               <View style={{ gap: 16 }}>
                 <Text style={{ color: '#fff', fontWeight: '900', fontSize: 18, textAlign: 'center' }}>Room Aktif 🎬</Text>
                 <View style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16, padding: 20, alignItems: 'center', gap: 8, borderWidth: 1, borderColor: `${COLORS.gold}40` }}>
@@ -148,7 +133,6 @@ export function NobarFAB({ activeRoomCode, insetBottom }: Props) {
                 </TouchableOpacity>
               </View>
             ) : (
-              // Belum di room — form join
               <View style={{ gap: 16 }}>
                 <Text style={{ color: '#fff', fontWeight: '900', fontSize: 18, textAlign: 'center' }}>Nobar Bareng 🍿</Text>
                 <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, textAlign: 'center' }}>
