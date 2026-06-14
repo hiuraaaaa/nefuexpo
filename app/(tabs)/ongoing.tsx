@@ -14,6 +14,7 @@ import { useTheme } from '@/hooks/theme';
 import { Anime } from '@/types';
 import AnimeCard from '@/components/AnimeCard';
 import { CardSkeleton } from '@/components/Skeleton';
+import { useNavigateAnime } from '@/hooks/useNavigateAnime';
 
 const { width } = Dimensions.get('window');
 const NUM_COLUMNS = 4;
