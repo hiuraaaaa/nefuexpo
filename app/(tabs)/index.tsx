@@ -14,6 +14,7 @@ import { Anime } from '@/types';
 import AnimeCard from '@/components/AnimeCard';
 import SearchModal from '@/components/SearchModal';
 import { HorizontalCardSkeleton, RankSkeleton } from '@/components/Skeleton';
+import { useNavigateAnime } from '@/hooks/useNavigateAnime';
 
 import {
   useHomeData, todayLabel,
@@ -23,6 +24,7 @@ import {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { goToAnime } = useNavigateAnime();
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -40,7 +42,7 @@ export default function HomeScreen() {
     visibleAnnouncements, dismissAnnouncement,
   } = useHomeData();
 
-  const goToAnime = (a: Anime) => router.push(`/watch/${getAnimeSlug(a)}`);
+// const { goToAnime } = useNavigateAnime();
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.bg }}>
