@@ -9,6 +9,7 @@ import { decodeAnimeId } from '@/hooks/api/api';
 import { historyStorage, favoritStorage, storageMain } from '@/hooks/storage/storage';
 import { getCurrentUser } from '@/hooks/auth';
 import { WatchSkeleton } from '@/components/Skeleton';
+import { useRoomContext } from '@/contexts/RoomContext';
 
 import { useWatchData }       from './hooks/useWatchData';
 import { useEpisodeLoader }   from './hooks/useEpisodeLoader';
@@ -61,7 +62,7 @@ export default function WatchScreen() {
     isHost, loading: roomLoading, error: roomError,
     createRoom, joinRoom, leaveRoom,
     sendMessage, updatePlayback,
-  } = useRoom();
+  } = useRoomContext();
 
   const { hostTogglePlay, hostSeek } = useSync({
     room,
