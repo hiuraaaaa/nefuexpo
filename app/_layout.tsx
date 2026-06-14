@@ -1,13 +1,15 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { useEffect, useState, Component, ReactNode } from 'react';
-import { Text, ScrollView, TouchableOpacity } from 'react-native';
+import { useEffect, useState, useCallback, Component, ReactNode } from 'react';
+import { Text, ScrollView, TouchableOpacity, AppState, AppStateStatus } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
+import NetInfo from '@react-native-community/netinfo';
 import { loadSavedTheme, useTheme } from '@/hooks/theme';
 import { isAdmin, onAuthStateChanged } from '@/hooks/auth';
 import DebugOverlay from '@/components/DebugOverlay';
 import MaintenancePage from '@/components/MaintenancePage';
+import OfflinePage from '@/components/OfflinePage';
 import firestore from '@react-native-firebase/firestore';
 import { refreshDomain } from '@/hooks/scraper';
 import { SystemBars } from 'react-native-edge-to-edge';
@@ -58,20 +60,49 @@ function AppLayout() {
   const router = useRouter();
   const [maintenance, setMaintenance] = useState<MaintenanceData | null>(null);
   const [adminUser, setAdminUser]     = useState(false);
+  const [isOffline, setIsOffline]     = useState(false);
 
   useEffect(() => { loadSavedTheme(); refreshDomain(); }, []);
-
-  useEffect(() => {
-    rescheduleNotifs();
-  }, []);
-
+  useEffect(() => { rescheduleNotifs(); }, []);
   useNotifTapHandler(router);
 
+  // ── Offline detection ──────────────────────────────────────────────────────
+  useEffect(() => {
+    // Check initial state
+    NetInfo.fetch().then(state => {
+      setIsOffline(!state.isConnected);
+    });
+
+    // Listen perubahan koneksi
+    const unsub = NetInfo.addEventListener(state => {
+      setIsOffline(!state.isConnected);
+    });
+
+    return unsub;
+  }, []);
+
+  // Re-check saat app kembali ke foreground
+  useEffect(() => {
+    const handler = (nextState: AppStateStatus) => {
+      if (nextState === 'active') {
+        NetInfo.fetch().then(state => setIsOffline(!state.isConnected));
+      }
+    };
+    const sub = AppState.addEventListener('change', handler);
+    return () => sub.remove();
+  }, []);
+
+  const handleRetry = useCallback(() => {
+    NetInfo.fetch().then(state => setIsOffline(!state.isConnected));
+  }, []);
+
+  // ── Auth ───────────────────────────────────────────────────────────────────
   useEffect(() => {
     const unsub = onAuthStateChanged(() => { setAdminUser(isAdmin()); });
     return unsub;
   }, []);
 
+  // ── Maintenance ────────────────────────────────────────────────────────────
   useEffect(() => {
     const unsub = firestore()
       .collection('config')
@@ -86,6 +117,17 @@ function AppLayout() {
 
   const statusBarStyle  = theme.tint === 'light' ? 'dark' : 'light';
   const systemBarsStyle = theme.tint === 'light' ? 'dark' : 'light';
+
+  // Offline — prioritas tertinggi sebelum maintenance
+  if (isOffline) {
+    return (
+      <>
+        <SystemBars style="light" />
+        <StatusBar style="light" />
+        <OfflinePage onRetry={handleRetry} />
+      </>
+    );
+  }
 
   if (maintenance) {
     return (
@@ -115,14 +157,9 @@ function AppLayout() {
         <TouchableOpacity
           onPress={sendTestNotif}
           style={{
-            position:          'absolute',
-            bottom:            120,
-            right:             16,
-            zIndex:            9999,
-            backgroundColor:   '#e63946',
-            borderRadius:      999,
-            paddingHorizontal: 16,
-            paddingVertical:   10,
+            position: 'absolute', bottom: 120, right: 16, zIndex: 9999,
+            backgroundColor: '#e63946', borderRadius: 999,
+            paddingHorizontal: 16, paddingVertical: 10,
           }}
         >
           <Text style={{ color: '#fff', fontWeight: '900', fontSize: 12 }}>Test Notif</Text>
@@ -137,7 +174,6 @@ export default function RootLayout() {
   return (
     <RootErrorBoundary>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        {/* RoomProvider membungkus AppLayout */}
         <RoomProvider>
           <AppLayout />
         </RoomProvider>
@@ -145,4 +181,3 @@ export default function RootLayout() {
     </RootErrorBoundary>
   );
 }
-
