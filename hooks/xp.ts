@@ -1,4 +1,6 @@
 import { storageMain } from '@/hooks/storage/storage';
+import firestore from '@react-native-firebase/firestore';
+import auth from '@react-native-firebase/auth';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type XPData = {
@@ -33,7 +35,7 @@ export const LEVELS: LevelEntry[] = [
 export function getLevelData(xp: number): {
   current: LevelEntry;
   next: LevelEntry | null;
-  progress: number; // 0–1
+  progress: number;
 } {
   let current = LEVELS[0];
   for (const l of LEVELS) {
@@ -56,7 +58,24 @@ const DEFAULT: XPData = {
 
 const todayStr = (): string => new Date().toISOString().slice(0, 10);
 
-// ─── Storage (MMKV sync) ──────────────────────────────────────────────────────
+// ─── Sync XP ke Firestore ─────────────────────────────────────────────────────
+const syncXPToFirestore = (data: XPData): void => {
+  const uid = auth().currentUser?.uid;
+  if (!uid) return;
+  firestore()
+    .collection('users')
+    .doc(uid)
+    .set({
+      xp:            data.xp,
+      level:         data.level,
+      streak:        data.streak,
+      lastWatchDate: data.lastWatchDate,
+      xpUpdatedAt:   Date.now(),
+    }, { merge: true })
+    .catch(() => {});
+};
+
+// ─── Storage (MMKV lokal + Firestore sync) ────────────────────────────────────
 export const xpStorage = {
   get: (): XPData => {
     try {
@@ -74,7 +93,36 @@ export const xpStorage = {
   },
 
   set: (data: XPData): void => {
-    try { storageMain.set(XP_KEY, JSON.stringify(data)); } catch {}
+    try {
+      storageMain.set(XP_KEY, JSON.stringify(data));
+      syncXPToFirestore(data); // ← sync ke Firestore setiap save
+    } catch {}
+  },
+
+  // Sync dari Firestore ke lokal — dipanggil saat login
+  syncFromFirestore: async (): Promise<XPData | null> => {
+    const uid = auth().currentUser?.uid;
+    if (!uid) return null;
+    try {
+      const snap = await firestore().collection('users').doc(uid).get();
+      const data = snap.data();
+      if (!data) return null;
+
+      const remote: XPData = {
+        xp:            typeof data.xp === 'number'            ? data.xp            : 0,
+        level:         typeof data.level === 'number'         ? data.level         : 1,
+        streak:        typeof data.streak === 'number'        ? data.streak        : 0,
+        lastWatchDate: typeof data.lastWatchDate === 'string' ? data.lastWatchDate : '',
+        _todayXP:      typeof data._todayXP === 'number'      ? data._todayXP      : 0,
+      };
+
+      // Ambil nilai tertinggi antara lokal dan remote (anti data hilang)
+      const local = xpStorage.get();
+      const merged: XPData = remote.xp >= local.xp ? remote : local;
+
+      storageMain.set(XP_KEY, JSON.stringify(merged));
+      return merged;
+    } catch { return null; }
   },
 
   add: (amount: number): XPData => {
@@ -104,7 +152,7 @@ export const xpStorage = {
       lastWatchDate: today,
       _todayXP:      dailyUsed + actualAdd,
     };
-    xpStorage.set(updated);
+    xpStorage.set(updated); // set sudah include sync ke Firestore
     return updated;
   },
 
