@@ -136,8 +136,12 @@ export default function RootLayout() {
   return (
     <RootErrorBoundary>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <AppLayout />
+        {/* RoomProvider membungkus AppLayout */}
+        <RoomProvider>
+          <AppLayout />
+        </RoomProvider>
       </GestureHandlerRootView>
     </RootErrorBoundary>
   );
 }
+
