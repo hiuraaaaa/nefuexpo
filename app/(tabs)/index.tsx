@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import {
   View, Text, ScrollView, RefreshControl,
-  StatusBar,
+  StatusBar, TouchableOpacity,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
@@ -42,7 +42,6 @@ export default function HomeScreen() {
     visibleAnnouncements, dismissAnnouncement,
   } = useHomeData();
 
-// const { goToAnime } = useNavigateAnime();
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.bg }}>
@@ -118,7 +117,11 @@ export default function HomeScreen() {
             >
               {isLoading
                 ? [...Array(6)].map((_, i) => <HorizontalCardSkeleton key={i} />)
-                : ongoing.map(item => <AnimeCard key={item.id} anime={item} onPress={() => goToAnime(item)} width={100} />)
+                : ongoing.map(item => (
+                  <TouchableOpacity key={item.id} onPress={() => goToAnime(item)} activeOpacity={0.85}>
+                    <AnimeCard anime={item} width={100} />
+                  </TouchableOpacity>
+                ))
               }
             </ScrollView>
           </View>
@@ -148,7 +151,11 @@ export default function HomeScreen() {
                 snapToInterval={110} decelerationRate="fast" snapToAlignment="start"
                 contentContainerStyle={{ gap: 10 }}
               >
-                {todayAnime.map(item => <AnimeCard key={item.id} anime={item} onPress={() => goToAnime(item)} width={100} />)}
+                {todayAnime.map(item => (
+                  <TouchableOpacity key={item.id} onPress={() => goToAnime(item)} activeOpacity={0.85}>
+                    <AnimeCard anime={item} width={100} />
+                  </TouchableOpacity>
+                ))}
               </ScrollView>
             )}
           </View>
