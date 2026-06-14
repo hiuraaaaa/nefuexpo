@@ -6,9 +6,11 @@ import { useRouter } from 'expo-router';
 import { COLORS } from '@/constants';
 import { Anime } from '@/types';
 import { getAnimeSlug } from '@/hooks/api/api';
+import { useNavigateAnime } from '@/hooks/useNavigateAnime';
 
 export function RecommendationList({ items }: { items: Anime[] }) {
   const router = useRouter();
+  const { goToAnime } = useNavigateAnime();
   if (!items.length) return null;
   return (
     <View style={{ marginHorizontal: 16 }}>
