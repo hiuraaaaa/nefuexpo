@@ -12,6 +12,7 @@ import firestore from '@react-native-firebase/firestore';
 import { refreshDomain } from '@/hooks/scraper';
 import { SystemBars } from 'react-native-edge-to-edge';
 import { useRouter } from 'expo-router';
+import { RoomProvider } from '@/contexts/RoomContext';
 import { rescheduleNotifs, useNotifTapHandler, sendTestNotif } from '@/hooks/notifications';
 import '../global.css';
 
