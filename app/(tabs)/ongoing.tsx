@@ -84,6 +84,7 @@ const SkeletonItem = React.memo(() => (
 
 export default function OngoingScreen() {
   const router = useRouter();
+  const { goToAnime } = useNavigateAnime();
   const theme  = useTheme();
 
   const [results, setResults]   = useState<Anime[]>([]);
