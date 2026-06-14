@@ -4,12 +4,14 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useEffect, useState, useCallback, Component, ReactNode } from 'react';
 import { Text, ScrollView, TouchableOpacity, AppState, AppStateStatus } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
+import Constants from 'expo-constants';
 import NetInfo from '@react-native-community/netinfo';
 import { loadSavedTheme, useTheme } from '@/hooks/theme';
 import { isAdmin, onAuthStateChanged } from '@/hooks/auth';
 import DebugOverlay from '@/components/DebugOverlay';
 import MaintenancePage from '@/components/MaintenancePage';
 import OfflinePage from '@/components/OfflinePage';
+import UpdatePage from '@/components/UpdatePage';
 import firestore from '@react-native-firebase/firestore';
 import { refreshDomain } from '@/hooks/scraper';
 import { SystemBars } from 'react-native-edge-to-edge';
@@ -61,6 +63,7 @@ function AppLayout() {
   const [maintenance, setMaintenance] = useState<MaintenanceData | null>(null);
   const [adminUser, setAdminUser]     = useState(false);
   const [isOffline, setIsOffline]     = useState(false);
+  const [updateInfo, setUpdateInfo]    = useState<{ storeUrl: string; latestVersion: string } | null>(null);
 
   useEffect(() => { loadSavedTheme(); refreshDomain(); }, []);
   useEffect(() => { rescheduleNotifs(); }, []);
@@ -92,6 +95,37 @@ function AppLayout() {
     return () => sub.remove();
   }, []);
 
+  // ── Update check via GitHub Releases ─────────────────────────────────────
+  useEffect(() => {
+    const checkUpdate = async () => {
+      try {
+        const res  = await fetch(
+          'https://api.github.com/repos/hiuraaaaa/nefuexpo/releases/latest',
+          { headers: { 'Accept': 'application/vnd.github.v3+json' } }
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+
+        const latestTag = (data.tag_name as string ?? '').replace(/^v/, '');
+        const current   = Constants.expoConfig?.version ?? '0.0.0';
+
+        const toNum = (v: string) =>
+          v.split('.').map(Number).reduce((a, b, i) => a + b * Math.pow(1000, 2 - i), 0);
+
+        if (toNum(current) < toNum(latestTag)) {
+          const downloadUrl = `https://github.com/hiuraaaaa/nefuexpo/releases/download/v${latestTag}/NefuSoft.apk`;
+          setUpdateInfo({ storeUrl: downloadUrl, latestVersion: latestTag });
+        } else {
+          setUpdateInfo(null);
+        }
+      } catch {
+        setUpdateInfo(null);
+      }
+    };
+
+    checkUpdate();
+  }, []);
+
   const handleRetry = useCallback(() => {
     NetInfo.fetch().then(state => setIsOffline(!state.isConnected));
   }, []);
@@ -118,13 +152,24 @@ function AppLayout() {
   const statusBarStyle  = theme.tint === 'light' ? 'dark' : 'light';
   const systemBarsStyle = theme.tint === 'light' ? 'dark' : 'light';
 
-  // Offline — prioritas tertinggi sebelum maintenance
+  // Offline — prioritas tertinggi
   if (isOffline) {
     return (
       <>
         <SystemBars style="light" />
         <StatusBar style="light" />
         <OfflinePage onRetry={handleRetry} />
+      </>
+    );
+  }
+
+  // Update required
+  if (updateInfo) {
+    return (
+      <>
+        <SystemBars style="light" />
+        <StatusBar style="light" />
+        <UpdatePage storeUrl={updateInfo.storeUrl} latestVersion={updateInfo.latestVersion} />
       </>
     );
   }
