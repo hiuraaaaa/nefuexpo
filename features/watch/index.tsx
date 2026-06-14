@@ -150,6 +150,24 @@ export default function WatchScreen() {
     setAutoNext(prev => { const n = !prev; historyStorage.setAutoNext(n); return n; });
   }, []);
 
+  // ── Handle join room — redirect ke anime host kalau beda ──────────────────
+  const handleJoinRoom = useCallback(async (code: string) => {
+    const result = await joinRoom(code);
+    if (result.success && result.room) {
+      const { anime_id, episode_id } = result.room;
+      setShowRoomModal(false);
+
+      if (anime_id !== watchData.anime?.id) {
+        // Anime beda — navigate ke anime host
+        router.replace(`/watch/${anime_id}`);
+      } else {
+        // Anime sama — sync episode aja
+        const ep = watchData.episodes.find(e => e.id === episode_id);
+        if (ep) epNav.changeEpisode(ep);
+      }
+    }
+  }, [joinRoom, watchData.anime, watchData.episodes, epNav, router]);
+
   if (watchData.isLoading) {
     return <View style={{ flex: 1, backgroundColor: COLORS.bg }}><WatchSkeleton /></View>;
   }
@@ -181,7 +199,7 @@ export default function WatchScreen() {
           episode_id:   watchData.currentEpId ?? '',
           episode_num:  epNav.currentEpNum,
         })}
-        onJoin={code => joinRoom(code)}
+        onJoin={handleJoinRoom}
         onLeave={leaveRoom}
       />
 
@@ -228,7 +246,6 @@ export default function WatchScreen() {
       {!playerSync.isFullscreen && (
         <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
 
-          {/* Nobar bar — muncul kalau lagi di room */}
           {roomCode && (
             <NobarBar
               roomCode={roomCode}
