@@ -29,6 +29,7 @@ const sanitizeKey = (id: string): string =>
     .replace(/[^\w-]/g, '').slice(0, 500) || 'unknown';
 
 // ─── Firestore sync helpers ───────────────────────────────────────────────────
+// Pakai set+merge biar ga gagal kalau field belum ada di doc
 
 const syncHistoryToFirestore = (history: HistoryItem[]): void => {
   const uid = auth().currentUser?.uid;
@@ -36,7 +37,10 @@ const syncHistoryToFirestore = (history: HistoryItem[]): void => {
   firestore()
     .collection('users')
     .doc(uid)
-    .update({ history: history.slice(0, 10), historyUpdatedAt: Date.now() })
+    .set(
+      { history: history.slice(0, 10), historyUpdatedAt: Date.now() },
+      { merge: true } // ← fix: merge bukan update
+    )
     .catch(() => {});
 };
 
@@ -46,8 +50,41 @@ const syncFavoritToFirestore = (favs: Anime[]): void => {
   firestore()
     .collection('users')
     .doc(uid)
-    .update({ favorites: favs.slice(0, 20), favoritesUpdatedAt: Date.now() })
+    .set(
+      { favorites: favs.slice(0, 20), favoritesUpdatedAt: Date.now() },
+      { merge: true } // ← fix: merge bukan update
+    )
     .catch(() => {});
+};
+
+// ─── Sync dari Firestore ke lokal — dipanggil saat login ─────────────────────
+export const syncFromFirestore = async (): Promise<void> => {
+  const uid = auth().currentUser?.uid;
+  if (!uid) return;
+  try {
+    const snap = await firestore().collection('users').doc(uid).get();
+    const data = snap.data();
+    if (!data) return;
+
+    // Sync history — ambil remote kalau lebih banyak dari lokal
+    if (Array.isArray(data.history) && data.history.length > 0) {
+      const local = historyStorage.getAll();
+      if (data.history.length >= local.length) {
+        setJSON(storageMain, HISTORY_KEY, data.history);
+      }
+    }
+
+    // Sync favorit — merge lokal + remote, dedupe by id
+    if (Array.isArray(data.favorites) && data.favorites.length > 0) {
+      const local  = favoritStorage.getAll();
+      const remote = data.favorites as Anime[];
+      const merged = [...local];
+      for (const r of remote) {
+        if (!merged.some(a => a.id === r.id)) merged.push(r);
+      }
+      setJSON(storageMain, FAVORIT_KEY, merged.slice(0, 100));
+    }
+  } catch {}
 };
 
 // ─── History ──────────────────────────────────────────────────────────────────
@@ -57,19 +94,19 @@ export const historyStorage = {
     getJSON<HistoryItem[]>(storageMain, HISTORY_KEY, []),
 
   add: (anime: Anime, episodeIndex: number): void => {
-    const history = historyStorage.getAll();
+    const history  = historyStorage.getAll();
     const filtered = history.filter(h => h.anime.id !== anime.id);
     const updated: HistoryItem[] = [
       { anime, episodeIndex, timestamp: Date.now() },
       ...filtered,
     ].slice(0, MAX_HISTORY);
     setJSON(storageMain, HISTORY_KEY, updated);
-    syncHistoryToFirestore(updated); // ← sync ke Firestore
+    syncHistoryToFirestore(updated);
   },
 
   clear: (): void => {
     storageMain.delete(HISTORY_KEY);
-    syncHistoryToFirestore([]); // ← sync clear
+    syncHistoryToFirestore([]);
   },
 
   getAutoNext: (): boolean =>
@@ -87,9 +124,9 @@ export const getSearchHistory = (): string[] =>
 
 export const addSearchHistory = (term: string): void => {
   if (!term?.trim()) return;
-  const prev = getSearchHistory();
+  const prev    = getSearchHistory();
   const filtered = prev.filter(t => t.toLowerCase() !== term.toLowerCase());
-  const updated = [term.trim(), ...filtered].slice(0, MAX_SEARCH_HISTORY);
+  const updated  = [term.trim(), ...filtered].slice(0, MAX_SEARCH_HISTORY);
   setJSON(storageMain, SEARCH_HISTORY_KEY, updated);
 };
 
@@ -137,31 +174,28 @@ export const favoritStorage = {
     favoritStorage.getAll().some(a => a.id === animeId),
 
   toggle: (anime: Anime): boolean => {
-    const list = favoritStorage.getAll();
+    const list   = favoritStorage.getAll();
     const exists = list.some(a => a.id === anime.id);
     let updated: Anime[];
     if (exists) {
       updated = list.filter(a => a.id !== anime.id);
-      setJSON(storageMain, FAVORIT_KEY, updated);
-      syncFavoritToFirestore(updated); // ← sync ke Firestore
-      return false;
     } else {
       updated = [anime, ...list];
-      setJSON(storageMain, FAVORIT_KEY, updated);
-      syncFavoritToFirestore(updated); // ← sync ke Firestore
-      return true;
     }
+    setJSON(storageMain, FAVORIT_KEY, updated);
+    syncFavoritToFirestore(updated);
+    return !exists;
   },
 
   remove: (animeId: string): void => {
-    const list = favoritStorage.getAll();
+    const list    = favoritStorage.getAll();
     const updated = list.filter(a => a.id !== animeId);
     setJSON(storageMain, FAVORIT_KEY, updated);
-    syncFavoritToFirestore(updated); // ← sync ke Firestore
+    syncFavoritToFirestore(updated);
   },
 
   clear: (): void => {
     storageMain.delete(FAVORIT_KEY);
-    syncFavoritToFirestore([]); // ← sync clear
+    syncFavoritToFirestore([]);
   },
 };
