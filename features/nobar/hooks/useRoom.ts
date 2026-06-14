@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import firestore, { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
+import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
 
 export interface RoomMember {
@@ -32,6 +32,11 @@ export interface RoomState {
   updated_at: number;
 }
 
+export interface JoinResult {
+  success: boolean;
+  room?: RoomState;
+}
+
 function generateCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code = '';
@@ -40,13 +45,13 @@ function generateCode(): string {
 }
 
 export function useRoom() {
-  const [roomCode, setRoomCode]       = useState<string | null>(null);
-  const [room, setRoom]               = useState<RoomState | null>(null);
-  const [members, setMembers]         = useState<RoomMember[]>([]);
-  const [messages, setMessages]       = useState<ChatMessage[]>([]);
-  const [isHost, setIsHost]           = useState(false);
-  const [loading, setLoading]         = useState(false);
-  const [error, setError]             = useState<string | null>(null);
+  const [roomCode, setRoomCode] = useState<string | null>(null);
+  const [room, setRoom]         = useState<RoomState | null>(null);
+  const [members, setMembers]   = useState<RoomMember[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isHost, setIsHost]     = useState(false);
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState<string | null>(null);
 
   const unsubRoom     = useRef<(() => void) | null>(null);
   const unsubMembers  = useRef<(() => void) | null>(null);
@@ -58,7 +63,7 @@ export function useRoom() {
     unsubRoom.current?.();
     unsubMembers.current?.();
     unsubMessages.current?.();
-    unsubRoom.current = null;
+    unsubRoom.current    = null;
     unsubMembers.current = null;
     unsubMessages.current = null;
   }, []);
@@ -66,7 +71,6 @@ export function useRoom() {
   const subscribeToRoom = useCallback((code: string) => {
     cleanup();
 
-    // Subscribe room state
     unsubRoom.current = firestore()
       .collection('rooms')
       .doc(code)
@@ -75,7 +79,6 @@ export function useRoom() {
         setRoom(snap.data() as RoomState);
       });
 
-    // Subscribe members
     unsubMembers.current = firestore()
       .collection('rooms').doc(code)
       .collection('members')
@@ -84,7 +87,6 @@ export function useRoom() {
         setMembers(snap.docs.map(d => ({ uid: d.id, ...d.data() } as RoomMember)));
       });
 
-    // Subscribe chat (last 50 messages)
     unsubMessages.current = firestore()
       .collection('rooms').doc(code)
       .collection('messages')
@@ -95,14 +97,14 @@ export function useRoom() {
       });
   }, [cleanup]);
 
-  // Create room
+  // ── Create room ───────────────────────────────────────────────────────────
   const createRoom = useCallback(async (params: {
     anime_id: string;
     anime_title: string;
     anime_poster: string;
     episode_id: string;
     episode_num: number;
-  }) => {
+  }): Promise<string | null> => {
     if (!currentUser) { setError('Login dulu untuk membuat room'); return null; }
     setLoading(true);
     setError(null);
@@ -120,7 +122,7 @@ export function useRoom() {
         updated_at: now,
       };
 
-      const batch = firestore().batch();
+      const batch     = firestore().batch();
       const roomRef   = firestore().collection('rooms').doc(code);
       const memberRef = roomRef.collection('members').doc(currentUser.uid);
 
@@ -146,17 +148,19 @@ export function useRoom() {
     }
   }, [currentUser, subscribeToRoom]);
 
-  // Join room
-  const joinRoom = useCallback(async (code: string) => {
-    if (!currentUser) { setError('Login dulu untuk bergabung'); return false; }
+  // ── Join room — return RoomState biar caller bisa redirect ke anime host ──
+  const joinRoom = useCallback(async (code: string): Promise<JoinResult> => {
+    if (!currentUser) { setError('Login dulu untuk bergabung'); return { success: false }; }
     setLoading(true);
     setError(null);
 
     try {
       const snap = await firestore().collection('rooms').doc(code.toUpperCase()).get();
-      if (!snap.exists) { setError('Room tidak ditemukan'); return false; }
+      if (!snap.exists) { setError('Room tidak ditemukan'); return { success: false }; }
 
+      const roomData = snap.data() as RoomState;
       const now = Date.now();
+
       await firestore()
         .collection('rooms').doc(code.toUpperCase())
         .collection('members').doc(currentUser.uid)
@@ -167,20 +171,22 @@ export function useRoom() {
           is_host:      false,
         });
 
-      const isHostUser = (snap.data() as RoomState).host_uid === currentUser.uid;
+      const isHostUser = roomData.host_uid === currentUser.uid;
       setRoomCode(code.toUpperCase());
       setIsHost(isHostUser);
       subscribeToRoom(code.toUpperCase());
-      return true;
+
+      // Return roomData biar caller bisa navigate ke anime yang bener
+      return { success: true, room: roomData };
     } catch (e: any) {
       setError(e.message || 'Gagal bergabung ke room');
-      return false;
+      return { success: false };
     } finally {
       setLoading(false);
     }
   }, [currentUser, subscribeToRoom]);
 
-  // Leave room
+  // ── Leave room ────────────────────────────────────────────────────────────
   const leaveRoom = useCallback(async () => {
     if (!currentUser || !roomCode) return;
     try {
@@ -189,7 +195,6 @@ export function useRoom() {
         .collection('members').doc(currentUser.uid)
         .delete();
 
-      // If host, delete room
       if (isHost) {
         await firestore().collection('rooms').doc(roomCode).delete();
       }
@@ -202,7 +207,7 @@ export function useRoom() {
     setIsHost(false);
   }, [currentUser, roomCode, isHost, cleanup]);
 
-  // Send chat message
+  // ── Send chat ─────────────────────────────────────────────────────────────
   const sendMessage = useCallback(async (text: string) => {
     if (!currentUser || !roomCode || !text.trim()) return;
     try {
@@ -219,8 +224,10 @@ export function useRoom() {
     } catch {}
   }, [currentUser, roomCode]);
 
-  // Host: update playback state
-  const updatePlayback = useCallback(async (update: Partial<Pick<RoomState, 'is_playing' | 'position' | 'episode_id' | 'episode_num'>>) => {
+  // ── Host: update playback ─────────────────────────────────────────────────
+  const updatePlayback = useCallback(async (
+    update: Partial<Pick<RoomState, 'is_playing' | 'position' | 'episode_id' | 'episode_num'>>
+  ) => {
     if (!isHost || !roomCode) return;
     try {
       await firestore().collection('rooms').doc(roomCode).update({
