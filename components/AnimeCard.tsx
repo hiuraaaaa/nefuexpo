@@ -1,73 +1,28 @@
-import React, { useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withTiming,
-} from 'react-native-reanimated';
 import { COLORS } from '@/constants';
 import { Anime } from '@/types';
 
 interface Props {
   anime: Anime;
-  onPress: () => void;
   width?: number;
 }
 
-const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
-
-// Guard global — cegah 2 card di-tap hampir bersamaan
-let _lastNavTime = 0;
-const NAV_DEBOUNCE_MS = 600;
-
-export default function AnimeCard({ anime, onPress, width }: Props) {
-  const scale   = useSharedValue(1);
-  const opacity = useSharedValue(1);
-  // Guard lokal per-card — cegah double-tap card yang sama
-  const firedRef = useRef(false);
-
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-    opacity: opacity.value,
-  }));
-
-  const handlePressIn = () => {
-    scale.value   = withSpring(0.93, { damping: 15, stiffness: 300 });
-    opacity.value = withTiming(0.7, { duration: 80 });
-  };
-
-  const handlePressOut = () => {
-    scale.value   = withSpring(1, { damping: 12, stiffness: 200 });
-    opacity.value = withTiming(1, { duration: 150 });
-  };
-
-  const handlePress = () => {
-    const now = Date.now();
-    if (firedRef.current || now - _lastNavTime < NAV_DEBOUNCE_MS) return;
-    firedRef.current = true;
-    _lastNavTime = now;
-    onPress();
-    // Reset setelah 1 detik biar bisa navigate lagi kalau user balik
-    setTimeout(() => { firedRef.current = false; }, 1000);
-  };
-
+// AnimeCard adalah pure render component — tanpa animasi, tanpa shared values.
+// Press handler & animasi diurus parent (AnimeItem / FlashList cell) supaya
+// tidak ada puluhan useSharedValue jalan paralel saat scroll grid.
+export default function AnimeCard({ anime, width }: Props) {
   return (
-    <AnimatedTouchable
-      onPress={handlePress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      activeOpacity={1}
-      style={[animStyle, width ? { width } : { flex: 1 }]}
-    >
+    <View style={[styles.root, width ? { width } : { flex: 1 }]}>
       {/* Poster */}
       <View style={styles.posterWrapper}>
         <Image
           source={{ uri: anime.image_poster }}
-          style={{ width: '100%', height: '100%' }}
+          style={styles.image}
           contentFit="cover"
+          recyclingKey={anime.id}
         />
         <LinearGradient
           colors={['transparent', 'rgba(0,0,0,0.6)']}
@@ -91,17 +46,24 @@ export default function AnimeCard({ anime, onPress, width }: Props) {
           {[anime.year, anime.studio].filter(Boolean).join(' · ')}
         </Text>
       ) : null}
-    </AnimatedTouchable>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
   posterWrapper: {
     aspectRatio: 3 / 4.5,
     width: '100%',
     backgroundColor: COLORS.card,
     borderRadius: 8,
     overflow: 'hidden',
+  },
+  image: {
+    width: '100%',
+    height: '100%',
   },
   gradient: {
     position: 'absolute',
