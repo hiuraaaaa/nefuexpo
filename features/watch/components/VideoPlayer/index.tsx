@@ -1,10 +1,11 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
 import { VideoView, isPictureInPictureSupported } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import Animated from 'react-native-reanimated';
 import { COLORS } from '@/constants';
-import { Episode, Server } from '@/types';
+import { Server } from '@/types';
 import { SeekToast } from './SeekToast';
 import { PlayerTopBar } from './PlayerTopBar';
 import { PlayerBottomBar } from './PlayerBottomBar';
@@ -52,6 +53,8 @@ interface Props {
   onSlidingComplete: (val: number) => void;
 }
 
+type FitMode = 'contain' | 'cover';
+
 export function VideoPlayer({
   player, selectedServer, isEpLoading, isBuffering, isPlaying,
   isFullscreen, showControls, seekLeft, seekRight, controlsStyle,
@@ -62,9 +65,16 @@ export function VideoPlayer({
   handleTapLeft, handleTapRight, handlePrev, handleNext,
   onBack, onBookmark, onNobar, onQualityPress, onSlidingComplete,
 }: Props) {
-  const videoRef    = useRef<VideoView>(null);
+  const videoRef     = useRef<VideoView>(null);
   const pipSupported = isPictureInPictureSupported();
   const videoHeight  = isFullscreen ? Dimensions.get('window').height : width * (9 / 16);
+
+  const [fitMode, setFitMode] = useState<FitMode>('contain');
+
+  const toggleFit = () => {
+    setFitMode(p => p === 'contain' ? 'cover' : 'contain');
+    resetControlsTimer();
+  };
 
   return (
     <View style={{ width: '100%', height: videoHeight, backgroundColor: '#000', marginTop: isFullscreen ? 0 : insetTop }}>
@@ -73,7 +83,7 @@ export function VideoPlayer({
           ref={videoRef}
           player={player}
           style={{ width: '100%', height: '100%' }}
-          contentFit="contain"
+          contentFit={fitMode}
           nativeControls={false}
           allowsFullscreen
           allowsPictureInPicture={pipEnabled}
@@ -94,10 +104,10 @@ export function VideoPlayer({
         </View>
       )}
 
-      {/* Tap zones — single tap toggle controls, double tap seek */}
-      <TouchableOpacity activeOpacity={1} onPress={handleTapLeft}     style={{ position: 'absolute', top: 0, left: 0, width: '40%', bottom: 0 }} />
-      <TouchableOpacity activeOpacity={1} onPress={toggleControls}    style={{ position: 'absolute', top: 0, left: '40%', width: '20%', bottom: 0 }} />
-      <TouchableOpacity activeOpacity={1} onPress={handleTapRight}    style={{ position: 'absolute', top: 0, right: 0, width: '40%', bottom: 0 }} />
+      {/* Tap zones */}
+      <TouchableOpacity activeOpacity={1} onPress={handleTapLeft}  style={{ position: 'absolute', top: 0, left: 0, width: '40%', bottom: 0 }} />
+      <TouchableOpacity activeOpacity={1} onPress={toggleControls} style={{ position: 'absolute', top: 0, left: '40%', width: '20%', bottom: 0 }} />
+      <TouchableOpacity activeOpacity={1} onPress={handleTapRight} style={{ position: 'absolute', top: 0, right: 0, width: '40%', bottom: 0 }} />
 
       <SeekToast direction="left"  visible={seekLeft}  />
       <SeekToast direction="right" visible={seekRight} />
@@ -118,6 +128,31 @@ export function VideoPlayer({
             onBookmark={onBookmark}
             onNobar={onNobar}
           />
+
+          {/* Fit mode toggle — pojok kanan atas, di bawah top bar */}
+          <TouchableOpacity
+            onPress={toggleFit}
+            style={{
+              position: 'absolute', top: 52, right: 16,
+              flexDirection: 'row', alignItems: 'center', gap: 4,
+              backgroundColor: 'rgba(0,0,0,0.5)',
+              paddingHorizontal: 10, paddingVertical: 5,
+              borderRadius: 20, borderWidth: 1,
+              borderColor: fitMode === 'cover' ? COLORS.gold : 'rgba(255,255,255,0.2)',
+            }}
+          >
+            <Ionicons
+              name={fitMode === 'cover' ? 'scan-outline' : 'expand-outline'}
+              size={12}
+              color={fitMode === 'cover' ? COLORS.gold : 'rgba(255,255,255,0.7)'}
+            />
+            <Text style={{
+              color: fitMode === 'cover' ? COLORS.gold : 'rgba(255,255,255,0.7)',
+              fontSize: 10, fontWeight: '800',
+            }}>
+              {fitMode === 'cover' ? 'Full' : 'Fit'}
+            </Text>
+          </TouchableOpacity>
 
           {/* Center controls */}
           <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 36 }} pointerEvents="box-none">
