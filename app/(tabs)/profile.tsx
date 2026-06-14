@@ -14,7 +14,7 @@ import firestore from '@react-native-firebase/firestore';
 import { useTheme } from '@/hooks/theme';
 import { signInWithGoogle, isAdmin, onAuthStateChanged } from '@/hooks/auth';
 import { xpStorage, XPData } from '@/hooks/xp';
-import { historyStorage, favoritStorage, storageMain } from '@/hooks/storage/storage';
+import { historyStorage, favoritStorage, storageMain, syncFromFirestore } from '@/hooks/storage/storage';
 import { HistoryItem, Anime } from '@/types';
 
 import { UserCard }         from '@/features/profile/components/UserCard';
@@ -51,10 +51,21 @@ export default function ProfileScreen() {
   const [showAdmin, setShowAdmin]     = useState(false);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged((u: any) => {
+    const unsub = onAuthStateChanged(async (u: any) => {
       setUser(u ?? null);
       setAdmin(isAdmin());
-      setAuthReady(true);  // ← auth state sudah resolved
+      setAuthReady(true);
+
+      if (u) {
+        // Sync data dari Firestore ke lokal saat login/auth resolved
+        try {
+          await syncFromFirestore();
+          const synced = await xpStorage.syncFromFirestore();
+          if (synced) setXpData(synced);
+          setHistory(historyStorage.getAll()?.slice(0, 5) ?? []);
+          setFavorites(favoritStorage.getAll() ?? []);
+        } catch {}
+      }
     });
     return unsub;
   }, []);
