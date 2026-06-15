@@ -236,11 +236,7 @@ const fetchMovie = async (page = 0): Promise<ApiResponse<Anime[]>> => {
 
 const fetchSearch = async (q: string, page = 0): Promise<ApiResponse<Anime[]>> => {
   const json = await safeGet<any>('/search.php', { keyword: q, page: page + 1, per_page: 20 });
-  // Response bisa: array langsung, atau { data: [...] }, atau { data: [{ result: [...] }] }
-  const result: any[] =
-    Array.isArray(json)              ? json :
-    Array.isArray(json?.data)        ? json.data :
-    json?.data?.[0]?.result          ?? [];
+  const result: any[] = json?.data?.[0]?.result ?? [];
   return { status: true, data: result.map(mapAnime) };
 };
 
