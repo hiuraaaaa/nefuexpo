@@ -1,4 +1,4 @@
-// index.tsx
+// profile.tsx — Modern Glassmorphism Profile Screen
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, Alert,
@@ -57,7 +57,6 @@ export default function ProfileScreen() {
       setAuthReady(true);
 
       if (u) {
-        // Sync data dari Firestore ke lokal saat login/auth resolved
         try {
           await syncFromFirestore();
           const synced = await xpStorage.syncFromFirestore();
@@ -106,26 +105,74 @@ export default function ProfileScreen() {
     loadAllUsers();
   };
 
-  // Tunggu auth state resolved dulu sebelum render
   if (!authReady) return null;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }} edges={['top']}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 120 }}
+      >
 
-        {/* Header */}
-        <View style={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Text style={{ color: theme.text, fontWeight: '900', fontSize: 28, letterSpacing: -0.5 }}>PROFILE</Text>
+        {/* ── Header ── */}
+        <View style={{
+          paddingHorizontal: 20,
+          paddingTop: 10,
+          paddingBottom: 14,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}>
+          <View>
+            <Text style={{
+              color: theme.subtext,
+              fontSize: 10,
+              fontWeight: '700',
+              letterSpacing: 2.5,
+              textTransform: 'uppercase',
+              marginBottom: 2,
+            }}>
+              Akun
+            </Text>
+            <Text style={{
+              color: theme.text,
+              fontWeight: '900',
+              fontSize: 26,
+              letterSpacing: -0.5,
+            }}>
+              Profil
+            </Text>
+          </View>
+
           {admin && (
             <TouchableOpacity
               onPress={openAdmin}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: theme.accent, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 5,
+                backgroundColor: `${theme.accent}20`,
+                borderWidth: 1,
+                borderColor: `${theme.accent}40`,
+                paddingHorizontal: 12,
+                paddingVertical: 7,
+                borderRadius: 12,
+              }}
             >
-              <Ionicons name="shield" size={13} color={theme.bg} />
-              <Text style={{ color: theme.bg, fontSize: 11, fontWeight: '900' }}>Admin</Text>
+              <Ionicons name="shield" size={12} color={theme.accent} />
+              <Text style={{ color: theme.accent, fontSize: 11, fontWeight: '800' }}>Admin</Text>
             </TouchableOpacity>
           )}
         </View>
+
+        {/* ── Thin accent line under header ── */}
+        <View style={{
+          height: 1,
+          marginHorizontal: 20,
+          marginBottom: 12,
+          backgroundColor: `${theme.accent}15`,
+          borderRadius: 1,
+        }} />
 
         {user ? (
           <Animated.View entering={FadeIn.duration(300)}>
@@ -142,32 +189,69 @@ export default function ProfileScreen() {
           </Animated.View>
         ) : (
           <>
+            {/* Login card */}
             <Animated.View
               entering={FadeInDown.delay(60).springify()}
               style={{
-                marginHorizontal: 16, marginBottom: 12, borderRadius: 16,
-                overflow: 'hidden', backgroundColor: theme.card,
-                padding: 32, alignItems: 'center', gap: 8,
-                borderWidth: 1, borderColor: theme.border,
+                marginHorizontal: 16,
+                marginBottom: 12,
+                borderRadius: 20,
+                overflow: 'hidden',
+                borderWidth: 1,
+                borderColor: `${theme.accent}25`,
+                backgroundColor: theme.card,
               }}
             >
               <LinearGradient
-                colors={[theme.accentDim, 'transparent']}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                colors={[`${theme.accent}18`, 'transparent', `${theme.accent}10`]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{ position: 'absolute', inset: 0 }}
               />
-              <Ionicons name="person-circle-outline" size={64} color={theme.subtext} />
-              <Text style={{ color: theme.text, fontSize: 18, fontWeight: '800', marginTop: 4 }}>Belum Login</Text>
-              <Text style={{ color: theme.subtext, fontSize: 12, textAlign: 'center' }}>Login untuk simpan history & XP kamu</Text>
-              <TouchableOpacity
-                onPress={handleLogin} disabled={loading}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: theme.accent, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 10, marginTop: 8 }}
-              >
-                <Ionicons name="logo-google" size={16} color={theme.bg} />
-                <Text style={{ color: theme.bg, fontWeight: '800', fontSize: 14 }}>
-                  {loading ? 'Memuat...' : 'Login dengan Google'}
+              <View style={{ padding: 32, alignItems: 'center', gap: 8 }}>
+                <View style={{
+                  width: 72,
+                  height: 72,
+                  borderRadius: 36,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: `${theme.accent}15`,
+                  borderWidth: 1,
+                  borderColor: `${theme.accent}30`,
+                  marginBottom: 4,
+                }}>
+                  <Ionicons name="person-outline" size={32} color={theme.accent} />
+                </View>
+                <Text style={{ color: theme.text, fontSize: 18, fontWeight: '800' }}>
+                  Belum Login
                 </Text>
-              </TouchableOpacity>
+                <Text style={{ color: theme.subtext, fontSize: 12, textAlign: 'center' }}>
+                  Login untuk simpan history & XP kamu
+                </Text>
+                <TouchableOpacity
+                  onPress={handleLogin}
+                  disabled={loading}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 8,
+                    backgroundColor: theme.accent,
+                    paddingHorizontal: 24,
+                    paddingVertical: 12,
+                    borderRadius: 14,
+                    marginTop: 8,
+                    shadowColor: theme.accent,
+                    shadowOpacity: 0.4,
+                    shadowRadius: 12,
+                    elevation: 6,
+                  }}
+                >
+                  <Ionicons name="logo-google" size={16} color={theme.bg} />
+                  <Text style={{ color: theme.bg, fontWeight: '800', fontSize: 14 }}>
+                    {loading ? 'Memuat...' : 'Login dengan Google'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </Animated.View>
 
             <Animated.View entering={FadeInDown.delay(120).springify()}>
@@ -197,4 +281,4 @@ export default function ProfileScreen() {
       />
     </SafeAreaView>
   );
-              }
+}
