@@ -5,6 +5,7 @@ import { useEffect, useState, useCallback, Component, ReactNode } from 'react';
 import { Text, ScrollView, TouchableOpacity, AppState, AppStateStatus } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import Constants from 'expo-constants';
+import { initSession } from '@/hooks/api/api';
 import NetInfo from '@react-native-community/netinfo';
 import { loadSavedTheme, useTheme } from '@/hooks/theme';
 import { isAdmin, onAuthStateChanged } from '@/hooks/auth';
@@ -65,7 +66,7 @@ function AppLayout() {
   const [isOffline, setIsOffline]     = useState(false);
   const [updateInfo, setUpdateInfo]    = useState<{ storeUrl: string; latestVersion: string } | null>(null);
 
-  useEffect(() => { loadSavedTheme(); refreshDomain(); }, []);
+  useEffect(() => { loadSavedTheme(); refreshDomain(); initSession(); }, []);
   useEffect(() => { rescheduleNotifs(); }, []);
   useNotifTapHandler(router);
 
