@@ -23,7 +23,8 @@ import { AnimeInfo }          from './components/AnimeInfo';
 import { ServerModal }        from './components/ServerModal';
 import { RecommendationList } from './components/RecommendationList';
 
-import { useRoom, useSync, RoomModal, NobarBar } from '@/features/nobar';
+// FIX BUG 1: hapus useRoom dari sini, semua state dari useRoomContext aja
+import { useSync, RoomModal, NobarBar } from '@/features/nobar';
 
 export default function WatchScreen() {
   const { slug }  = useLocalSearchParams<{ slug: string }>();
@@ -56,7 +57,7 @@ export default function WatchScreen() {
 
   const playerSync = usePlayerSync(epLoader.player, () => { if (autoNext) handleAutoNext(); });
 
-  // ── Nobar ──────────────────────────────────────────────────────────────────
+  // ── Nobar — semua dari context, satu sumber kebenaran ────────────────────
   const {
     roomCode, room, members, messages,
     isHost, loading: roomLoading, error: roomError,
@@ -71,17 +72,18 @@ export default function WatchScreen() {
     isPlaying: playerSync.isPlaying,
     position:  playerSync.position,
     updatePlayback,
-    onEpisodeChange: (episodeId) => {
+    onEpisodeChange: (episodeId, episodeNum) => {
       const ep = watchData.episodes.find(e => e.id === episodeId);
       if (ep) epNav.changeEpisode(ep);
     },
   });
 
-  // Wrap togglePlayPause — host sync ke room
+  // FIX BUG 4: capture isPlaying SEBELUM toggle, bukan setelah
   const handleTogglePlay = useCallback(() => {
+    const nextPlaying = !playerSync.isPlaying; // capture dulu sebelum toggle
     playerSync.togglePlayPause();
     if (isHost && roomCode) {
-      hostTogglePlay(!playerSync.isPlaying);
+      hostTogglePlay(nextPlaying);
     }
   }, [playerSync, isHost, roomCode, hostTogglePlay]);
 
@@ -95,7 +97,7 @@ export default function WatchScreen() {
     }
   }, [epLoader.player, isHost, roomCode, hostSeek]);
 
-  // ──────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
 
   useProgressTracker({
     currentEpId: watchData.currentEpId,
@@ -126,7 +128,7 @@ export default function WatchScreen() {
       episode_num: epNav.currentEpNum,
       position:    0,
     });
-  }, [watchData.currentEpId]);
+  }, [watchData.currentEpId]); // eslint-disable-line
 
   const handleBack = useCallback(() => {
     if (playerSync.isFullscreen) playerSync.toggleFullscreen();
@@ -151,7 +153,7 @@ export default function WatchScreen() {
     setAutoNext(prev => { const n = !prev; historyStorage.setAutoNext(n); return n; });
   }, []);
 
-  // ── Handle join room — redirect ke anime host kalau beda ──────────────────
+  // ── Handle join room — redirect ke anime host kalau beda ─────────────────
   const handleJoinRoom = useCallback(async (code: string) => {
     const result = await joinRoom(code);
     if (result.success && result.room) {
@@ -159,10 +161,8 @@ export default function WatchScreen() {
       setShowRoomModal(false);
 
       if (anime_id !== watchData.anime?.id) {
-        // Anime beda — navigate ke anime host
         router.replace(`/watch/${anime_id}`);
       } else {
-        // Anime sama — sync episode aja
         const ep = watchData.episodes.find(e => e.id === episode_id);
         if (ep) epNav.changeEpisode(ep);
       }
