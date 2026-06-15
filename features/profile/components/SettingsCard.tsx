@@ -1,3 +1,4 @@
+// SettingsCard.tsx — Glassmorphism
 import React from 'react';
 import { Switch } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -11,11 +12,11 @@ const PIP_KEY  = 'nefusoft_pip';
 const INFO_KEY = 'nefusoft_info';
 
 interface Props {
-  pip:           boolean;
-  info:          boolean;
-  setPip:        (v: boolean) => void;
-  setInfo:       (v: boolean) => void;
-  onThemePress:  () => void;
+  pip:            boolean;
+  info:           boolean;
+  setPip:         (v: boolean) => void;
+  setInfo:        (v: boolean) => void;
+  onThemePress:   () => void;
   onTentangPress: () => void;
 }
 
@@ -51,9 +52,11 @@ export function SettingsCard({ pip, info, setPip, setInfo, onThemePress, onTenta
             subtitle="Video tetap jalan saat minimize"
             right={
               <Switch
-                value={pip} onValueChange={togglePip}
-                trackColor={{ false: theme.border, true: theme.accent }}
-                thumbColor={pip ? theme.bg : theme.subtext}
+                value={pip}
+                onValueChange={togglePip}
+                trackColor={{ false: `${theme.accent}20`, true: `${theme.accent}80` }}
+                thumbColor={pip ? theme.accent : theme.subtext}
+                ios_backgroundColor={`${theme.accent}20`}
               />
             }
           />
@@ -64,9 +67,11 @@ export function SettingsCard({ pip, info, setPip, setInfo, onThemePress, onTenta
             last
             right={
               <Switch
-                value={info} onValueChange={toggleInfo}
-                trackColor={{ false: theme.border, true: theme.accent }}
-                thumbColor={info ? theme.bg : theme.subtext}
+                value={info}
+                onValueChange={toggleInfo}
+                trackColor={{ false: `${theme.accent}20`, true: `${theme.accent}80` }}
+                thumbColor={info ? theme.accent : theme.subtext}
+                ios_backgroundColor={`${theme.accent}20`}
               />
             }
           />
