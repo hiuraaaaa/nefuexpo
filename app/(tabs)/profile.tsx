@@ -19,8 +19,7 @@ import { HistoryItem, Anime } from '@/types';
 
 import { UserCard }         from '@/features/profile/components/UserCard';
 import { XPCard }           from '@/features/profile/components/XPCard';
-import { HistoryCard }      from '@/features/profile/components/HistoryCard';
-import { FavoritCard }      from '@/features/profile/components/FavoritCard';
+import { LibraryCard }      from '@/features/profile/components/LibraryCard';
 import { SettingsCard }     from '@/features/profile/components/SettingsCard';
 import { ThemePickerModal } from '@/features/profile/components/ThemePickerModal';
 import { TentangModal }     from '@/features/profile/components/TentangModal';
@@ -178,8 +177,7 @@ export default function ProfileScreen() {
           <Animated.View entering={FadeIn.duration(300)}>
             <UserCard user={user} admin={admin} xpData={xpData} />
             <XPCard xpData={xpData} />
-            <FavoritCard favorites={favorites} />
-            <HistoryCard history={history} />
+            <LibraryCard favorites={favorites} history={history} />
             <SettingsCard
               pip={pip} info={info}
               setPip={setPip} setInfo={setInfo}
