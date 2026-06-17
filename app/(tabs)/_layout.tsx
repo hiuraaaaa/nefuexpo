@@ -22,13 +22,13 @@ const TAB_HEIGHT    = 62;
 const BORDER_RADIUS = 36;
 const ICON_SIZE     = 23;
 
-type TabName = 'index' | 'explore' | 'news' | 'schedule' | 'profile';
+type TabName = 'index' | 'explore' | 'library' | 'schedule' | 'profile';
 interface TabConfig { name: TabName; label: string; Icon: LucideIcon; badge?: string; }
 
 const TABS: readonly TabConfig[] = [
   { name: 'index',    label: 'Home',     Icon: Home      },
   { name: 'explore',  label: 'Explore',  Icon: Compass   },
-  { name: 'news',     label: 'News',     Icon: Newspaper, badge: 'NEW' },
+  { name: 'library',  label: 'Library',  Icon: Bookmark  },
   { name: 'schedule', label: 'Schedule', Icon: Calendar  },
   { name: 'profile',  label: 'Profile',  Icon: User      },
 ] as const;
@@ -169,6 +169,7 @@ export default function TabLayout() {
       ))}
       <Tabs.Screen name="ongoing" options={{ href: null }} />
       <Tabs.Screen name="history" options={{ href: null }} />
+      <Tabs.Screen name="news" options={{ href: null }} />
     </Tabs>
   );
 }
