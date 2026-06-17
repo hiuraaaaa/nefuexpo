@@ -1,26 +1,5 @@
 // app/(tabs)/schedule.tsx
-// ─────────────────────────────────────────────────────────────────────────────
-// Optimasi dari versi sebelumnya:
-//
-//  PERFORMA:
-//  • Hapus FadeInDown per-item → ganti enteringAnimation hanya untuk batch pertama
-//    (index < 8). Item di luar viewport tidak perlu animasi masuk.
-//  • LinearGradient dipindah ke komponen terpisah + memo → tidak re-create tiap render
-//  • Image: tambah cachePolicy="memory-disk" → gambar tidak reload saat scroll balik
-//  • getItemLayout ditambahkan ke FlatList → skip layout calculation, scroll lebih smooth
-//  • theme di-destructure di parent, dipass sebagai primitif ke child → mencegah
-//    re-render ScheduleCard saat object theme sama tapi referensi berubah
-//
-//  BUG FIX:
-//  • timeText: anime.updated bisa undefined → fallback '--:--' sudah ada tapi
-//    tambah guard type-safe
-//  • weekDates: kalkulasi tanggal lebih robust pakai Date cloning
-//  • DayItem underline width: animated via Reanimated agar tidak layout jump
-// ─────────────────────────────────────────────────────────────────────────────
-
-import React, {
-  useState, useEffect, useRef, useMemo, useCallback,
-} from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, FlatList,
   ScrollView, Dimensions, StyleSheet,
@@ -33,207 +12,175 @@ import { Anime, ScheduleDay } from '@/types';
 import { ScheduleCardSkeleton } from '@/components/Skeleton';
 import { useTheme } from '@/hooks/theme';
 import Animated, {
-  FadeInDown,
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
+  FadeInDown, FadeInLeft,
+  useSharedValue, useAnimatedStyle, withTiming, withSpring,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
-const DAY_ITEM_W  = (width - 32) / 7;
+const DAY_ITEM_W = (width - 32) / 7;
+const ITEM_HEIGHT = 98;
 
-// Card height tetap — dipakai getItemLayout agar FlatList skip measure
-const CARD_HEIGHT = 88;   // poster 64 * (4/3) ≈ 85 + margin 10
-const ITEM_HEIGHT = CARD_HEIGHT + 10; // + marginBottom timelineWrap
+// ─── CardGradient ────────────────────────────────────────────────────────────
 
-// ─── Static Styles ────────────────────────────────────────────────────────────
-
-const s = StyleSheet.create({
-  flex1:        { flex: 1 },
-  row:          { flexDirection: 'row' },
-  header:       { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16 },
-  title:        { fontWeight: '900', fontSize: 22, letterSpacing: -0.5 },
-  subtitle:     { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, marginTop: 2 },
-  dayRow:       { flexDirection: 'row', paddingHorizontal: 16, marginBottom: 4 },
-  dayItem:      { alignItems: 'center', paddingVertical: 8 },
-  dayName:      { fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  dayDate:      { fontSize: 16, fontWeight: '900', marginTop: 2 },
-  dot:          { width: 3, height: 3, borderRadius: 2, marginTop: 3 },
-  underline:    { height: 2, borderRadius: 1, marginTop: 6 },
-  divider:      { height: 1, marginHorizontal: 16, marginBottom: 12 },
-  listContent:  { paddingHorizontal: 16, paddingBottom: 120 },
-  emptyGap:     { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  emptyText:    { fontWeight: '700', fontSize: 13, textTransform: 'uppercase', letterSpacing: 2 },
-  timelineWrap: { flexDirection: 'row', gap: 10, marginBottom: 10 },
-  timelineLeft: { width: 40, alignItems: 'center', paddingTop: 14 },
-  timeText:     { fontSize: 10, fontWeight: '900', textAlign: 'center', lineHeight: 13 },
-  timelineLine: { width: 1.5, flex: 1, marginTop: 6, borderRadius: 1 },
-  dotWrap:      { width: 10, alignItems: 'center', paddingTop: 16 },
-  dotCircle:    { width: 8, height: 8, borderRadius: 4 },
-  card:         { flex: 1, borderRadius: 14, overflow: 'hidden', borderWidth: 1 },
-  poster:       { width: 64, aspectRatio: 3 / 4 },
-  gradientFade: { width: 28, position: 'absolute', left: 52, top: 0, bottom: 0 },
-  cardInfo:     { flex: 1, padding: 12, justifyContent: 'center', gap: 4 },
-  cardTitle:    { fontWeight: '800', fontSize: 12, lineHeight: 16 },
-  cardMeta:     { fontSize: 9, fontWeight: '600' },
-  cardGenre:    { fontSize: 9, fontWeight: '600' },
-  arrowWrap:    { justifyContent: 'center', paddingRight: 12 },
-  skeletonContent: { paddingHorizontal: 16, paddingBottom: 100 },
-});
-
-// ─── CardGradient — memo agar tidak re-render tiap scroll ─────────────────────
-
-interface CardGradientProps { cardColor: string }
-
-const CardGradient = React.memo<CardGradientProps>(({ cardColor }) => (
+const CardGradient = React.memo<{ cardColor: string }>(({ cardColor }) => (
   <LinearGradient
     colors={[cardColor + '00', cardColor]}
     start={{ x: 0, y: 0 }}
     end={{ x: 1, y: 0 }}
     style={s.gradientFade}
+    pointerEvents="none"
   />
 ));
 CardGradient.displayName = 'CardGradient';
 
-// ─── DayItem ──────────────────────────────────────────────────────────────────
+// ─── DayItem ─────────────────────────────────────────────────────────────────
 
 type DayItemProps = {
   name: string; date: number; dayKey: string;
   isToday: boolean; isSelected: boolean;
   onPress: (key: string) => void;
-  accent: string; text: string; subtext: string;
+  accent: string; text: string; subtext: string; accentDim: string;
 };
 
 const DayItem = React.memo(({
   name, date, dayKey, isToday, isSelected,
-  onPress, accent, text, subtext,
+  onPress, accent, text, subtext, accentDim,
 }: DayItemProps) => {
-  // Animasi underline dengan Reanimated — hindari layout recalculation
-  const underlineW = useSharedValue(isSelected ? DAY_ITEM_W * 0.6 : 0);
+  const scale    = useSharedValue(isSelected ? 1 : 0.9);
+  const bgOpacity = useSharedValue(isSelected ? 1 : 0);
 
   useEffect(() => {
-    underlineW.value = withTiming(isSelected ? DAY_ITEM_W * 0.6 : 0, { duration: 200 });
+    scale.value     = withSpring(isSelected ? 1 : 0.9, { damping: 14, stiffness: 200 });
+    bgOpacity.value = withTiming(isSelected ? 1 : 0, { duration: 160 });
   }, [isSelected]);
 
-  const underlineStyle = useAnimatedStyle(() => ({
-    width: underlineW.value,
-    backgroundColor: accent,
-  }));
+  const pillStyle = useAnimatedStyle(() => ({ opacity: bgOpacity.value }));
+  const wrapStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
   return (
     <TouchableOpacity
       onPress={() => onPress(dayKey)}
       activeOpacity={0.7}
-      style={[s.dayItem, { width: DAY_ITEM_W }]}
+      style={[s.dayTouch, { width: DAY_ITEM_W }]}
     >
-      <Text style={[s.dayName, { color: isSelected ? accent : subtext }]}>{name}</Text>
-      <Text style={[s.dayDate, { color: isSelected ? accent : text }]}>{date}</Text>
-      {isToday && (
-        <View style={[s.dot, { backgroundColor: isSelected ? accent : subtext }]} />
-      )}
-      <Animated.View style={[s.underline, underlineStyle]} />
+      <Animated.View style={[s.dayInner, wrapStyle]}>
+        <Animated.View style={[s.dayPill, { backgroundColor: accentDim }, pillStyle]} />
+        <Text style={[s.dayName, { color: isSelected ? accent : subtext }]}>{name}</Text>
+        <Text style={[s.dayDate, { color: isSelected ? accent : text, fontSize: isSelected ? 20 : 15 }]}>
+          {date}
+        </Text>
+        {isToday && (
+          <View style={[s.todayDot, { backgroundColor: isSelected ? accent : subtext }]} />
+        )}
+      </Animated.View>
     </TouchableOpacity>
   );
 });
 DayItem.displayName = 'DayItem';
 
-// ─── ScheduleCard ─────────────────────────────────────────────────────────────
-// Props dipass sebagai primitif (bukan object theme) → React.memo lebih efektif
-// karena shallow comparison bekerja dengan benar
+// ─── ScheduleCard ────────────────────────────────────────────────────────────
 
-type ScheduleCardProps = {
-  anime:      Anime;
-  index:      number;
-  onPress:    (anime: Anime) => void;
-  // Primitif dari theme — bukan whole object
-  cardColor:  string;
-  borderColor: string;
-  textColor:  string;
-  accentColor: string;
-  subtextColor: string;
+type CardProps = {
+  anime: Anime; index: number; onPress: (a: Anime) => void;
+  cardColor: string; borderColor: string; textColor: string;
+  accentColor: string; subtextColor: string; accentDim: string;
 };
 
 const ScheduleCard = React.memo(({
   anime, index, onPress,
-  cardColor, borderColor, textColor, accentColor, subtextColor,
-}: ScheduleCardProps) => {
-  // Guard type-safe: updated bisa undefined/null
+  cardColor, borderColor, textColor, accentColor, subtextColor, accentDim,
+}: CardProps) => {
   const timeText = useMemo(() => {
     const ts = anime.updated;
-    if (!ts || typeof ts !== 'number') return '--:--';
-    return new Date(ts * 1000).toLocaleTimeString('id-ID', {
-      hour: '2-digit', minute: '2-digit',
-    });
-  }, [anime.updated]);
+    if (!ts || typeof ts !== 'number') return anime.time ?? '--:--';
+    return new Date(ts * 1000).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+  }, [anime.updated, anime.time]);
 
-  // Animasi masuk hanya untuk 8 item pertama — sisanya langsung muncul
-  // Ini yang paling berdampak untuk performa awal masuk screen
-  const entering = index < 8
-    ? FadeInDown.delay(index * 35).springify().damping(18)
+  const [hour, min] = timeText.split(':');
+
+  const genres = useMemo(() =>
+    anime.genre ? anime.genre.split(',').map(g => g.trim()).filter(Boolean).slice(0, 2) : [],
+    [anime.genre],
+  );
+
+  const entering = index < 10
+    ? FadeInDown.delay(index * 30).springify().damping(18)
     : undefined;
 
   return (
-    <Animated.View entering={entering} style={s.timelineWrap}>
+    <Animated.View entering={entering} style={s.row}>
+
       {/* Timeline kiri */}
-      <View style={s.timelineLeft}>
-        <Text style={[s.timeText, { color: accentColor }]}>{timeText}</Text>
-        <View style={[s.timelineLine, { backgroundColor: borderColor }]} />
+      <View style={s.timeCol}>
+        <Text style={[s.timeHour, { color: accentColor }]}>{hour}</Text>
+        <Text style={[s.timeMin,  { color: subtextColor }]}>{min ?? '--'}</Text>
+        <View style={[s.timeLine, { backgroundColor: borderColor }]} />
       </View>
 
       {/* Dot */}
-      <View style={s.dotWrap}>
-        <View style={[s.dotCircle, { backgroundColor: accentColor }]} />
+      <View style={s.dotCol}>
+        <View style={[s.dotOuter, { borderColor: accentColor }]}>
+          <View style={[s.dotInner, { backgroundColor: accentColor }]} />
+        </View>
       </View>
 
       {/* Card */}
       <TouchableOpacity
         onPress={() => onPress(anime)}
-        activeOpacity={0.85}
+        activeOpacity={0.8}
         style={[s.card, { backgroundColor: cardColor, borderColor }]}
       >
-        <View style={s.row}>
-          <Image
-            source={{ uri: anime.image_poster }}
-            style={s.poster}
-            contentFit="cover"
-            // Cache agresif — gambar tidak reload saat scroll balik
-            cachePolicy="memory-disk"
-            transition={150}
-          />
-          {/* Gradient dipisah ke komponen memo */}
+        {/* Accent bar kiri */}
+        <View style={[s.accentBar, { backgroundColor: accentColor }]} />
+
+        <View style={s.cardRow}>
+          {/* Poster */}
+          <View style={s.posterWrap}>
+            <Image
+              source={{ uri: anime.image_poster }}
+              style={s.poster}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              transition={120}
+            />
+            {anime.type ? (
+              <View style={[s.typeBadge, { backgroundColor: 'rgba(0,0,0,0.7)' }]}>
+                <Text style={s.typeBadgeText}>{anime.type}</Text>
+              </View>
+            ) : null}
+            {anime.total_episode != null && (
+              <View style={[s.epsBadge, { backgroundColor: accentColor }]}>
+                <Text style={[s.epsBadgeText, { color: '#000' }]}>{anime.total_episode}ep</Text>
+              </View>
+            )}
+          </View>
+
           <CardGradient cardColor={cardColor} />
 
+          {/* Info */}
           <View style={s.cardInfo}>
-            <Text
-              style={[s.cardTitle, { color: textColor }]}
-              numberOfLines={2}
-            >
+            <Text style={[s.cardTitle, { color: textColor }]} numberOfLines={2}>
               {anime.title}
             </Text>
+
+            {genres.length > 0 && (
+              <View style={s.genreRow}>
+                {genres.map(g => (
+                  <View key={g} style={[s.genreChip, { backgroundColor: accentDim }]}>
+                    <Text style={[s.genreText, { color: accentColor }]}>{g}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
             {anime.date ? (
-              <Text
-                style={[s.cardMeta, { color: accentColor }]}
-                numberOfLines={1}
-              >
+              <Text style={[s.cardDate, { color: subtextColor }]} numberOfLines={1}>
                 {anime.date}
               </Text>
             ) : null}
-            {anime.genre ? (
-              <Text
-                style={[s.cardGenre, { color: subtextColor }]}
-                numberOfLines={1}
-              >
-                {anime.genre.replace(/,/g, ' · ')}
-              </Text>
-            ) : null}
-          </View>
-
-          <View style={s.arrowWrap}>
-            <Ionicons name="chevron-forward" size={14} color={subtextColor} />
           </View>
         </View>
       </TouchableOpacity>
@@ -242,18 +189,34 @@ const ScheduleCard = React.memo(({
 });
 ScheduleCard.displayName = 'ScheduleCard';
 
+// ─── Empty ────────────────────────────────────────────────────────────────────
+
+const EmptyState = React.memo(({ accent, subtext, text }: {
+  accent: string; subtext: string; text: string;
+}) => (
+  <Animated.View entering={FadeInLeft.delay(80).springify()} style={s.emptyWrap}>
+    <View style={[s.emptyLine, { backgroundColor: accent }]} />
+    <View>
+      <Text style={[s.emptyTitle, { color: text }]}>Hari ini bebas</Text>
+      <Text style={[s.emptySub,   { color: subtext }]}>
+        Ga ada jadwal tayang.{'\n'}Waktunya bakar backlog.
+      </Text>
+    </View>
+  </Animated.View>
+));
+EmptyState.displayName = 'EmptyState';
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function ScheduleScreen() {
-  const router  = useRouter();
-  const theme   = useTheme();
-  const listRef = useRef<FlatList>(null);
-
+  const router   = useRouter();
+  const theme    = useTheme();
+  const listRef  = useRef<FlatList>(null);
   const [schedule,  setSchedule]  = useState<ScheduleDay>({});
   const [isLoading, setIsLoading] = useState(true);
 
   const today         = useMemo(() => new Date(), []);
-  const currentDayIdx = today.getDay();
+  const currentDayIdx = today.getDay(); // 0=Sun
 
   const [selectedDay, setSelectedDay] = useState(() => DAY_KEYS[currentDayIdx]);
 
@@ -268,20 +231,24 @@ export default function ScheduleScreen() {
     DAY_NAMES.map((name, i) => {
       const d = new Date(today);
       d.setDate(today.getDate() - currentDayIdx + i);
-      return {
-        name,
-        date:    d.getDate(),
-        key:     DAY_KEYS[i],
-        isToday: i === currentDayIdx,
-      };
-    }),
-    [today, currentDayIdx],
+      return { name, date: d.getDate(), key: DAY_KEYS[i], isToday: i === currentDayIdx };
+    }), [today, currentDayIdx],
   );
 
   const animeList: Anime[] = useMemo(
     () => schedule[selectedDay] || [],
     [schedule, selectedDay],
   );
+
+  const todayCount = useMemo(
+    () => schedule[DAY_KEYS[currentDayIdx]]?.length ?? 0,
+    [schedule, currentDayIdx],
+  );
+
+  const selectedDayName = useMemo(() => {
+    const idx = DAY_KEYS.indexOf(selectedDay);
+    return DAY_NAMES[idx] ?? '';
+  }, [selectedDay]);
 
   const handleDayPress = useCallback((key: string) => {
     Haptics.selectionAsync();
@@ -294,30 +261,21 @@ export default function ScheduleScreen() {
     router.push(`/watch/${getAnimeSlug(anime)}`);
   }, [router]);
 
-  // getItemLayout — skip layout calculation, scroll instantly smooth
   const getItemLayout = useCallback((_: any, index: number) => ({
-    length: ITEM_HEIGHT,
-    offset: ITEM_HEIGHT * index,
-    index,
+    length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index,
   }), []);
 
   const renderItem = useCallback(({ item, index }: { item: Anime; index: number }) => (
     <ScheduleCard
-      anime={item}
-      index={index}
-      onPress={handleCardPress}
-      // Pass primitif, bukan whole theme object
-      cardColor={theme.card}
-      borderColor={theme.border}
-      textColor={theme.text}
-      accentColor={theme.accent}
-      subtextColor={theme.subtext}
+      anime={item} index={index} onPress={handleCardPress}
+      cardColor={theme.card}   borderColor={theme.border}
+      textColor={theme.text}   accentColor={theme.accent}
+      subtextColor={theme.subtext} accentDim={theme.accentDim}
     />
-  ), [handleCardPress, theme.card, theme.border, theme.text, theme.accent, theme.subtext]);
+  ), [handleCardPress, theme]);
 
   const keyExtractor = useCallback(
-    (item: Anime, index: number) => `${item.id}-${index}`,
-    [],
+    (item: Anime, index: number) => `${item.id}-${index}`, [],
   );
 
   return (
@@ -325,10 +283,21 @@ export default function ScheduleScreen() {
 
       {/* Header */}
       <View style={s.header}>
-        <Text style={[s.title, { color: theme.text }]}>SCHEDULE</Text>
-        <Text style={[s.subtitle, { color: theme.subtext }]}>
-          Anime yang tayang minggu ini
-        </Text>
+        <View style={s.headerRow}>
+          <View>
+            <Text style={[s.title, { color: theme.text }]}>SCHEDULE</Text>
+            <Text style={[s.subtitle, { color: theme.subtext }]}>
+              {selectedDayName} · {animeList.length} anime
+            </Text>
+          </View>
+          {todayCount > 0 && (
+            <View style={[s.countBadge, { backgroundColor: theme.accentDim }]}>
+              <Text style={[s.countBadgeText, { color: theme.accent }]}>
+                {todayCount} hari ini
+              </Text>
+            </View>
+          )}
+        </View>
       </View>
 
       {/* Day picker */}
@@ -336,50 +305,109 @@ export default function ScheduleScreen() {
         {weekDates.map(w => (
           <DayItem
             key={w.key}
-            name={w.name}
-            date={w.date}
-            dayKey={w.key}
-            isToday={w.isToday}
-            isSelected={selectedDay === w.key}
+            name={w.name} date={w.date} dayKey={w.key}
+            isToday={w.isToday} isSelected={selectedDay === w.key}
             onPress={handleDayPress}
-            accent={theme.accent}
-            text={theme.text}
-            subtext={theme.subtext}
+            accent={theme.accent} text={theme.text}
+            subtext={theme.subtext} accentDim={theme.accentDim}
           />
         ))}
       </View>
 
-      {/* Divider */}
-      <View style={[s.divider, { backgroundColor: theme.border }]} />
+      {/* Divider accent */}
+      <View style={s.dividerWrap}>
+        <View style={[s.dividerAccent, { backgroundColor: theme.accent }]} />
+        <View style={[s.dividerFade,   { backgroundColor: theme.border }]} />
+      </View>
 
       {/* Content */}
       {isLoading ? (
-        <ScrollView contentContainerStyle={s.skeletonContent}>
+        <ScrollView contentContainerStyle={s.skeletonWrap}>
           {[...Array(5)].map((_, i) => <ScheduleCardSkeleton key={i} />)}
         </ScrollView>
       ) : animeList.length === 0 ? (
-        <View style={s.emptyGap}>
-          <Ionicons name="calendar-outline" size={56} color={theme.subtext} />
-          <Text style={[s.emptyText, { color: theme.subtext }]}>Belum ada jadwal</Text>
-        </View>
+        <EmptyState accent={theme.accent} subtext={theme.subtext} text={theme.text} />
       ) : (
         <FlatList
           ref={listRef}
           data={animeList}
           keyExtractor={keyExtractor}
           renderItem={renderItem}
-          contentContainerStyle={s.listContent}
+          contentContainerStyle={s.listWrap}
           showsVerticalScrollIndicator={false}
-          // ── Optimasi FlatList ──────────────────────────────────────────
-          getItemLayout={getItemLayout}      // skip measure, scroll mulus
-          initialNumToRender={8}             // hanya render 8 item pertama
-          maxToRenderPerBatch={6}            // batch render saat scroll
-          windowSize={5}                     // viewport 5x tinggi layar
-          removeClippedSubviews={true}       // unmount item di luar viewport
-          updateCellsBatchingPeriod={50}     // batching lebih agresif
+          getItemLayout={getItemLayout}
+          initialNumToRender={8}
+          maxToRenderPerBatch={6}
+          windowSize={5}
+          removeClippedSubviews
         />
       )}
-
     </SafeAreaView>
   );
 }
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+const s = StyleSheet.create({
+  flex1: { flex: 1 },
+
+  // Header
+  header:         { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12 },
+  headerRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  title:          { fontWeight: '900', fontSize: 22, letterSpacing: -0.5 },
+  subtitle:       { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1.5, marginTop: 3 },
+  countBadge:     { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
+  countBadgeText: { fontSize: 10, fontWeight: '800' },
+
+  // Day picker
+  dayRow:   { flexDirection: 'row', paddingHorizontal: 16, marginBottom: 6 },
+  dayTouch: { alignItems: 'center' },
+  dayInner: { alignItems: 'center', paddingVertical: 8, paddingHorizontal: 2, position: 'relative', minWidth: 34 },
+  dayPill:  { position: 'absolute', top: 2, left: 0, right: 0, bottom: 2, borderRadius: 10 },
+  dayName:  { fontSize: 8, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.4, zIndex: 1 },
+  dayDate:  { fontWeight: '900', marginTop: 2, zIndex: 1 },
+  todayDot: { width: 3, height: 3, borderRadius: 2, marginTop: 3, zIndex: 1 },
+
+  // Divider
+  dividerWrap:   { flexDirection: 'row', marginHorizontal: 20, marginBottom: 12, height: 1.5 },
+  dividerAccent: { width: 28, borderRadius: 1 },
+  dividerFade:   { flex: 1, borderRadius: 1, opacity: 0.35 },
+
+  // List
+  listWrap:    { paddingHorizontal: 16, paddingBottom: 120 },
+  skeletonWrap: { paddingHorizontal: 16, paddingBottom: 100 },
+
+  // Timeline row
+  row:    { flexDirection: 'row', gap: 8, marginBottom: 10 },
+  timeCol: { width: 34, alignItems: 'center', paddingTop: 10 },
+  timeHour: { fontSize: 13, fontWeight: '900', lineHeight: 15 },
+  timeMin:  { fontSize: 9, fontWeight: '700', lineHeight: 12 },
+  timeLine: { width: 1.5, flex: 1, marginTop: 4, borderRadius: 1 },
+  dotCol:   { width: 14, alignItems: 'center', paddingTop: 13 },
+  dotOuter: { width: 10, height: 10, borderRadius: 5, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  dotInner: { width: 4, height: 4, borderRadius: 2 },
+
+  // Card
+  card:         { flex: 1, borderRadius: 14, overflow: 'hidden', borderWidth: 1 },
+  accentBar:    { position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, zIndex: 1 },
+  cardRow:      { flexDirection: 'row' },
+  posterWrap:   { position: 'relative' },
+  poster:       { width: 68, aspectRatio: 3 / 4 },
+  gradientFade: { position: 'absolute', left: 56, top: 0, bottom: 0, width: 28 },
+  typeBadge:    { position: 'absolute', top: 5, left: 4, paddingHorizontal: 4, paddingVertical: 2, borderRadius: 4 },
+  typeBadgeText: { fontSize: 7, fontWeight: '700', color: 'rgba(255,255,255,0.85)', letterSpacing: 0.3 },
+  epsBadge:     { position: 'absolute', bottom: 5, left: 4, paddingHorizontal: 4, paddingVertical: 2, borderRadius: 4 },
+  epsBadgeText: { fontSize: 7, fontWeight: '900' },
+  cardInfo:     { flex: 1, paddingHorizontal: 10, paddingVertical: 10, justifyContent: 'center', gap: 5 },
+  cardTitle:    { fontWeight: '800', fontSize: 12, lineHeight: 16 },
+  genreRow:     { flexDirection: 'row', gap: 4 },
+  genreChip:    { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 },
+  genreText:    { fontSize: 8, fontWeight: '800' },
+  cardDate:     { fontSize: 9, fontWeight: '600' },
+
+  // Empty
+  emptyWrap:  { flex: 1, flexDirection: 'row', gap: 16, paddingHorizontal: 28, paddingTop: 48, alignItems: 'flex-start' },
+  emptyLine:  { width: 3, height: 48, borderRadius: 2, marginTop: 4 },
+  emptyTitle: { fontSize: 18, fontWeight: '900', letterSpacing: -0.5, marginBottom: 8 },
+  emptySub:   { fontSize: 13, lineHeight: 20, fontWeight: '500' },
+});
