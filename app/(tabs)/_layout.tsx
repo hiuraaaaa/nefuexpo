@@ -12,7 +12,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
 import {
-  Home, Compass, Newspaper, Calendar, User, type LucideIcon,
+  Home, Compass, Bookmark, Calendar, User, type LucideIcon,
 } from 'lucide-react-native';
 import { useTheme } from '@/hooks/theme';
 import { type Theme } from '@/constants';
