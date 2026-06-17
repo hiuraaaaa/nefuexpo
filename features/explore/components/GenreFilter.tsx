@@ -1,6 +1,11 @@
+// features/explore/components/GenreFilter.tsx
+//
+// Signature: tab strip editorial — active word besar & cerah, inactive kecil
+// & redup, underline offset ke kiri di bawah active (persis LibraryHeader).
+// Tidak ada pill bubble, tidak ada border radius 20, tidak ada card wrapper.
 import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import { Genre } from '@/types';
 
 interface Props {
@@ -14,26 +19,37 @@ interface Props {
 export default function GenreFilter({ genres, selectedGenres, onToggle, onClearAll, theme }: Props) {
   if (genres.length === 0) return null;
 
+  const allActive = selectedGenres.length === 0;
+
   return (
-    <Animated.View entering={FadeIn.duration(300)}>
+    <View style={{ marginBottom: 8 }}>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingBottom: 12 }}
+        contentContainerStyle={{ paddingHorizontal: 22, gap: 20, paddingBottom: 4 }}
       >
+        {/* "Semua" */}
         <TouchableOpacity
-          onPress={onClearAll}
-          style={{
-            paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
-            backgroundColor: selectedGenres.length === 0 ? theme.accent : theme.card,
-            borderWidth: 1,
-            borderColor: selectedGenres.length === 0 ? theme.accent : theme.border,
-          }}
+          onPress={() => { Haptics.selectionAsync(); onClearAll(); }}
+          activeOpacity={0.7}
         >
           <Text style={{
-            color: selectedGenres.length === 0 ? theme.bg : theme.subtext,
-            fontSize: 11, fontWeight: '800',
-          }}>Semua</Text>
+            color: allActive ? theme.text : theme.subtext,
+            fontWeight: '900',
+            fontSize: allActive ? 16 : 12,
+            letterSpacing: -0.3,
+          }}>
+            Semua
+          </Text>
+          {allActive && (
+            <View style={{
+              height: 3,
+              width: 28,
+              backgroundColor: theme.accent,
+              borderRadius: 2,
+              marginTop: 5,
+            }} />
+          )}
         </TouchableOpacity>
 
         {genres.map(g => {
@@ -42,20 +58,30 @@ export default function GenreFilter({ genres, selectedGenres, onToggle, onClearA
             <TouchableOpacity
               key={g.id}
               onPress={() => onToggle(g.id)}
-              style={{
-                paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
-                backgroundColor: active ? theme.accent : theme.card,
-                borderWidth: 1, borderColor: active ? theme.accent : theme.border,
-              }}
+              activeOpacity={0.7}
             >
               <Text style={{
-                color: active ? theme.bg : theme.subtext,
-                fontSize: 11, fontWeight: '800',
-              }}>{g.name}</Text>
+                color: active ? theme.text : theme.subtext,
+                fontWeight: active ? '900' : '600',
+                fontSize: active ? 16 : 12,
+                letterSpacing: -0.3,
+              }}>
+                {g.name}
+              </Text>
+              {active && (
+                <View style={{
+                  height: 3,
+                  // Width tidak seragam — ikutin panjang teks approximate
+                  width: g.name.length * 7.5,
+                  backgroundColor: theme.accent,
+                  borderRadius: 2,
+                  marginTop: 5,
+                }} />
+              )}
             </TouchableOpacity>
           );
         })}
       </ScrollView>
-    </Animated.View>
+    </View>
   );
 }
