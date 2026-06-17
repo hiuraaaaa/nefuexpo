@@ -1,8 +1,8 @@
+// features/explore/index.tsx
 import React, { useCallback } from 'react';
 import { View, Text, TouchableOpacity, FlatList } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/hooks/theme';
 import { Anime } from '@/types';
@@ -41,8 +41,9 @@ export default function ExploreScreen() {
     />
   ), [theme, router]);
 
+  // ── Header editorial ──────────────────────────────────────────────────────
   const ListHeader = (
-    <View>
+    <View style={{ marginBottom: 18 }}>
       {!query && (
         <GenreFilter
           genres={genres}
@@ -53,39 +54,110 @@ export default function ExploreScreen() {
         />
       )}
 
-      {query.length > 0 && (
-        <View style={{ marginBottom: 14 }}>
+      {/* Divider tipis */}
+      <View style={{ height: 1, backgroundColor: `${theme.subtext}18`, marginHorizontal: 22, marginBottom: 16 }} />
+
+      {/* Context label — query atau genre atau default */}
+      {query.length > 0 ? (
+        <View style={{ paddingHorizontal: 22 }}>
           <Text style={{
-            color: theme.subtext, fontSize: 10, fontWeight: '700',
-            letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 2,
+            color: theme.subtext, fontSize: 9, fontWeight: '800',
+            letterSpacing: 2.5, textTransform: 'uppercase', marginBottom: 3,
           }}>Hasil untuk</Text>
           <Text style={{
-            color: theme.accent, fontSize: 22, fontWeight: '900', letterSpacing: -0.5,
-          }} numberOfLines={1}>"{query}"</Text>
+            color: theme.accent, fontSize: 24, fontWeight: '900',
+            letterSpacing: -0.8, fontStyle: 'italic',
+          }} numberOfLines={1}>
+            {query}
+          </Text>
         </View>
-      )}
-
-      {!query && selectedGenres.length === 0 && (
-        <View style={{ marginBottom: 10 }}>
+      ) : selectedGenres.length > 0 ? (
+        <View style={{ paddingHorizontal: 22 }}>
           <Text style={{
-            color: theme.subtext, fontSize: 10, fontWeight: '800',
-            letterSpacing: 1.5, textTransform: 'uppercase',
+            color: theme.subtext, fontSize: 9, fontWeight: '800',
+            letterSpacing: 2.5, textTransform: 'uppercase', marginBottom: 3,
+          }}>Genre</Text>
+          <Text style={{
+            color: theme.text, fontSize: 22, fontWeight: '900', letterSpacing: -0.5,
+          }}>
+            {selectedGenres.join(' + ')}
+          </Text>
+        </View>
+      ) : (
+        <View style={{ paddingHorizontal: 22 }}>
+          <Text style={{
+            color: theme.subtext, fontSize: 9, fontWeight: '800',
+            letterSpacing: 2.5, textTransform: 'uppercase',
           }}>Semua Anime</Text>
         </View>
       )}
     </View>
   );
 
+  // ── Empty state — typographic, bukan icon centered ────────────────────────
+  const EmptyState = (
+    <View style={{ flex: 1, paddingHorizontal: 22, paddingTop: 48 }}>
+      <Text style={{
+        color: `${theme.accent}25`,
+        fontSize: 96,
+        fontWeight: '900',
+        fontStyle: 'italic',
+        letterSpacing: -4,
+        lineHeight: 96,
+      }}>0</Text>
+      <Text style={{
+        color: theme.subtext,
+        fontSize: 14,
+        fontWeight: '700',
+        marginTop: 12,
+        letterSpacing: 0.2,
+      }}>
+        Tidak ada hasil
+      </Text>
+      <Text style={{
+        color: `${theme.subtext}70`,
+        fontSize: 12,
+        fontWeight: '500',
+        marginTop: 4,
+        lineHeight: 18,
+      }}>
+        {query.length > 0
+          ? `Coba kata kunci lain untuk "${query}"`
+          : 'Belum ada anime yang tersedia'}
+      </Text>
+      {query.length > 0 && (
+        <TouchableOpacity
+          onPress={clearQuery}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={{ marginTop: 20, alignSelf: 'flex-start' }}
+        >
+          <Text style={{ color: theme.accent, fontWeight: '800', fontSize: 13 }}>
+            ← Hapus pencarian
+          </Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }} edges={['top']}>
-      {/* Header */}
-      <View style={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12 }}>
-        <Text style={{ color: theme.text, fontWeight: '900', fontSize: 28, letterSpacing: -0.5 }}>
-          Explore
+
+      {/* ── Header ── */}
+      <View style={{ paddingHorizontal: 22, paddingTop: 8, paddingBottom: 4 }}>
+        <Text style={{
+          color: theme.subtext, fontSize: 9, fontWeight: '800',
+          letterSpacing: 3, textTransform: 'uppercase', marginBottom: 3,
+        }}>
+          Temukan
+        </Text>
+        <Text style={{
+          color: theme.text, fontWeight: '900', fontSize: 30, letterSpacing: -1,
+        }}>
+          Anime
         </Text>
       </View>
 
-      {/* Search bar */}
+      {/* ── Search bar ── */}
       <SearchBar
         value={query}
         onChangeText={handleQueryChange}
@@ -93,44 +165,27 @@ export default function ExploreScreen() {
         theme={theme}
       />
 
-      {/* Loading skeleton */}
+      {/* ── Loading skeleton ── */}
       {isLoading ? (
         <FlatList
           data={[...Array(8)]}
           keyExtractor={(_, i) => String(i)}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
+          contentContainerStyle={{ paddingHorizontal: 22, paddingBottom: 100 }}
           renderItem={() => <ListCardSkeleton theme={theme} />}
           scrollEnabled={false}
           ListHeaderComponent={ListHeader}
         />
 
-      /* Empty state */
+      /* ── Empty state ── */
       ) : results.length === 0 ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingBottom: 80 }}>
-          <Ionicons name="search-outline" size={56} color={theme.subtext} />
-          <Text style={{
-            color: theme.subtext, fontWeight: '700', fontSize: 13,
-            textTransform: 'uppercase', letterSpacing: 2,
-          }}>Tidak ditemukan</Text>
-          {query.length > 0 && (
-            <TouchableOpacity
-              onPress={clearQuery}
-              style={{
-                paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10,
-                backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border,
-              }}
-            >
-              <Text style={{ color: theme.accent, fontWeight: '700', fontSize: 12 }}>Hapus Pencarian</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        EmptyState
 
-      /* Results list */
+      /* ── Results ── */
       ) : (
         <FlatList
           data={results}
           keyExtractor={item => item.id}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 120 }}
+          contentContainerStyle={{ paddingHorizontal: 22, paddingBottom: 120 }}
           renderItem={renderItem}
           removeClippedSubviews
           maxToRenderPerBatch={10}
@@ -150,4 +205,3 @@ export default function ExploreScreen() {
     </SafeAreaView>
   );
 }
-
