@@ -1,14 +1,14 @@
-import React, { useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
+import React, { useRef, useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, Dimensions, Animated } from 'react-native';
 import { VideoView, isPictureInPictureSupported } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import Animated from 'react-native-reanimated';
+import Reanimated from 'react-native-reanimated';
 import { COLORS } from '@/constants';
 import { Server } from '@/types';
 import { SeekToast } from './SeekToast';
 import { PlayerTopBar } from './PlayerTopBar';
 import { PlayerBottomBar } from './PlayerBottomBar';
+import { EpisodeTransition } from './EpisodeTransition';
 import { IconPrev, IconNext, IconPlay, IconPause } from '../shared/Icons';
 
 const { width } = Dimensions.get('window');
@@ -69,7 +69,22 @@ export function VideoPlayer({
   const pipSupported = isPictureInPictureSupported();
   const videoHeight  = isFullscreen ? Dimensions.get('window').height : width * (9 / 16);
 
-  const [fitMode, setFitMode] = useState<FitMode>('contain');
+  const [fitMode, setFitMode]           = useState<FitMode>('contain');
+  const [showTransition, setShowTransition] = useState(false);
+
+  // Track server link untuk detect ganti episode
+  const prevLinkRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const newLink = selectedServer?.link ?? null;
+    if (newLink && newLink !== prevLinkRef.current) {
+      // Trigger transition
+      setShowTransition(true);
+      const timer = setTimeout(() => setShowTransition(false), 900);
+      prevLinkRef.current = newLink;
+      return () => clearTimeout(timer);
+    }
+  }, [selectedServer?.link]);
 
   const toggleFit = () => {
     setFitMode(p => p === 'contain' ? 'cover' : 'contain');
@@ -78,6 +93,8 @@ export function VideoPlayer({
 
   return (
     <View style={{ width: '100%', height: videoHeight, backgroundColor: '#000', marginTop: isFullscreen ? 0 : insetTop }}>
+
+      {/* Video */}
       {selectedServer && !isEpLoading ? (
         <VideoView
           ref={videoRef}
@@ -90,19 +107,28 @@ export function VideoPlayer({
           startsPictureInPictureAutomatically={false}
         />
       ) : (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={COLORS.gold} size="large" />
-          <Text style={{ color: COLORS.gold, fontSize: 12, marginTop: 10, fontWeight: '700' }}>
-            {isEpLoading ? 'Memuat episode...' : 'Video tidak tersedia'}
-          </Text>
+        // Loading state awal (sebelum server ready) — minimal
+        <View style={{ flex: 1 }} />
+      )}
+
+      {/* Buffering indicator — horizontal bar tipis di atas, bukan spinner */}
+      {isBuffering && !isEpLoading && !showTransition && (
+        <View style={{
+          position: 'absolute', top: 0, left: 0, right: 0,
+          height: 2, pointerEvents: 'none',
+          overflow: 'hidden',
+        }}>
+          <Animated.View style={{
+            position: 'absolute', top: 0, bottom: 0,
+            width: '40%',
+            backgroundColor: COLORS.gold,
+            opacity: 0.85,
+          }} />
         </View>
       )}
 
-      {isBuffering && !isEpLoading && (
-        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-          <ActivityIndicator color={COLORS.gold} size="large" />
-        </View>
-      )}
+      {/* Episode transition overlay — flash hitam + logo */}
+      <EpisodeTransition visible={showTransition || isEpLoading} />
 
       {/* Tap zones */}
       <TouchableOpacity activeOpacity={1} onPress={handleTapLeft}  style={{ position: 'absolute', top: 0, left: 0, width: '40%', bottom: 0 }} />
@@ -113,9 +139,22 @@ export function VideoPlayer({
       <SeekToast direction="right" visible={seekRight} />
 
       {selectedServer && !isEpLoading && (
-        <Animated.View style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }, controlsStyle]} pointerEvents={showControls ? 'box-none' : 'none'}>
-          <LinearGradient colors={['rgba(0,0,0,0.7)', 'transparent']} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 80 }} pointerEvents="none" />
-          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.8)']} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 90 }} pointerEvents="none" />
+        <Reanimated.View
+          style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }, controlsStyle]}
+          pointerEvents={showControls ? 'box-none' : 'none'}
+        >
+          {/* Gradient top */}
+          <LinearGradient
+            colors={['rgba(0,0,0,0.75)', 'transparent']}
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 90 }}
+            pointerEvents="none"
+          />
+          {/* Gradient bottom */}
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.85)']}
+            style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 100 }}
+            pointerEvents="none"
+          />
 
           <PlayerTopBar
             title={title}
@@ -129,43 +168,79 @@ export function VideoPlayer({
             onNobar={onNobar}
           />
 
-          {/* Fit mode toggle — pojok kanan atas, di bawah top bar */}
+          {/* Fit toggle — pojok kanan atas, di bawah top bar, minimal */}
           <TouchableOpacity
             onPress={toggleFit}
             style={{
-              position: 'absolute', top: 52, right: 16,
+              position: 'absolute', top: 50, right: 14,
               flexDirection: 'row', alignItems: 'center', gap: 4,
-              backgroundColor: 'rgba(0,0,0,0.5)',
-              paddingHorizontal: 10, paddingVertical: 5,
-              borderRadius: 20, borderWidth: 1,
-              borderColor: fitMode === 'cover' ? COLORS.gold : 'rgba(255,255,255,0.2)',
+              opacity: fitMode === 'cover' ? 1 : 0.45,
             }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Ionicons
-              name={fitMode === 'cover' ? 'scan-outline' : 'expand-outline'}
-              size={12}
-              color={fitMode === 'cover' ? COLORS.gold : 'rgba(255,255,255,0.7)'}
-            />
             <Text style={{
-              color: fitMode === 'cover' ? COLORS.gold : 'rgba(255,255,255,0.7)',
-              fontSize: 10, fontWeight: '800',
+              color: fitMode === 'cover' ? COLORS.gold : '#fff',
+              fontSize: 9, fontWeight: '900',
+              letterSpacing: 1.5, textTransform: 'uppercase',
             }}>
-              {fitMode === 'cover' ? 'Full' : 'Fit'}
+              {fitMode === 'cover' ? 'FULL' : 'FIT'}
             </Text>
           </TouchableOpacity>
 
-          {/* Center controls */}
-          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 36 }} pointerEvents="box-none">
-            <TouchableOpacity onPress={() => { handlePrev(); resetControlsTimer(); }} disabled={!canGoPrev}
-              style={{ opacity: canGoPrev ? 1 : 0.25, width: 52, height: 52, alignItems: 'center', justifyContent: 'center' }}>
-              <IconPrev color={COLORS.gold} size={26} />
+          {/* Center controls — asimetris: prev < play > next */}
+          <View style={{
+            position: 'absolute', top: 0, left: 0, right: 0, bottom: 40,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 0,
+          }} pointerEvents="box-none">
+
+            {/* Prev — lebih kecil */}
+            <TouchableOpacity
+              onPress={() => { handlePrev(); resetControlsTimer(); }}
+              disabled={!canGoPrev}
+              style={{
+                opacity: canGoPrev ? 1 : 0.2,
+                width: 56, height: 56,
+                alignItems: 'center', justifyContent: 'center',
+                marginRight: 8,
+              }}
+            >
+              <IconPrev color="rgba(255,255,255,0.85)" size={22} />
             </TouchableOpacity>
-            <TouchableOpacity onPress={togglePlayPause} style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: 'rgba(255,255,255,0.15)', borderWidth: 2, borderColor: 'rgba(255,255,255,0.7)', alignItems: 'center', justifyContent: 'center' }}>
-              {isPlaying ? <IconPause size={26} /> : <IconPlay size={26} />}
+
+            {/* Play/Pause — dominan, sedikit offset ke kiri dari benar-benar center */}
+            <TouchableOpacity
+              onPress={togglePlayPause}
+              style={{
+                width: 68, height: 68,
+                borderRadius: 34,
+                backgroundColor: 'rgba(255,255,255,0.12)',
+                borderWidth: 1.5,
+                borderColor: 'rgba(255,255,255,0.5)',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginRight: 8,
+              }}
+            >
+              {isPlaying
+                ? <IconPause size={24} />
+                : <IconPlay  size={24} />
+              }
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => { handleNext(); resetControlsTimer(); }} disabled={!canGoNext}
-              style={{ opacity: canGoNext ? 1 : 0.25, width: 52, height: 52, alignItems: 'center', justifyContent: 'center' }}>
-              <IconNext color={COLORS.gold} size={26} />
+
+            {/* Next — lebih besar dari prev */}
+            <TouchableOpacity
+              onPress={() => { handleNext(); resetControlsTimer(); }}
+              disabled={!canGoNext}
+              style={{
+                opacity: canGoNext ? 1 : 0.2,
+                width: 64, height: 64,
+                alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <IconNext color="#fff" size={28} />
             </TouchableOpacity>
           </View>
 
@@ -184,7 +259,7 @@ export function VideoPlayer({
             onPip={() => {}}
             resetControlsTimer={resetControlsTimer}
           />
-        </Animated.View>
+        </Reanimated.View>
       )}
     </View>
   );
