@@ -25,6 +25,8 @@ export function useEpisodeLoader(currentEpId: string | null) {
     try {
       player.replace({ uri: selectedServer.link });
       player.pause();
+      // Reset posisi ke 0 biar durasi ga carry over dari episode sebelumnya
+      try { player.seekBy(-(player.currentTime ?? 0)); } catch {}
     } catch {}
   }, [selectedServer?.link]);
 
@@ -36,6 +38,8 @@ export function useEpisodeLoader(currentEpId: string | null) {
       setServerGroup({});
       setSelectedQuality('');
       setSelectedServer(null);
+      // Reset posisi player ke 0 saat ganti episode
+      try { player.seekBy(-(player.currentTime ?? 0)); } catch {}
       try {
         const res = await api.episode(currentEpId);
         if (res.status && res.data) {
