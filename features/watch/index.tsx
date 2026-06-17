@@ -259,23 +259,63 @@ export default function WatchScreen() {
             />
           )}
 
-          <View style={{ flexDirection: 'row', gap: 12, padding: 16 }}>
-            <TouchableOpacity onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); epNav.handlePrev(); }}
+          {/* Nav prev/next — asimetris */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 16 }}>
+            <TouchableOpacity
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); epNav.handlePrev(); }}
               disabled={!epNav.canGoPrev}
-              style={{ flex: 1, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', borderRadius: 10, paddingVertical: 14, alignItems: 'center', opacity: epNav.canGoPrev ? 1 : 0.3 }}>
-              <Text style={{ color: '#fff', fontWeight: '900' }}>‹ Sebelumnya</Text>
+              style={{ opacity: epNav.canGoPrev ? 1 : 0.2, paddingVertical: 8 }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={{ color: 'rgba(255,255,255,0.45)', fontWeight: '700', fontSize: 13 }}>‹ Sebelumnya</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); epNav.handleNext(); }}
+
+            <View style={{ flex: 1 }} />
+
+            <TouchableOpacity
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); epNav.handleNext(); }}
               disabled={!epNav.canGoNext}
-              style={{ flex: 1, borderWidth: 1, borderColor: `${COLORS.gold}60`, borderRadius: 10, paddingVertical: 14, alignItems: 'center', opacity: epNav.canGoNext ? 1 : 0.3 }}>
-              <Text style={{ color: COLORS.gold, fontWeight: '900' }}>Selanjutnya ›</Text>
+              style={{
+                opacity: epNav.canGoNext ? 1 : 0.2,
+                backgroundColor: COLORS.gold,
+                paddingHorizontal: 20, paddingVertical: 10,
+                borderRadius: 8,
+              }}
+            >
+              <Text style={{ color: '#000', fontWeight: '900', fontSize: 13 }}>Selanjutnya ›</Text>
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity onPress={() => { Haptics.selectionAsync(); toggleAutoNext(); }}
-            style={{ marginHorizontal: 16, marginBottom: 16, paddingVertical: 14, borderRadius: 10, borderWidth: 1, borderColor: autoNext ? `${COLORS.gold}60` : 'rgba(255,255,255,0.1)', alignItems: 'center' }}>
-            <Text style={{ color: autoNext ? COLORS.gold : 'rgba(255,255,255,0.4)', fontWeight: '900', fontSize: 13 }}>AutoNext {autoNext ? 'ON' : 'OFF'}</Text>
-            <Text style={{ color: autoNext ? `${COLORS.gold}80` : 'rgba(255,255,255,0.2)', fontSize: 10, marginTop: 2 }}>hidupkan untuk memutar otomatis episode selanjutnya</Text>
+          {/* AutoNext — row kecil, toggle switch style */}
+          <TouchableOpacity
+            onPress={() => { Haptics.selectionAsync(); toggleAutoNext(); }}
+            activeOpacity={0.7}
+            style={{
+              flexDirection: 'row', alignItems: 'center',
+              marginHorizontal: 16, marginBottom: 20,
+              paddingVertical: 6, gap: 10,
+            }}
+          >
+            <Text style={{
+              color: 'rgba(255,255,255,0.3)',
+              fontSize: 10, fontWeight: '700',
+              letterSpacing: 1, textTransform: 'uppercase', flex: 1,
+            }}>
+              Putar otomatis
+            </Text>
+            {/* Toggle pill */}
+            <View style={{
+              width: 36, height: 20, borderRadius: 10,
+              backgroundColor: autoNext ? COLORS.gold : 'rgba(255,255,255,0.1)',
+              justifyContent: 'center',
+              paddingHorizontal: 2,
+            }}>
+              <View style={{
+                width: 16, height: 16, borderRadius: 8,
+                backgroundColor: autoNext ? '#000' : 'rgba(255,255,255,0.4)',
+                alignSelf: autoNext ? 'flex-end' : 'flex-start',
+              }} />
+            </View>
           </TouchableOpacity>
 
           <EpisodeList
