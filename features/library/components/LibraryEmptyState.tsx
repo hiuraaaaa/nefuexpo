@@ -1,7 +1,10 @@
 // features/library/components/LibraryEmptyState.tsx
+//
+// Signature: no centered icon-in-circle. Empty state reads like a torn ticket
+// stub — big oversized punctuation mark set off-axis, left-aligned copy,
+// asymmetric single CTA that isn't full-width or centered.
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/hooks/theme';
@@ -15,72 +18,69 @@ interface Props {
 export function LibraryEmptyState({ tab, loggedIn }: Props) {
   const theme  = useTheme();
   const router = useRouter();
-
   const isFavorit = tab === 'favorit';
 
   const title = !loggedIn
-    ? 'Belum Login'
+    ? 'Login dulu'
     : isFavorit
-      ? 'Belum Ada Favorit'
-      : 'Belum Ada Riwayat';
+      ? 'Belum ada favorit'
+      : 'Belum ada riwayat';
 
   const subtitle = !loggedIn
-    ? 'Login untuk menyimpan favorit & riwayat tontonan kamu'
+    ? 'Favorit dan riwayat tontonan kamu tersimpan begitu login.'
     : isFavorit
-      ? 'Tap ikon bookmark di halaman anime untuk menyimpannya di sini'
-      : 'Anime yang kamu tonton akan muncul di sini secara otomatis';
+      ? 'Tekan tanda simpan di halaman anime — judulnya akan muncul di sini.'
+      : 'Episode yang kamu tonton tercatat otomatis di sini.';
+
+  const ctaLabel = !loggedIn ? 'Login' : isFavorit ? 'Cari anime' : null;
 
   return (
-    <View style={{ alignItems: 'center', paddingVertical: 80, paddingHorizontal: 32 }}>
-      <View style={{
-        width: 72, height: 72, borderRadius: 22,
-        alignItems: 'center', justifyContent: 'center',
-        backgroundColor: `${theme.accent}12`,
-        borderWidth: 1, borderColor: `${theme.accent}25`,
-        marginBottom: 16,
+    <View style={{ flex: 1, paddingHorizontal: 26, paddingTop: 40 }}>
+      {/* Oversized mark, pushed left, slight rotation — not centered, not a stock icon */}
+      <Text style={{
+        color: `${theme.accent}30`,
+        fontSize: 96,
+        fontWeight: '900',
+        lineHeight: 96,
+        marginLeft: -6,
+        transform: [{ rotate: '-4deg' }],
       }}>
-        <Ionicons
-          name={!loggedIn ? 'person-outline' : isFavorit ? 'bookmark-outline' : 'time-outline'}
-          size={32}
-          color={`${theme.accent}80`}
-        />
-      </View>
-      <Text style={{ color: theme.text, fontSize: 16, fontWeight: '800', marginBottom: 6 }}>
+        {isFavorit ? '⌘' : '∿'}
+      </Text>
+
+      <Text style={{
+        color: theme.text, fontSize: 19, fontWeight: '800',
+        marginTop: 4, marginBottom: 8,
+      }}>
         {title}
       </Text>
-      <Text style={{ color: theme.subtext, fontSize: 12, textAlign: 'center', lineHeight: 18 }}>
+
+      <Text style={{
+        color: theme.subtext, fontSize: 13, lineHeight: 19,
+        maxWidth: 260,
+      }}>
         {subtitle}
       </Text>
 
-      {!loggedIn && (
+      {ctaLabel && (
         <TouchableOpacity
-          onPress={() => { Haptics.selectionAsync(); router.push('/profile'); }}
+          onPress={() => {
+            Haptics.selectionAsync();
+            router.push(!loggedIn ? '/profile' : '/');
+          }}
           style={{
-            marginTop: 18,
-            backgroundColor: theme.accent,
-            paddingHorizontal: 22, paddingVertical: 11,
-            borderRadius: 13,
+            alignSelf: 'flex-start',
+            marginTop: 22,
+            borderBottomWidth: 2,
+            borderBottomColor: theme.accent,
+            paddingBottom: 4,
           }}
         >
-          <Text style={{ color: theme.bg, fontWeight: '800', fontSize: 13 }}>Login Sekarang</Text>
-        </TouchableOpacity>
-      )}
-
-      {loggedIn && isFavorit && (
-        <TouchableOpacity
-          onPress={() => { Haptics.selectionAsync(); router.push('/'); }}
-          style={{
-            marginTop: 18,
-            backgroundColor: `${theme.accent}15`,
-            borderWidth: 1, borderColor: `${theme.accent}30`,
-            paddingHorizontal: 22, paddingVertical: 11,
-            borderRadius: 13,
-          }}
-        >
-          <Text style={{ color: theme.accent, fontWeight: '800', fontSize: 13 }}>Jelajahi Anime</Text>
+          <Text style={{ color: theme.text, fontWeight: '800', fontSize: 14 }}>
+            {ctaLabel} →
+          </Text>
         </TouchableOpacity>
       )}
     </View>
   );
 }
-
