@@ -35,7 +35,7 @@ export function HistoryCard({ history }: { history: HistoryItem[] }) {
             }}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push(`/watch/${h.anime.id}`);
+              router.push(`/watch/${h.anime.id}?ep=${h.episodeIndex}`);
             }}
           >
             {/* Poster */}
