@@ -1,13 +1,14 @@
 // UserCard.tsx
 //
-// Signature: name reads as a byline/masthead — large, left-anchored, with the
-// level title set underneath it as a job-title line ("Senpai", "Kage no Ou"),
-// not a colored pill badge. Avatar is small and pushed off to the side rather
-// than centered or overlapping a banner. No drop shadow; a single accent
-// underline rule does the separating work instead of a card boundary.
+// Signature: name reads as a byline/masthead, level title as a subtitle line.
+// Avatar gets a real frame — colored ring + slight rotation tag — so it reads
+// as a designed object instead of a bare square thumbnail floating in empty
+// space. Background gets a soft radial tint behind the name so the header
+// doesn't sit on flat black.
 import React from 'react';
 import { View, Text, TouchableOpacity, Alert } from 'react-native';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { signOut } from '@/hooks/auth';
 import { useTheme } from '@/hooks/theme';
@@ -35,50 +36,71 @@ export function UserCard({ user, admin, xpData }: Props) {
   };
 
   return (
-    <View style={{ paddingHorizontal: 22, marginBottom: 22 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-        {/* Avatar — small, square-ish, offset to the right of the text rather
-            than leading the row. Breaks the avatar-always-comes-first pattern. */}
-        <View style={{ flex: 1, paddingRight: 16 }}>
-          <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '700', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 4 }}>
+    <View style={{ paddingTop: 14, marginBottom: 28 }}>
+      {/* Soft tinted wash behind the header instead of flat black */}
+      <LinearGradient
+        colors={[`${theme.accent}1c`, `${theme.accent}00`]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0.9, y: 1 }}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 210 }}
+        pointerEvents="none"
+      />
+
+      <View style={{ paddingHorizontal: 22, flexDirection: 'row', alignItems: 'flex-start' }}>
+        <View style={{ flex: 1, paddingRight: 18 }}>
+          <Text style={{ color: theme.accent, fontSize: 10, fontWeight: '800', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 6 }}>
             {admin ? 'Admin · Akun' : 'Akun'}
           </Text>
 
           <Text
-            style={{ color: theme.text, fontWeight: '900', fontSize: 27, letterSpacing: -0.7, lineHeight: 31 }}
+            style={{ color: theme.text, fontWeight: '900', fontSize: 30, letterSpacing: -0.8, lineHeight: 34 }}
             numberOfLines={1}
           >
             {user.displayName ?? 'User'}
           </Text>
 
-          {/* Level title set as a subtitle line, not a badge */}
-          <Text style={{ color: theme.accent, fontSize: 14, fontWeight: '700', marginTop: 3 }}>
-            {current.title}
-          </Text>
+          {/* Level title as a colored chip-on-baseline, not a pill, but with
+              actual fill behind it so it isn't bare text floating alone */}
+          <View style={{ flexDirection: 'row', marginTop: 8 }}>
+            <Text style={{
+              color: theme.bg, backgroundColor: theme.accent,
+              fontSize: 12.5, fontWeight: '900',
+              paddingHorizontal: 9, paddingVertical: 4,
+              borderRadius: 5, overflow: 'hidden',
+              transform: [{ rotate: '-1.5deg' }],
+            }}>
+              {current.title.toUpperCase()}
+            </Text>
+          </View>
 
-          <Text style={{ color: theme.subtext, fontSize: 11.5, marginTop: 6 }} numberOfLines={1}>
+          <Text style={{ color: theme.subtext, fontSize: 11.5, marginTop: 10 }} numberOfLines={1}>
             {user.email ?? ''}
           </Text>
         </View>
 
-        <View style={{ width: 58, height: 58, marginTop: 2 }}>
+        {/* Avatar with a real frame: colored ring offset + slight tilt */}
+        <View style={{ width: 64, height: 64, marginTop: 2 }}>
+          <View style={{
+            position: 'absolute', top: -4, left: -4, right: 4, bottom: 4,
+            borderRadius: 12, borderWidth: 1.5, borderColor: `${theme.accent}50`,
+            transform: [{ rotate: '4deg' }],
+          }} />
           <Image
             source={{ uri: user.photoURL ?? `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName ?? 'U')}` }}
-            style={{ width: 58, height: 58, borderRadius: 8 }}
+            style={{ width: 64, height: 64, borderRadius: 12, borderWidth: 2, borderColor: theme.bg }}
             contentFit="cover"
           />
         </View>
       </View>
 
-      {/* Asymmetric rule: short, left-anchored, not full width */}
-      <View style={{ height: 2, width: 36, backgroundColor: theme.accent, borderRadius: 1, marginTop: 16 }} />
-
-      {/* Logout sits as a quiet text action below, not a floating icon button */}
-      <TouchableOpacity onPress={handleLogout} style={{ marginTop: 14 }} hitSlop={{ top: 6, bottom: 6 }}>
-        <Text style={{ color: theme.subtext, fontSize: 12, fontWeight: '600' }}>
-          Keluar dari akun
-        </Text>
-      </TouchableOpacity>
+      <View style={{ paddingHorizontal: 22, marginTop: 20 }}>
+        <View style={{ height: 2, width: 36, backgroundColor: theme.accent, borderRadius: 1, marginBottom: 14 }} />
+        <TouchableOpacity onPress={handleLogout} hitSlop={{ top: 6, bottom: 6 }}>
+          <Text style={{ color: theme.subtext, fontSize: 12, fontWeight: '600' }}>
+            Keluar dari akun
+          </Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
