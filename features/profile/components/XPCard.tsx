@@ -1,77 +1,77 @@
-// XPCard.tsx — Glassmorphism XP card with glow bar
+// XPCard.tsx
+//
+// Signature: progress is shown as a typeset fraction (current XP / target XP)
+// the way a scoreboard or page-counter reads, plus a tick-marked rule where
+// each tick is one rank from the LEVELS table — not a smooth gradient bar.
+// Streak is folded into the same line as plain text, not a separate pill.
 import React from 'react';
 import { View, Text } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/hooks/theme';
-import { XPBar } from '@/components/XPBar';
-import { XPData, getLevelData } from '@/hooks/xp';
+import { XPData, getLevelData, LEVELS } from '@/hooks/xp';
 
 export function XPCard({ xpData }: { xpData: XPData }) {
   const theme = useTheme();
-  const { current, next } = getLevelData(xpData.xp);
+  const { current, next, progress } = getLevelData(xpData.xp);
+  const currentRankIndex = LEVELS.findIndex(l => l.level === current.level);
 
   return (
-    <Animated.View
-      entering={FadeInDown.delay(60).springify()}
-      style={{
-        marginHorizontal: 16,
-        marginBottom: 12,
-        borderRadius: 20,
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: `${theme.accent}20`,
-        backgroundColor: theme.card,
-      }}
-    >
-      {/* subtle glass shimmer */}
-      <LinearGradient
-        colors={[`${theme.accent}12`, 'transparent', `${theme.accent}08`]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={{ position: 'absolute', inset: 0 }}
-      />
+    <View style={{ paddingHorizontal: 22, marginBottom: 26 }}>
+      <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '700', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 10 }}>
+        Pangkat
+      </Text>
 
-      <View style={{ padding: 16, gap: 14 }}>
-        {/* Header row */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <View style={{ gap: 3 }}>
-            <Text style={{
-              color: theme.subtext,
-              fontSize: 9,
-              fontWeight: '800',
-              letterSpacing: 2,
-              textTransform: 'uppercase',
-            }}>
-              Level & XP
+      {/* Fraction line: big current XP, small slash, smaller target XP — reads
+          like a scoreboard, not a percentage bar with a caption */}
+      <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+        <Text style={{ color: theme.text, fontSize: 34, fontWeight: '900', letterSpacing: -1 }}>
+          {xpData.xp.toLocaleString('id-ID')}
+        </Text>
+        {next && (
+          <>
+            <Text style={{ color: theme.subtext, fontSize: 18, fontWeight: '300', marginHorizontal: 6 }}>/</Text>
+            <Text style={{ color: theme.subtext, fontSize: 18, fontWeight: '700' }}>
+              {next.min.toLocaleString('id-ID')}
             </Text>
-            <Text style={{ color: theme.text, fontSize: 15, fontWeight: '800' }}>
-              {current.title}{!next ? ' (MAX)' : ''}
-            </Text>
-          </View>
-
-          {/* Streak pill */}
-          <View style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 5,
-            backgroundColor: `${theme.accent}18`,
-            borderWidth: 1,
-            borderColor: `${theme.accent}30`,
-            paddingHorizontal: 10,
-            paddingVertical: 6,
-            borderRadius: 20,
-          }}>
-            <Text style={{ fontSize: 14 }}>🔥</Text>
-            <Text style={{ color: theme.accent, fontSize: 12, fontWeight: '800' }}>
-              {xpData.streak} hari
-            </Text>
-          </View>
-        </View>
-
-        {/* XP bar */}
-        <XPBar xp={xpData.xp} />
+          </>
+        )}
       </View>
-    </Animated.View>
+
+      <Text style={{ color: theme.subtext, fontSize: 12, marginTop: 3 }}>
+        {next
+          ? `${(next.min - xpData.xp).toLocaleString('id-ID')} XP ke ${next.title}`
+          : `Pangkat tertinggi tercapai`}
+      </Text>
+
+      {/* Rank rule: one tick per level in the table, ticks before current rank
+          filled solid, current rank tick enlarged, future ranks hollow.
+          This literally encodes the 10-rank progression instead of decorating
+          a generic 0-100% bar. */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 18, gap: 5 }}>
+        {LEVELS.map((lvl, i) => {
+          const isPast    = i < currentRankIndex;
+          const isCurrent = i === currentRankIndex;
+          return (
+            <View
+              key={lvl.level}
+              style={{
+                flex: 1,
+                height: isCurrent ? 5 : 3,
+                borderRadius: 2,
+                backgroundColor: isPast || isCurrent ? theme.accent : `${theme.accent}1f`,
+              }}
+            />
+          );
+        })}
+      </View>
+
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+        <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '600' }}>
+          Lv.{current.level} {current.title}
+        </Text>
+        <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '600' }}>
+          🔥 {xpData.streak} hari beruntun
+        </Text>
+      </View>
+    </View>
   );
 }
