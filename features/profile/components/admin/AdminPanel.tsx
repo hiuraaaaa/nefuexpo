@@ -107,23 +107,28 @@ export function AdminPanel({ visible, onClose, allUsers: initialUsers, loading }
                     reads as a real actionable control, not floating text ── */}
                 <View style={{ paddingHorizontal: 22, marginBottom: 28 }}>
                   <TouchableOpacity onPress={openMaintenance} activeOpacity={0.75}>
-                    <LinearGradient
-                      colors={[`${DANGER}22`, `${DANGER}06`]}
-                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                      style={{
-                        borderRadius: 14,
-                        borderLeftWidth: 3, borderLeftColor: DANGER,
-                        paddingHorizontal: 16, paddingVertical: 14,
-                        marginBottom: 14,
-                      }}
-                    >
-                      <Text style={{ color: DANGER, fontWeight: '900', fontSize: 17, letterSpacing: -0.3 }}>
-                        Mode maintenance
-                      </Text>
-                      <Text style={{ color: theme.subtext, fontSize: 11.5, marginTop: 3 }}>
-                        Matikan akses sementara untuk semua user
-                      </Text>
-                    </LinearGradient>
+                    <View style={{
+                      borderRadius: 14,
+                      overflow: 'hidden',
+                      marginBottom: 14,
+                    }}>
+                      <LinearGradient
+                        colors={[`${DANGER}22`, `${DANGER}06`]}
+                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                      />
+                      {/* Accent edge as its own solid bar, not a border fighting the radius */}
+                      <View style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 3, backgroundColor: DANGER }} />
+
+                      <View style={{ paddingHorizontal: 18, paddingVertical: 14 }}>
+                        <Text style={{ color: DANGER, fontWeight: '900', fontSize: 17, letterSpacing: -0.3 }}>
+                          Mode maintenance
+                        </Text>
+                        <Text style={{ color: theme.subtext, fontSize: 11.5, marginTop: 3 }}>
+                          Matikan akses sementara untuk semua user
+                        </Text>
+                      </View>
+                    </View>
                   </TouchableOpacity>
 
                   <TouchableOpacity onPress={openAnnouncement} activeOpacity={0.7}>
