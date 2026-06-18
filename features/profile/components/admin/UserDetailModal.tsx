@@ -15,7 +15,7 @@ import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import firestore from '@react-native-firebase/firestore';
 import { useTheme } from '@/hooks/theme';
-import { LEVELS } from '@/hooks/xp';
+import { LEVELS, clampXP, MAX_XP } from '@/hooks/xp';
 import { HistoryItem, Anime } from '@/types';
 
 interface Props {
@@ -60,8 +60,15 @@ export function UserDetailModal({ visible, user, onClose, onXPUpdated }: Props) 
 
   const handleSetXP = async () => {
     if (!user || !xpInput) return;
-    const newXp = parseInt(xpInput);
-    if (isNaN(newXp)) return;
+    const parsed = parseInt(xpInput, 10);
+    if (isNaN(parsed)) {
+      Alert.alert('Error', 'Masukkan angka XP yang valid');
+      return;
+    }
+
+    const newXp = clampXP(parsed);
+    const wasClamped = newXp !== parsed;
+
     setSaving(true);
     try {
       let newLevel = 1;
@@ -69,7 +76,12 @@ export function UserDetailModal({ visible, user, onClose, onXPUpdated }: Props) 
       await firestore().collection('users').doc(user.id).update({ xp: newXp, level: newLevel });
       onXPUpdated(user.id, newXp, newLevel);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Berhasil', `XP ${user.displayName} diubah ke ${newXp}`);
+      Alert.alert(
+        'Berhasil',
+        wasClamped
+          ? `XP ${user.displayName} disesuaikan ke ${newXp.toLocaleString('id-ID')} (maksimum ${MAX_XP.toLocaleString('id-ID')})`
+          : `XP ${user.displayName} diubah ke ${newXp.toLocaleString('id-ID')}`
+      );
       onClose();
     } catch {
       Alert.alert('Error', 'Gagal update XP');
@@ -176,14 +188,18 @@ export function UserDetailModal({ visible, user, onClose, onXPUpdated }: Props) 
                 keyboardType="numeric"
                 placeholder="Jumlah XP"
                 placeholderTextColor={theme.subtext}
+                maxLength={String(MAX_XP).length}
                 style={{
                   color: theme.text, fontSize: 16, fontWeight: '700',
                   borderBottomWidth: 1.5, borderBottomColor: `${theme.accent}40`,
                   paddingVertical: 8, marginBottom: 8,
                 }}
               />
-              <Text style={{ color: theme.subtext, fontSize: 10, lineHeight: 15, marginBottom: 20 }}>
+              <Text style={{ color: theme.subtext, fontSize: 10, lineHeight: 15, marginBottom: 4 }}>
                 {LEVELS.map(l => `Lv${l.level} ${l.min.toLocaleString('id-ID')}`).join('   ')}
+              </Text>
+              <Text style={{ color: `${theme.accent}90`, fontSize: 10, fontWeight: '700', marginBottom: 20 }}>
+                Maksimum {MAX_XP.toLocaleString('id-ID')} XP
               </Text>
 
               <TouchableOpacity onPress={handleSetXP} disabled={saving} activeOpacity={0.7}>
