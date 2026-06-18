@@ -1,4 +1,10 @@
-// UserDetailModal.tsx — Glassmorphism
+// UserDetailModal.tsx
+//
+// Signature: tabs reuse the underline-word pattern from the Library screen
+// (three words side by side, active one bigger, underline keyed to word
+// length) instead of three equal pill tabs. Mini stats are a sentence, not
+// boxed tiles. History/Favorit rows reuse the directory-list language —
+// hairline divider, no per-row card.
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, Modal, TouchableOpacity, ScrollView,
@@ -6,8 +12,6 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import firestore from '@react-native-firebase/firestore';
 import { useTheme } from '@/hooks/theme';
@@ -22,6 +26,8 @@ interface Props {
 }
 
 type Tab = 'info' | 'history' | 'favorit';
+const TAB_ORDER: Tab[] = ['info', 'history', 'favorit'];
+const TAB_LABEL: Record<Tab, string> = { info: 'Info', history: 'Riwayat', favorit: 'Favorit' };
 
 export function UserDetailModal({ visible, user, onClose, onXPUpdated }: Props) {
   const theme = useTheme();
@@ -76,214 +82,143 @@ export function UserDetailModal({ visible, user, onClose, onXPUpdated }: Props) 
 
   if (!user) return null;
 
-  const TABS: { key: Tab; label: string; icon: string }[] = [
-    { key: 'info',    label: 'Info',    icon: 'person-outline'   },
-    { key: 'history', label: 'History', icon: 'time-outline'     },
-    { key: 'favorit', label: 'Favorit', icon: 'bookmark-outline' },
-  ];
-
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <BlurView intensity={30} tint="dark" style={{ flex: 1, justifyContent: 'flex-end' }}>
         <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
         <View style={{
-          backgroundColor: theme.card,
-          borderTopLeftRadius: 28, borderTopRightRadius: 28,
+          backgroundColor: theme.bg,
+          borderTopLeftRadius: 22, borderTopRightRadius: 22,
           maxHeight: '88%',
-          borderWidth: 1, borderColor: `${theme.accent}20`,
-          overflow: 'hidden',
+          paddingTop: 10,
         }}>
-          {/* glass shimmer */}
-          <LinearGradient
-            colors={[`${theme.accent}10`, 'transparent']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0.5 }}
-            style={{ position: 'absolute', inset: 0 }}
-            pointerEvents="none"
-          />
-
           {/* Handle */}
           <View style={{
-            width: 36, height: 4,
-            backgroundColor: `${theme.accent}30`,
-            borderRadius: 2, alignSelf: 'center',
-            marginTop: 12, marginBottom: 16,
+            width: 32, height: 4, backgroundColor: `${theme.accent}30`,
+            borderRadius: 2, alignSelf: 'center', marginBottom: 18,
           }} />
 
-          {/* User header */}
-          <View style={{
-            flexDirection: 'row', alignItems: 'center', gap: 12,
-            paddingHorizontal: 20, marginBottom: 16,
-          }}>
-            {/* Avatar */}
-            <View style={{
-              shadowColor: theme.accent, shadowOpacity: 0.4,
-              shadowRadius: 10, elevation: 5,
-            }}>
-              <Image
-                source={{ uri: user.photoURL ?? `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName ?? 'User')}` }}
-                style={{
-                  width: 50, height: 50, borderRadius: 15,
-                  borderWidth: 1.5, borderColor: theme.accent,
-                }}
-              />
-            </View>
-
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={{ color: theme.text, fontWeight: '800', fontSize: 15 }} numberOfLines={1}>
+          {/* User header — small avatar offset right, name as headline, level as subtitle */}
+          <View style={{ paddingHorizontal: 22, flexDirection: 'row', alignItems: 'flex-start', marginBottom: 16 }}>
+            <View style={{ flex: 1, paddingRight: 14 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+                <Text style={{ color: theme.text, fontWeight: '900', fontSize: 21, letterSpacing: -0.5 }} numberOfLines={1}>
                   {user.displayName}
                 </Text>
                 {user.isAdmin && (
-                  <View style={{
-                    backgroundColor: `${theme.accent}20`,
-                    paddingHorizontal: 6, paddingVertical: 2,
-                    borderRadius: 5, borderWidth: 1, borderColor: `${theme.accent}40`,
-                  }}>
-                    <Text style={{ color: theme.accent, fontSize: 8, fontWeight: '900' }}>ADMIN</Text>
-                  </View>
+                  <Text style={{ color: theme.accent, fontSize: 10, fontWeight: '900', fontStyle: 'italic' }}>admin</Text>
                 )}
               </View>
-              <Text style={{ color: theme.subtext, fontSize: 11, marginTop: 2 }}>{user.email}</Text>
+              <Text style={{ color: theme.subtext, fontSize: 11.5, marginTop: 2 }} numberOfLines={1}>
+                {user.email}
+              </Text>
+              <Text style={{ color: theme.subtext, fontSize: 12, marginTop: 8 }}>
+                Level <Text style={{ color: theme.accent, fontWeight: '800' }}>{user.level ?? 1}</Text>
+                {'  ·  '}
+                {(user.xp ?? 0).toLocaleString('id-ID')} xp
+                {'  ·  '}
+                {history.length} riwayat
+                {'  ·  '}
+                {favorit.length} favorit
+              </Text>
             </View>
 
-            <View style={{
-              alignItems: 'center',
-              backgroundColor: `${theme.accent}15`,
-              borderWidth: 1, borderColor: `${theme.accent}30`,
-              paddingHorizontal: 10, paddingVertical: 8,
-              borderRadius: 12,
-            }}>
-              <Text style={{ color: theme.accent, fontWeight: '900', fontSize: 16 }}>Lv {user.level ?? 1}</Text>
-              <Text style={{ color: theme.subtext, fontSize: 9, marginTop: 1 }}>{(user.xp ?? 0).toLocaleString()} XP</Text>
+            <View style={{ width: 46, height: 46 }}>
+              <Image
+                source={{ uri: user.photoURL ?? `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName ?? 'User')}` }}
+                style={{ width: 46, height: 46, borderRadius: 7 }}
+              />
             </View>
           </View>
 
-          {/* Tabs */}
-          <View style={{ flexDirection: 'row', paddingHorizontal: 20, gap: 8, marginBottom: 16 }}>
-            {TABS.map(t => (
-              <TouchableOpacity
-                key={t.key}
-                onPress={() => { Haptics.selectionAsync(); setTab(t.key); }}
-                style={{
-                  flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-                  gap: 4, paddingVertical: 9, borderRadius: 12,
-                  backgroundColor: tab === t.key ? theme.accent : `${theme.accent}10`,
-                  borderWidth: 1,
-                  borderColor: tab === t.key ? theme.accent : `${theme.accent}20`,
-                }}
-              >
-                <Ionicons name={t.icon as any} size={12} color={tab === t.key ? theme.bg : theme.subtext} />
-                <Text style={{ color: tab === t.key ? theme.bg : theme.subtext, fontSize: 11, fontWeight: '800' }}>{t.label}</Text>
-              </TouchableOpacity>
-            ))}
+          {/* Underline word-tabs, same language as the Library screen */}
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 16, paddingHorizontal: 22, marginBottom: 8 }}>
+            {TAB_ORDER.map(t => {
+              const active = tab === t;
+              return (
+                <TouchableOpacity key={t} onPress={() => { Haptics.selectionAsync(); setTab(t); }} activeOpacity={0.7}>
+                  <Text style={{
+                    color: active ? theme.text : theme.subtext,
+                    fontWeight: '900',
+                    fontSize: active ? 17 : 13,
+                    marginBottom: active ? 0 : 2,
+                  }}>
+                    {TAB_LABEL[t]}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
+          <View style={{
+            height: 2,
+            width: tab === 'info' ? 34 : tab === 'history' ? 50 : 48,
+            backgroundColor: theme.accent,
+            borderRadius: 1,
+            marginLeft: 22 + (tab === 'history' ? 70 : tab === 'favorit' ? 134 : 0),
+            marginBottom: 14,
+          }} />
 
-          {/* ── Info Tab ── */}
+          {/* ── Info tab ── */}
           {tab === 'info' && (
-            <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 48, gap: 12 }}>
-              {/* Mini stats */}
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                {[
-                  { label: 'History', value: history.length, icon: 'time-outline' },
-                  { label: 'Favorit', value: favorit.length, icon: 'bookmark-outline' },
-                  { label: 'Streak',  value: `${user.streak ?? 0}🔥`, icon: 'flame-outline' },
-                ].map((s, i) => (
-                  <View key={i} style={{
-                    flex: 1, backgroundColor: theme.bg, borderRadius: 12, padding: 12,
-                    alignItems: 'center', borderWidth: 1, borderColor: `${theme.accent}15`,
-                  }}>
-                    <Text style={{ color: theme.accent, fontSize: 18, fontWeight: '900' }}>{s.value}</Text>
-                    <Text style={{ color: theme.subtext, fontSize: 9, fontWeight: '700', marginTop: 2 }}>{s.label}</Text>
-                  </View>
-                ))}
-              </View>
-
+            <ScrollView contentContainerStyle={{ paddingHorizontal: 22, paddingBottom: 40 }}>
               {user.lastLoginAt && (
-                <View style={{
-                  backgroundColor: theme.bg, borderRadius: 12, padding: 14,
-                  borderWidth: 1, borderColor: `${theme.accent}15`,
-                  flexDirection: 'row', alignItems: 'center', gap: 10,
-                }}>
-                  <View style={{
-                    width: 32, height: 32, borderRadius: 9,
-                    alignItems: 'center', justifyContent: 'center',
-                    backgroundColor: `${theme.accent}15`,
-                  }}>
-                    <Ionicons name="log-in-outline" size={15} color={theme.accent} />
-                  </View>
-                  <View>
-                    <Text style={{ color: theme.subtext, fontSize: 9, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 }}>Terakhir Login</Text>
-                    <Text style={{ color: theme.text, fontSize: 12, fontWeight: '600', marginTop: 2 }}>{formatDate(user.lastLoginAt)}</Text>
-                  </View>
-                </View>
+                <Text style={{ color: theme.subtext, fontSize: 12, marginBottom: 18 }}>
+                  Terakhir login {formatDate(user.lastLoginAt)}
+                </Text>
               )}
 
-              {/* Set XP */}
-              <View style={{ gap: 6 }}>
-                <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 }}>Set XP</Text>
-                <TextInput
-                  value={xpInput}
-                  onChangeText={setXpInput}
-                  keyboardType="numeric"
-                  placeholder="Masukkan jumlah XP"
-                  placeholderTextColor={theme.subtext}
-                  style={{
-                    backgroundColor: theme.bg, color: theme.text,
-                    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13,
-                    fontSize: 15, fontWeight: '700',
-                    borderWidth: 1, borderColor: `${theme.accent}25`,
-                  }}
-                />
-                <Text style={{ color: theme.subtext, fontSize: 9, lineHeight: 14 }}>
-                  {LEVELS.map(l => `Lv${l.level}: ${l.min.toLocaleString()}`).join('  ·  ')}
-                </Text>
-              </View>
-
-              <TouchableOpacity
-                onPress={handleSetXP}
-                disabled={saving}
+              <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 8 }}>
+                Ubah XP
+              </Text>
+              <TextInput
+                value={xpInput}
+                onChangeText={setXpInput}
+                keyboardType="numeric"
+                placeholder="Jumlah XP"
+                placeholderTextColor={theme.subtext}
                 style={{
-                  backgroundColor: theme.accent,
-                  paddingVertical: 14, borderRadius: 14,
-                  alignItems: 'center',
-                  shadowColor: theme.accent, shadowOpacity: 0.4,
-                  shadowRadius: 10, elevation: 6,
+                  color: theme.text, fontSize: 16, fontWeight: '700',
+                  borderBottomWidth: 1.5, borderBottomColor: `${theme.accent}40`,
+                  paddingVertical: 8, marginBottom: 8,
                 }}
-              >
-                <Text style={{ color: theme.bg, fontWeight: '900', fontSize: 14 }}>
-                  {saving ? 'Menyimpan...' : 'Simpan XP'}
+              />
+              <Text style={{ color: theme.subtext, fontSize: 10, lineHeight: 15, marginBottom: 20 }}>
+                {LEVELS.map(l => `Lv${l.level} ${l.min.toLocaleString('id-ID')}`).join('   ')}
+              </Text>
+
+              <TouchableOpacity onPress={handleSetXP} disabled={saving} activeOpacity={0.7}>
+                <Text style={{ color: theme.accent, fontWeight: '900', fontSize: 15 }}>
+                  {saving ? 'Menyimpan…' : 'Simpan XP →'}
                 </Text>
               </TouchableOpacity>
             </ScrollView>
           )}
 
-          {/* ── History Tab ── */}
+          {/* ── History tab ── */}
           {tab === 'history' && (
             <FlatList
               data={history}
               keyExtractor={(_, i) => String(i)}
-              contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 48, gap: 8 }}
+              contentContainerStyle={{ paddingHorizontal: 22, paddingBottom: 40 }}
               ListEmptyComponent={
-                <View style={{ alignItems: 'center', paddingVertical: 48 }}>
-                  <Ionicons name="time-outline" size={36} color={`${theme.accent}40`} />
-                  <Text style={{ color: theme.subtext, marginTop: 10, fontWeight: '600', fontSize: 13 }}>
-                    {loading ? 'Memuat...' : 'Belum ada history'}
-                  </Text>
-                </View>
+                <Text style={{ color: theme.subtext, fontSize: 13, paddingVertical: 30 }}>
+                  {loading ? 'Memuat…' : 'Belum ada riwayat'}
+                </Text>
               }
               renderItem={({ item, index }) => (
                 <View style={{
                   flexDirection: 'row', alignItems: 'center', gap: 12,
-                  backgroundColor: theme.bg, borderRadius: 12, padding: 12,
-                  borderWidth: 1, borderColor: `${theme.accent}12`,
+                  paddingVertical: 10,
+                  borderTopWidth: index === 0 ? 1 : 0,
+                  borderBottomWidth: 1,
+                  borderColor: `${theme.accent}12`,
                 }}>
-                  <Text style={{ color: `${theme.accent}60`, fontSize: 10, fontWeight: '800', width: 18, textAlign: 'center' }}>{index + 1}</Text>
-                  <Image source={{ uri: item.anime?.image_poster }} style={{ width: 34, aspectRatio: 3 / 4.5, borderRadius: 7 }} contentFit="cover" />
+                  <Text style={{ color: `${theme.accent}70`, fontSize: 11, fontWeight: '900', width: 16 }}>{index + 1}</Text>
+                  <Image source={{ uri: item.anime?.image_poster }} style={{ width: 32, aspectRatio: 2 / 3, borderRadius: 5 }} />
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: theme.text, fontSize: 12, fontWeight: '600' }} numberOfLines={1}>{item.anime?.title}</Text>
-                    <Text style={{ color: theme.subtext, fontSize: 10, marginTop: 2 }}>
-                      Episode {item.episodeIndex}
-                      {item.timestamp ? `  ·  ${formatDate(item.timestamp)}` : ''}
+                    <Text style={{ color: theme.text, fontSize: 12.5, fontWeight: '600' }} numberOfLines={1}>{item.anime?.title}</Text>
+                    <Text style={{ color: theme.subtext, fontSize: 10.5, marginTop: 2 }}>
+                      Eps {item.episodeIndex}{item.timestamp ? `  ·  ${formatDate(item.timestamp)}` : ''}
                     </Text>
                   </View>
                 </View>
@@ -291,32 +226,30 @@ export function UserDetailModal({ visible, user, onClose, onXPUpdated }: Props) 
             />
           )}
 
-          {/* ── Favorit Tab ── */}
+          {/* ── Favorit tab ── */}
           {tab === 'favorit' && (
             <FlatList
               data={favorit}
               keyExtractor={(_, i) => String(i)}
-              contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 48, gap: 8 }}
+              contentContainerStyle={{ paddingHorizontal: 22, paddingBottom: 40 }}
               ListEmptyComponent={
-                <View style={{ alignItems: 'center', paddingVertical: 48 }}>
-                  <Ionicons name="bookmark-outline" size={36} color={`${theme.accent}40`} />
-                  <Text style={{ color: theme.subtext, marginTop: 10, fontWeight: '600', fontSize: 13 }}>
-                    {loading ? 'Memuat...' : 'Belum ada favorit'}
-                  </Text>
-                </View>
+                <Text style={{ color: theme.subtext, fontSize: 13, paddingVertical: 30 }}>
+                  {loading ? 'Memuat…' : 'Belum ada favorit'}
+                </Text>
               }
-              renderItem={({ item }) => (
+              renderItem={({ item, index }) => (
                 <View style={{
                   flexDirection: 'row', alignItems: 'center', gap: 12,
-                  backgroundColor: theme.bg, borderRadius: 12, padding: 12,
-                  borderWidth: 1, borderColor: `${theme.accent}12`,
+                  paddingVertical: 10,
+                  borderTopWidth: index === 0 ? 1 : 0,
+                  borderBottomWidth: 1,
+                  borderColor: `${theme.accent}12`,
                 }}>
-                  <Image source={{ uri: item.image_poster }} style={{ width: 34, aspectRatio: 3 / 4.5, borderRadius: 7 }} contentFit="cover" />
+                  <Image source={{ uri: item.image_poster }} style={{ width: 32, aspectRatio: 2 / 3, borderRadius: 5 }} />
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: theme.text, fontSize: 12, fontWeight: '600' }} numberOfLines={1}>{item.title}</Text>
-                    <Text style={{ color: theme.subtext, fontSize: 10, marginTop: 2 }}>{item.type} • {item.status}</Text>
+                    <Text style={{ color: theme.text, fontSize: 12.5, fontWeight: '600' }} numberOfLines={1}>{item.title}</Text>
+                    <Text style={{ color: theme.subtext, fontSize: 10.5, marginTop: 2 }}>{item.type} · {item.status}</Text>
                   </View>
-                  <Ionicons name="bookmark" size={13} color={theme.accent} />
                 </View>
               )}
             />
