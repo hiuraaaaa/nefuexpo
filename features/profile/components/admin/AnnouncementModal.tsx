@@ -1,32 +1,36 @@
-// AnnouncementModal.tsx — Glassmorphism
+// AnnouncementModal.tsx
+//
+// Signature: type selector is four text-chips of deliberately unequal size —
+// weighted by real-world urgency (Maintenance biggest/reddest, Info smallest/
+// quietest) instead of four identical icon tiles. List/create toggle reuses
+// the underline word-tab language. List rows are left-bordered by type color
+// at a width matching urgency, not a uniform colored left-strip.
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, Modal, TouchableOpacity, Switch, TextInput, Alert, FlatList, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import firestore from '@react-native-firebase/firestore';
 import { useTheme } from '@/hooks/theme';
 
 const TYPES = [
-  { id: 'info',        label: 'Info',        color: '#4a9eff', icon: 'information-circle-outline' },
-  { id: 'warning',     label: 'Warning',     color: '#F6CF80', icon: 'warning-outline' },
-  { id: 'promo',       label: 'Promo',       color: '#2ecc71', icon: 'gift-outline' },
-  { id: 'maintenance', label: 'Maintenance', color: '#e63946', icon: 'construct-outline' },
+  { id: 'maintenance', label: 'Maintenance', color: '#e15c5c', weight: 17, edge: 4 },
+  { id: 'warning',     label: 'Warning',     color: '#e0a93f', weight: 15, edge: 3 },
+  { id: 'promo',       label: 'Promo',       color: '#3fae6a', weight: 14, edge: 2 },
+  { id: 'info',        label: 'Info',        color: '#4a9eff', weight: 13, edge: 2 },
 ];
 
 export function AnnouncementModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const theme = useTheme();
 
-  const [title, setTitle]     = useState('');
-  const [body, setBody]       = useState('');
-  const [type, setType]       = useState('info');
+  const [title, setTitle]       = useState('');
+  const [body, setBody]         = useState('');
+  const [type, setType]         = useState('info');
   const [isActive, setIsActive] = useState(true);
-  const [ctaText, setCtaText] = useState('');
-  const [ctaUrl, setCtaUrl]   = useState('');
-  const [saving, setSaving]   = useState(false);
+  const [ctaText, setCtaText]   = useState('');
+  const [ctaUrl, setCtaUrl]     = useState('');
+  const [saving, setSaving]     = useState(false);
   const [announcements, setAnnouncements] = useState<any[]>([]);
-  const [tab, setTab]         = useState<'list' | 'create'>('list');
+  const [tab, setTab]           = useState<'list' | 'create'>('list');
 
   const loadAnnouncements = useCallback(async () => {
     const snap = await firestore().collection('announcements').orderBy('createdAt', 'desc').limit(10).get();
@@ -81,39 +85,36 @@ export function AnnouncementModal({ visible, onClose }: { visible: boolean; onCl
       <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }}>
 
         {/* Header */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 14 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <TouchableOpacity
-              onPress={onClose}
-              style={{
-                width: 36, height: 36, borderRadius: 11,
-                alignItems: 'center', justifyContent: 'center',
-                backgroundColor: theme.card,
-                borderWidth: 1, borderColor: `${theme.accent}20`,
-              }}
-            >
-              <Ionicons name="arrow-back" size={18} color={theme.text} />
+        <View style={{ paddingHorizontal: 22, paddingTop: 6, paddingBottom: 18 }}>
+          <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8 }} style={{ marginBottom: 14 }}>
+            <Text style={{ color: theme.subtext, fontSize: 13, fontWeight: '700' }}>‹ Kembali</Text>
+          </TouchableOpacity>
+
+          <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '700', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 4 }}>
+            Sistem
+          </Text>
+          <Text style={{ color: theme.text, fontWeight: '900', fontSize: 24, letterSpacing: -0.6 }}>
+            Announcement
+          </Text>
+
+          {/* List / Buat underline word-tabs */}
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 16, marginTop: 18 }}>
+            <TouchableOpacity onPress={() => setTab('list')} activeOpacity={0.7}>
+              <Text style={{ color: tab === 'list' ? theme.text : theme.subtext, fontWeight: '900', fontSize: tab === 'list' ? 17 : 13 }}>
+                Riwayat
+              </Text>
             </TouchableOpacity>
-
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: theme.subtext, fontSize: 9, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase' }}>Sistem</Text>
-              <Text style={{ color: theme.text, fontSize: 18, fontWeight: '900', letterSpacing: -0.3 }}>Announcement</Text>
-            </View>
-
-            <TouchableOpacity
-              onPress={() => setTab(tab === 'list' ? 'create' : 'list')}
-              style={{
-                flexDirection: 'row', alignItems: 'center', gap: 5,
-                backgroundColor: theme.accent,
-                paddingHorizontal: 12, paddingVertical: 8,
-                borderRadius: 10,
-                shadowColor: theme.accent, shadowOpacity: 0.4, shadowRadius: 8, elevation: 4,
-              }}
-            >
-              <Ionicons name={tab === 'list' ? 'add' : 'list'} size={14} color={theme.bg} />
-              <Text style={{ color: theme.bg, fontSize: 11, fontWeight: '900' }}>{tab === 'list' ? 'Buat' : 'List'}</Text>
+            <TouchableOpacity onPress={() => setTab('create')} activeOpacity={0.7}>
+              <Text style={{ color: tab === 'create' ? theme.text : theme.subtext, fontWeight: '900', fontSize: tab === 'create' ? 17 : 13 }}>
+                Buat baru
+              </Text>
             </TouchableOpacity>
           </View>
+          <View style={{
+            height: 2, width: tab === 'list' ? 52 : 70,
+            backgroundColor: theme.accent, borderRadius: 1,
+            marginLeft: tab === 'create' ? 68 : 0, marginTop: 6,
+          }} />
         </View>
 
         {/* List */}
@@ -121,171 +122,131 @@ export function AnnouncementModal({ visible, onClose }: { visible: boolean; onCl
           <FlatList
             data={announcements}
             keyExtractor={item => item.id}
-            contentContainerStyle={{ paddingHorizontal: 16, gap: 10, paddingBottom: 48 }}
+            contentContainerStyle={{ paddingHorizontal: 22, paddingBottom: 48 }}
             ListEmptyComponent={
-              <View style={{ alignItems: 'center', paddingVertical: 64 }}>
-                <View style={{
-                  width: 64, height: 64, borderRadius: 20,
-                  alignItems: 'center', justifyContent: 'center',
-                  backgroundColor: `${theme.accent}12`,
-                  borderWidth: 1, borderColor: `${theme.accent}20`,
-                  marginBottom: 12,
-                }}>
-                  <Ionicons name="megaphone-outline" size={28} color={`${theme.accent}60`} />
-                </View>
-                <Text style={{ color: theme.subtext, fontWeight: '600', fontSize: 13 }}>Belum ada announcement</Text>
-              </View>
+              <Text style={{ color: theme.subtext, fontSize: 13, paddingVertical: 30 }}>
+                Belum ada announcement
+              </Text>
             }
-            renderItem={({ item }) => {
-              const t = TYPES.find(x => x.id === item.type) ?? TYPES[0];
+            renderItem={({ item, index }) => {
+              const t = TYPES.find(x => x.id === item.type) ?? TYPES[3];
               return (
                 <View style={{
-                  backgroundColor: theme.card, borderRadius: 16, padding: 14,
-                  borderWidth: 1, borderColor: `${t.color}25`,
-                  borderLeftWidth: 3, borderLeftColor: t.color,
-                  overflow: 'hidden',
+                  paddingVertical: 13,
+                  borderTopWidth: index === 0 ? 1 : 0,
+                  borderBottomWidth: 1,
+                  borderColor: `${theme.accent}12`,
+                  borderLeftWidth: t.edge,
+                  borderLeftColor: t.color,
+                  paddingLeft: 12,
                 }}>
-                  <LinearGradient
-                    colors={[`${t.color}08`, 'transparent']}
-                    style={{ position: 'absolute', inset: 0 }}
-                    pointerEvents="none"
-                  />
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                    <View style={{ backgroundColor: `${t.color}18`, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: `${t.color}30` }}>
-                      <Text style={{ color: t.color, fontSize: 9, fontWeight: '900', textTransform: 'uppercase' }}>{t.label}</Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: item.isActive ? '#2ecc71' : theme.subtext }} />
-                      <Text style={{ color: item.isActive ? '#2ecc71' : theme.subtext, fontSize: 9, fontWeight: '700' }}>
-                        {item.isActive ? 'Aktif' : 'Nonaktif'}
-                      </Text>
-                    </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
+                    <Text style={{ color: t.color, fontSize: 10.5, fontWeight: '900', textTransform: 'uppercase' }}>{t.label}</Text>
+                    <Text style={{ color: item.isActive ? '#3fae6a' : theme.subtext, fontSize: 10, fontWeight: '700' }}>
+                      {item.isActive ? 'aktif' : 'nonaktif'}
+                    </Text>
                     <View style={{ flex: 1 }} />
-                    <TouchableOpacity onPress={() => handleToggle(item.id, item.isActive)} style={{ padding: 4 }}>
-                      <Ionicons name={item.isActive ? 'pause-circle-outline' : 'play-circle-outline'} size={20} color={theme.accent} />
+                    <TouchableOpacity onPress={() => handleToggle(item.id, item.isActive)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                      <Text style={{ color: theme.accent, fontSize: 11, fontWeight: '700' }}>
+                        {item.isActive ? 'pause' : 'aktifkan'}
+                      </Text>
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={() => handleDelete(item.id)} style={{ padding: 4 }}>
-                      <Ionicons name="trash-outline" size={18} color="#e63946" />
+                    <TouchableOpacity onPress={() => handleDelete(item.id)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }} style={{ marginLeft: 14 }}>
+                      <Text style={{ color: '#e15c5c', fontSize: 11, fontWeight: '700' }}>hapus</Text>
                     </TouchableOpacity>
                   </View>
-                  <Text style={{ color: theme.text, fontWeight: '800', fontSize: 13, marginBottom: 4 }}>{item.title}</Text>
-                  <Text style={{ color: theme.subtext, fontSize: 11, lineHeight: 16 }} numberOfLines={2}>{item.body}</Text>
+                  <Text style={{ color: theme.text, fontWeight: '800', fontSize: 13.5 }}>{item.title}</Text>
+                  <Text style={{ color: theme.subtext, fontSize: 11.5, marginTop: 2, lineHeight: 16 }} numberOfLines={2}>{item.body}</Text>
                 </View>
               );
             }}
           />
         ) : (
-          <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 60 }}>
+          <ScrollView contentContainerStyle={{ paddingHorizontal: 22, paddingBottom: 60 }}>
 
-            {/* Type selector */}
-            <View>
-              <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 10 }}>Tipe</Text>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                {TYPES.map(t => (
-                  <TouchableOpacity
-                    key={t.id}
-                    onPress={() => { Haptics.selectionAsync(); setType(t.id); }}
-                    style={{
-                      flex: 1, paddingVertical: 11, borderRadius: 12,
-                      alignItems: 'center', gap: 3,
-                      backgroundColor: type === t.id ? `${t.color}18` : theme.card,
-                      borderWidth: 1, borderColor: type === t.id ? t.color : `${theme.accent}15`,
-                    }}
-                  >
-                    <Ionicons name={t.icon as any} size={15} color={type === t.id ? t.color : theme.subtext} />
-                    <Text style={{ color: type === t.id ? t.color : theme.subtext, fontSize: 9, fontWeight: '800' }}>{t.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+            {/* Type chips — unequal size by urgency, wrap naturally instead of a 4-grid */}
+            <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 10 }}>
+              Tipe
+            </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginBottom: 24, alignItems: 'baseline' }}>
+              {TYPES.map(t => (
+                <TouchableOpacity key={t.id} onPress={() => { Haptics.selectionAsync(); setType(t.id); }} activeOpacity={0.7}>
+                  <Text style={{
+                    color: type === t.id ? t.color : theme.subtext,
+                    fontWeight: '900',
+                    fontSize: type === t.id ? t.weight + 3 : t.weight - 2,
+                  }}>
+                    {t.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
 
-            {/* Judul */}
-            <View style={{ gap: 8 }}>
-              <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.5 }}>Judul</Text>
-              <TextInput
-                value={title} onChangeText={setTitle}
-                placeholder="Judul announcement..."
-                placeholderTextColor={theme.subtext}
-                style={{
-                  backgroundColor: theme.card, color: theme.text,
-                  borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13,
-                  fontSize: 13, borderWidth: 1, borderColor: `${theme.accent}20`,
-                }}
-              />
-            </View>
+            <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 8 }}>
+              Judul
+            </Text>
+            <TextInput
+              value={title} onChangeText={setTitle}
+              placeholder="Judul announcement…" placeholderTextColor={theme.subtext}
+              style={{
+                color: theme.text, fontSize: 15, fontWeight: '700',
+                borderBottomWidth: 1.5, borderBottomColor: `${theme.accent}30`,
+                paddingVertical: 9, marginBottom: 22,
+              }}
+            />
 
-            {/* Pesan */}
-            <View style={{ gap: 8 }}>
-              <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.5 }}>Pesan</Text>
-              <TextInput
-                value={body} onChangeText={setBody}
-                placeholder="Isi pesan..." placeholderTextColor={theme.subtext}
-                multiline numberOfLines={4}
-                style={{
-                  backgroundColor: theme.card, color: theme.text,
-                  borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13,
-                  fontSize: 13, borderWidth: 1, borderColor: `${theme.accent}20`,
-                  textAlignVertical: 'top', minHeight: 100,
-                }}
-              />
-            </View>
+            <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 8 }}>
+              Pesan
+            </Text>
+            <TextInput
+              value={body} onChangeText={setBody}
+              placeholder="Isi pesan…" placeholderTextColor={theme.subtext}
+              multiline numberOfLines={4}
+              style={{
+                color: theme.text, fontSize: 13,
+                borderBottomWidth: 1.5, borderBottomColor: `${theme.accent}30`,
+                paddingVertical: 9, marginBottom: 22, minHeight: 80, textAlignVertical: 'top',
+              }}
+            />
 
-            {/* CTA */}
-            <View style={{ gap: 8 }}>
-              <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.5 }}>Tombol CTA (Opsional)</Text>
-              <TextInput
-                value={ctaText} onChangeText={setCtaText}
-                placeholder="Teks tombol, misal: Update Sekarang"
-                placeholderTextColor={theme.subtext}
-                style={{
-                  backgroundColor: theme.card, color: theme.text,
-                  borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13,
-                  fontSize: 13, borderWidth: 1, borderColor: `${theme.accent}20`,
-                }}
-              />
-              <TextInput
-                value={ctaUrl} onChangeText={setCtaUrl}
-                placeholder="URL tujuan, misal: https://..."
-                placeholderTextColor={theme.subtext}
-                autoCapitalize="none"
-                style={{
-                  backgroundColor: theme.card, color: theme.text,
-                  borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13,
-                  fontSize: 13, borderWidth: 1, borderColor: `${theme.accent}20`,
-                }}
-              />
-            </View>
+            <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 8 }}>
+              Tombol CTA (opsional)
+            </Text>
+            <TextInput
+              value={ctaText} onChangeText={setCtaText}
+              placeholder="Teks tombol" placeholderTextColor={theme.subtext}
+              style={{
+                color: theme.text, fontSize: 13,
+                borderBottomWidth: 1.5, borderBottomColor: `${theme.accent}30`,
+                paddingVertical: 9, marginBottom: 14,
+              }}
+            />
+            <TextInput
+              value={ctaUrl} onChangeText={setCtaUrl}
+              placeholder="URL tujuan" placeholderTextColor={theme.subtext}
+              autoCapitalize="none"
+              style={{
+                color: theme.text, fontSize: 13,
+                borderBottomWidth: 1.5, borderBottomColor: `${theme.accent}30`,
+                paddingVertical: 9, marginBottom: 22,
+              }}
+            />
 
-            {/* Active toggle */}
-            <View style={{
-              flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-              backgroundColor: theme.card, borderRadius: 14, padding: 14,
-              borderWidth: 1, borderColor: `${theme.accent}20`,
-            }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
               <View>
-                <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13 }}>Langsung Aktif</Text>
-                <Text style={{ color: theme.subtext, fontSize: 10, marginTop: 2 }}>Tampilkan ke user sekarang</Text>
+                <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13.5 }}>Langsung aktif</Text>
+                <Text style={{ color: theme.subtext, fontSize: 11, marginTop: 1 }}>Tampilkan ke user sekarang</Text>
               </View>
               <Switch
                 value={isActive} onValueChange={setIsActive}
-                trackColor={{ false: `${theme.accent}20`, true: `${theme.accent}80` }}
-                thumbColor={isActive ? theme.accent : theme.subtext}
+                trackColor={{ false: `${theme.accent}25`, true: theme.accent }}
+                thumbColor={theme.bg}
               />
             </View>
 
-            {/* Submit */}
-            <TouchableOpacity
-              onPress={handleSave} disabled={saving}
-              style={{
-                backgroundColor: selectedType.color,
-                paddingVertical: 15, borderRadius: 14,
-                alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8,
-                shadowColor: selectedType.color, shadowOpacity: 0.5, shadowRadius: 12, elevation: 6,
-              }}
-            >
-              <Ionicons name="megaphone" size={16} color="#fff" />
-              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 14 }}>
-                {saving ? 'Menyimpan...' : 'Kirim Announcement'}
+            <TouchableOpacity onPress={handleSave} disabled={saving} activeOpacity={0.7}>
+              <Text style={{ color: selectedType.color, fontWeight: '900', fontSize: 18 }}>
+                {saving ? 'Menyimpan…' : 'Kirim announcement →'}
               </Text>
             </TouchableOpacity>
           </ScrollView>
