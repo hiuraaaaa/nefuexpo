@@ -122,6 +122,23 @@ export default function ProfileScreen() {
               onThemePress={() => setShowTheme(true)}
               onTentangPress={() => setShowTentang(true)}
             />
+
+            {/* Footer: oversized faded wordmark instead of trailing into bare
+                empty space — gives the screen a deliberate ending */}
+            <View style={{ paddingHorizontal: 22, marginTop: 48 }}>
+              <Text style={{
+                color: `${theme.accent}12`,
+                fontSize: 54,
+                fontWeight: '900',
+                letterSpacing: -2,
+                lineHeight: 54,
+              }}>
+                NEFUSOFT
+              </Text>
+              <Text style={{ color: theme.subtext, fontSize: 10.5, marginTop: 6, fontWeight: '600' }}>
+                v1.0.0 · dibuat dengan 🔥
+              </Text>
+            </View>
           </>
         ) : (
           <View style={{ paddingHorizontal: 22, paddingTop: 24 }}>
