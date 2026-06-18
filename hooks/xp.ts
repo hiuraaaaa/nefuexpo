@@ -31,6 +31,17 @@ export const LEVELS: LevelEntry[] = [
   { level: 10, min: 5500, title: 'Kage no Ou' },
 ];
 
+// Hard ceiling — nobody (including admin XP edits) should be able to push XP
+// past the top of the level table. Without this, a typo or a deliberately
+// huge number in the admin "Set XP" field has nowhere it gets clamped, and
+// XP can end up as something like 500,270,000,310 with no level above it.
+export const MAX_XP = LEVELS[LEVELS.length - 1].min;
+
+export function clampXP(xp: number): number {
+  if (!Number.isFinite(xp) || xp < 0) return 0;
+  return Math.min(Math.round(xp), MAX_XP);
+}
+
 // ─── getLevelData ─────────────────────────────────────────────────────────────
 export function getLevelData(xp: number): {
   current: LevelEntry;
@@ -94,8 +105,9 @@ export const xpStorage = {
 
   set: (data: XPData): void => {
     try {
-      storageMain.set(XP_KEY, JSON.stringify(data));
-      syncXPToFirestore(data); // ← sync ke Firestore setiap save
+      const safe: XPData = { ...data, xp: clampXP(data.xp) };
+      storageMain.set(XP_KEY, JSON.stringify(safe));
+      syncXPToFirestore(safe); // ← sync ke Firestore setiap save
     } catch {}
   },
 
@@ -109,7 +121,7 @@ export const xpStorage = {
       if (!data) return null;
 
       const remote: XPData = {
-        xp:            typeof data.xp === 'number'            ? data.xp            : 0,
+        xp:            clampXP(typeof data.xp === 'number' ? data.xp : 0),
         level:         typeof data.level === 'number'         ? data.level         : 1,
         streak:        typeof data.streak === 'number'        ? data.streak        : 0,
         lastWatchDate: typeof data.lastWatchDate === 'string' ? data.lastWatchDate : '',
@@ -143,7 +155,7 @@ export const xpStorage = {
       newStreak = data.lastWatchDate === yStr ? data.streak + 1 : 1;
     }
 
-    const newXP = data.xp + actualAdd;
+    const newXP = clampXP(data.xp + actualAdd);
     const { current } = getLevelData(newXP);
     const updated: XPData = {
       xp:            newXP,
