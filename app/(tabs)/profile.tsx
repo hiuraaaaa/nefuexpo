@@ -1,30 +1,26 @@
-// profile.tsx — Modern Glassmorphism Profile Screen
+// app/(tabs)/profile.tsx
+//
+// Header is a left-aligned masthead, not a centered title with a symmetric
+// admin pill on the right. Logged-out state mirrors the same left-aligned,
+// no-icon-circle language as the rest of the screen.
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View, Text, TouchableOpacity, ScrollView, Alert,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import { View, Text, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import firestore from '@react-native-firebase/firestore';
 
 import { useTheme } from '@/hooks/theme';
 import { signInWithGoogle, isAdmin, onAuthStateChanged } from '@/hooks/auth';
 import { xpStorage, XPData } from '@/hooks/xp';
-import { historyStorage, favoritStorage, storageMain, syncFromFirestore } from '@/hooks/storage/storage';
-import { HistoryItem, Anime } from '@/types';
+import { storageMain, syncFromFirestore } from '@/hooks/storage/storage';
 
 import { UserCard }         from '@/features/profile/components/UserCard';
 import { XPCard }           from '@/features/profile/components/XPCard';
-import { LibraryCard }      from '@/features/profile/components/LibraryCard';
 import { SettingsCard }     from '@/features/profile/components/SettingsCard';
 import { ThemePickerModal } from '@/features/profile/components/ThemePickerModal';
 import { TentangModal }     from '@/features/profile/components/TentangModal';
 import { AdminPanel }       from '@/features/profile/components/admin/AdminPanel';
-import { SectionLabel, Card, SettingRow } from '@/features/profile/components/shared';
 
 const PIP_KEY  = 'nefusoft_pip';
 const INFO_KEY = 'nefusoft_info';
@@ -35,8 +31,6 @@ export default function ProfileScreen() {
   const [authReady, setAuthReady] = useState(false);
   const [user, setUser]           = useState<any>(null);
   const [xpData, setXpData]       = useState<XPData>({ xp: 0, level: 1, streak: 0, lastWatchDate: '', _todayXP: 0 });
-  const [history, setHistory]     = useState<HistoryItem[]>([]);
-  const [favorites, setFavorites] = useState<Anime[]>([]);
   const [loading, setLoading]     = useState(false);
   const [admin, setAdmin]         = useState(false);
   const [allUsers, setAllUsers]   = useState<any[]>([]);
@@ -60,8 +54,6 @@ export default function ProfileScreen() {
           await syncFromFirestore();
           const synced = await xpStorage.syncFromFirestore();
           if (synced) setXpData(synced);
-          setHistory(historyStorage.getAll()?.slice(0, 5) ?? []);
-          setFavorites(favoritStorage.getAll() ?? []);
         } catch {}
       }
     });
@@ -70,13 +62,7 @@ export default function ProfileScreen() {
 
   useFocusEffect(useCallback(() => {
     try { setXpData(xpStorage.get()); } catch {}
-    try { setHistory(historyStorage.getAll()?.slice(0, 5) ?? []); } catch {}
   }, []));
-
-  useEffect(() => {
-    if (!user) { setFavorites([]); return; }
-    try { setFavorites(favoritStorage.getAll() ?? []); } catch {}
-  }, [user]);
 
   const handleLogin = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -108,163 +94,81 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }} edges={['top']}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 120 }}
-      >
-
-        {/* ── Header ── */}
-        <View style={{
-          paddingHorizontal: 20,
-          paddingTop: 10,
-          paddingBottom: 14,
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}>
-          <View>
-            <Text style={{
-              color: theme.subtext,
-              fontSize: 10,
-              fontWeight: '700',
-              letterSpacing: 2.5,
-              textTransform: 'uppercase',
-              marginBottom: 2,
-            }}>
-              Akun
-            </Text>
-            <Text style={{
-              color: theme.text,
-              fontWeight: '900',
-              fontSize: 26,
-              letterSpacing: -0.5,
-            }}>
-              Profil
-            </Text>
-          </View>
-
-          {admin && (
-            <TouchableOpacity
-              onPress={openAdmin}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 5,
-                backgroundColor: `${theme.accent}20`,
-                borderWidth: 1,
-                borderColor: `${theme.accent}40`,
-                paddingHorizontal: 12,
-                paddingVertical: 7,
-                borderRadius: 12,
-              }}
-            >
-              <Ionicons name="shield" size={12} color={theme.accent} />
-              <Text style={{ color: theme.accent, fontSize: 11, fontWeight: '800' }}>Admin</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* ── Thin accent line under header ── */}
-        <View style={{
-          height: 1,
-          marginHorizontal: 20,
-          marginBottom: 12,
-          backgroundColor: `${theme.accent}15`,
-          borderRadius: 1,
-        }} />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
 
         {user ? (
-          <Animated.View entering={FadeIn.duration(300)}>
+          <>
             <UserCard user={user} admin={admin} xpData={xpData} />
             <XPCard xpData={xpData} />
-            <LibraryCard favorites={favorites} history={history} />
+
+            {admin && (
+              <View style={{ paddingHorizontal: 22, marginBottom: 26 }}>
+                <TouchableOpacity
+                  onPress={openAdmin}
+                  style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}
+                  hitSlop={{ top: 6, bottom: 6 }}
+                >
+                  <Text style={{ color: theme.text, fontWeight: '800', fontSize: 14 }}>
+                    Panel admin
+                  </Text>
+                  <Text style={{ color: theme.subtext, fontSize: 16, fontWeight: '300' }}>→</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
             <SettingsCard
               pip={pip} info={info}
               setPip={setPip} setInfo={setInfo}
               onThemePress={() => setShowTheme(true)}
               onTentangPress={() => setShowTentang(true)}
             />
-          </Animated.View>
+          </>
         ) : (
-          <>
-            {/* Login card */}
-            <Animated.View
-              entering={FadeInDown.delay(60).springify()}
+          <View style={{ paddingHorizontal: 22, paddingTop: 24 }}>
+            <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '700', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 6 }}>
+              Akun
+            </Text>
+            <Text style={{ color: theme.text, fontWeight: '900', fontSize: 27, letterSpacing: -0.7, marginBottom: 8 }}>
+              Belum login
+            </Text>
+            <Text style={{ color: theme.subtext, fontSize: 13, lineHeight: 19, maxWidth: 280, marginBottom: 22 }}>
+              Login untuk menyimpan progres XP, riwayat tontonan, dan daftar favoritmu.
+            </Text>
+
+            <TouchableOpacity
+              onPress={handleLogin}
+              disabled={loading}
               style={{
-                marginHorizontal: 16,
-                marginBottom: 12,
-                borderRadius: 20,
-                overflow: 'hidden',
-                borderWidth: 1,
-                borderColor: `${theme.accent}25`,
-                backgroundColor: theme.card,
+                alignSelf: 'flex-start',
+                borderBottomWidth: 2,
+                borderBottomColor: theme.accent,
+                paddingBottom: 5,
               }}
             >
-              <LinearGradient
-                colors={[`${theme.accent}18`, 'transparent', `${theme.accent}10`]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={{ position: 'absolute', inset: 0 }}
-              />
-              <View style={{ padding: 32, alignItems: 'center', gap: 8 }}>
-                <View style={{
-                  width: 72,
-                  height: 72,
-                  borderRadius: 36,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: `${theme.accent}15`,
-                  borderWidth: 1,
-                  borderColor: `${theme.accent}30`,
-                  marginBottom: 4,
-                }}>
-                  <Ionicons name="person-outline" size={32} color={theme.accent} />
-                </View>
-                <Text style={{ color: theme.text, fontSize: 18, fontWeight: '800' }}>
-                  Belum Login
-                </Text>
-                <Text style={{ color: theme.subtext, fontSize: 12, textAlign: 'center' }}>
-                  Login untuk simpan history & XP kamu
-                </Text>
-                <TouchableOpacity
-                  onPress={handleLogin}
-                  disabled={loading}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 8,
-                    backgroundColor: theme.accent,
-                    paddingHorizontal: 24,
-                    paddingVertical: 12,
-                    borderRadius: 14,
-                    marginTop: 8,
-                    shadowColor: theme.accent,
-                    shadowOpacity: 0.4,
-                    shadowRadius: 12,
-                    elevation: 6,
-                  }}
-                >
-                  <Ionicons name="logo-google" size={16} color={theme.bg} />
-                  <Text style={{ color: theme.bg, fontWeight: '800', fontSize: 14 }}>
-                    {loading ? 'Memuat...' : 'Login dengan Google'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </Animated.View>
+              <Text style={{ color: theme.text, fontWeight: '800', fontSize: 15 }}>
+                {loading ? 'Memuat…' : 'Login dengan Google →'}
+              </Text>
+            </TouchableOpacity>
 
-            <Animated.View entering={FadeInDown.delay(120).springify()}>
-              <SectionLabel label="Tentang" />
-              <Card>
-                <SettingRow
-                  icon="information-circle-outline"
-                  label="Tentang Aplikasi"
-                  subtitle="Versi, kebijakan privasi, & lainnya"
-                  last
-                  onPress={() => { Haptics.selectionAsync(); setShowTentang(true); }}
-                />
-              </Card>
-            </Animated.View>
-          </>
+            <View style={{ marginTop: 40 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
+                <Text style={{ color: `${theme.accent}90`, fontSize: 11, fontWeight: '900', fontStyle: 'italic' }}>01</Text>
+                <Text style={{ color: theme.subtext, fontSize: 11, fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase' }}>
+                  Tentang
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => { Haptics.selectionAsync(); setShowTentang(true); }}
+                style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14 }}
+              >
+                <View style={{ flex: 1, paddingRight: 12 }}>
+                  <Text style={{ color: theme.text, fontSize: 14, fontWeight: '600' }}>Tentang aplikasi</Text>
+                  <Text style={{ color: theme.subtext, fontSize: 11, marginTop: 2 }}>Versi, kebijakan privasi & lainnya</Text>
+                </View>
+                <Text style={{ color: theme.subtext, fontSize: 16, fontWeight: '300' }}>›</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         )}
 
       </ScrollView>
