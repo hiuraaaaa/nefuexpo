@@ -1,14 +1,17 @@
-// MaintenanceModal.tsx — Glassmorphism
+// MaintenanceModal.tsx
+//
+// Signature: no icon-in-rounded-square header, no gradient shimmer. The
+// status line is set as plain typeset text with a colored dot, and the
+// switch sits inline with the title the way a real settings list reads —
+// not floated to one side of a symmetric row.
 import React, { useState, useEffect } from 'react';
 import { View, Text, Modal, TouchableOpacity, Switch, TextInput, Alert } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import firestore from '@react-native-firebase/firestore';
 import { useTheme } from '@/hooks/theme';
 
-const DANGER = '#e63946';
+const DANGER = '#e15c5c';
 
 export function MaintenanceModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const theme = useTheme();
@@ -47,95 +50,65 @@ export function MaintenanceModal({ visible, onClose }: { visible: boolean; onClo
       <BlurView intensity={40} tint="dark" style={{ flex: 1, justifyContent: 'flex-end' }}>
         <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
         <View style={{
-          backgroundColor: theme.card,
-          borderTopLeftRadius: 28, borderTopRightRadius: 28,
-          padding: 24, paddingBottom: 48,
-          borderWidth: 1, borderColor: `${DANGER}25`,
-          overflow: 'hidden',
+          backgroundColor: theme.bg,
+          borderTopLeftRadius: 22, borderTopRightRadius: 22,
+          padding: 24, paddingBottom: 44,
         }}>
-          {/* Danger glass shimmer */}
-          <LinearGradient
-            colors={[`${DANGER}10`, 'transparent']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={{ position: 'absolute', inset: 0 }}
-            pointerEvents="none"
-          />
-
-          {/* Handle */}
           <View style={{
-            width: 36, height: 4, borderRadius: 2,
-            backgroundColor: `${DANGER}30`,
-            alignSelf: 'center', marginBottom: 20,
+            width: 32, height: 4, backgroundColor: `${DANGER}30`,
+            borderRadius: 2, alignSelf: 'center', marginBottom: 22,
           }} />
 
-          {/* Title row */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-            <View style={{
-              width: 42, height: 42, borderRadius: 13,
-              alignItems: 'center', justifyContent: 'center',
-              backgroundColor: `${DANGER}18`,
-              borderWidth: 1, borderColor: `${DANGER}30`,
-            }}>
-              <Ionicons name="construct-outline" size={20} color={DANGER} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: theme.text, fontWeight: '900', fontSize: 16 }}>Mode Maintenance</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 }}>
-                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: isActive ? DANGER : '#2ecc71' }} />
-                <Text style={{ color: isActive ? DANGER : '#2ecc71', fontSize: 10, fontWeight: '700' }}>
-                  {isActive ? 'Aktif — user tidak bisa akses' : 'Nonaktif'}
-                </Text>
-              </View>
-            </View>
+          {/* Title + switch sit inline, status as plain text + dot below */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+            <Text style={{ color: theme.text, fontWeight: '900', fontSize: 22, letterSpacing: -0.5 }}>
+              Maintenance
+            </Text>
             <Switch
               value={isActive}
               onValueChange={val => { Haptics.selectionAsync(); setIsActive(val); }}
-              trackColor={{ false: `${theme.accent}20`, true: `${DANGER}70` }}
-              thumbColor={isActive ? DANGER : theme.subtext}
+              trackColor={{ false: `${theme.accent}25`, true: DANGER }}
+              thumbColor={theme.bg}
             />
           </View>
 
-          {/* Pesan */}
-          <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 8 }}>Pesan</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 26 }}>
+            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: isActive ? DANGER : '#3fae6a' }} />
+            <Text style={{ color: isActive ? DANGER : theme.subtext, fontSize: 12.5, fontWeight: '700' }}>
+              {isActive ? 'Aktif — user tidak bisa mengakses aplikasi' : 'Nonaktif, semua user bisa akses normal'}
+            </Text>
+          </View>
+
+          <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 8 }}>
+            Pesan untuk user
+          </Text>
           <TextInput
             value={message} onChangeText={setMessage}
-            placeholder="Pesan untuk user..." placeholderTextColor={theme.subtext}
+            placeholder="Sedang ada perbaikan sistem…" placeholderTextColor={theme.subtext}
             multiline numberOfLines={3}
             style={{
-              backgroundColor: theme.bg, color: theme.text,
-              borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
-              fontSize: 13, borderWidth: 1, borderColor: `${DANGER}20`,
-              marginBottom: 14, textAlignVertical: 'top', minHeight: 80,
+              color: theme.text, fontSize: 13,
+              borderBottomWidth: 1.5, borderBottomColor: `${DANGER}30`,
+              paddingVertical: 9, marginBottom: 20, minHeight: 70, textAlignVertical: 'top',
             }}
           />
 
-          {/* Estimasi */}
-          <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 8 }}>Estimasi Selesai</Text>
+          <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 8 }}>
+            Estimasi selesai
+          </Text>
           <TextInput
             value={estimasi} onChangeText={setEstimasi}
             placeholder="Contoh: 14:00 WIB" placeholderTextColor={theme.subtext}
             style={{
-              backgroundColor: theme.bg, color: theme.text,
-              borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
-              fontSize: 13, borderWidth: 1, borderColor: `${DANGER}20`,
-              marginBottom: 20,
+              color: theme.text, fontSize: 13,
+              borderBottomWidth: 1.5, borderBottomColor: `${DANGER}30`,
+              paddingVertical: 9, marginBottom: 28,
             }}
           />
 
-          {/* Save */}
-          <TouchableOpacity
-            onPress={handleSave} disabled={saving}
-            style={{
-              backgroundColor: isActive ? DANGER : theme.accent,
-              paddingVertical: 15, borderRadius: 14,
-              alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8,
-              shadowColor: isActive ? DANGER : theme.accent,
-              shadowOpacity: 0.5, shadowRadius: 12, elevation: 6,
-            }}
-          >
-            <Ionicons name={isActive ? 'construct' : 'checkmark-circle'} size={16} color="#fff" />
-            <Text style={{ color: '#fff', fontWeight: '900', fontSize: 14 }}>
-              {saving ? 'Menyimpan...' : 'Simpan'}
+          <TouchableOpacity onPress={handleSave} disabled={saving} activeOpacity={0.7}>
+            <Text style={{ color: isActive ? DANGER : theme.accent, fontWeight: '900', fontSize: 17 }}>
+              {saving ? 'Menyimpan…' : 'Simpan perubahan →'}
             </Text>
           </TouchableOpacity>
         </View>
