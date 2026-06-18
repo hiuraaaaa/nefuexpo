@@ -1,20 +1,23 @@
 // AdminPanel.tsx
 //
-// Signature: stats read as a sentence ("142 user, 38 aktif, 3 admin") not
-// three identical icon-tile cards. Quick actions are two stacked text-links
-// of unequal size/weight (danger action bigger and red, the other quieter),
-// not a row of icon tiles. The user list is a directory/log: name+email
-// left, level as a plain right-aligned number, hairline divider between
-// rows — no per-row card, no rounded-pill level badge, no glow shadow.
+// v2 — adds visual weight that v1 was missing on real devices: a tinted wash
+// behind the header (matches the Profile screen), three colored numeral
+// stats instead of one flat sentence, a tinted danger strip behind the
+// Maintenance action so it reads as clickable/important, level numbers in
+// a small filled chip instead of bare text, and a footer wordmark so the
+// screen doesn't trail into dead empty space when the user list is short.
 import React, { useState } from 'react';
 import { View, Text, Modal, TouchableOpacity, FlatList } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/hooks/theme';
 import { MaintenanceModal }  from './MaintenanceModal';
 import { AnnouncementModal } from './AnnouncementModal';
 import { UserDetailModal }   from './UserDetailModal';
+
+const DANGER = '#e15c5c';
 
 interface Props {
   visible:  boolean;
@@ -38,8 +41,8 @@ export function AdminPanel({ visible, onClose, allUsers: initialUsers, loading }
     setAllUsers(prev => prev.map(u => u.id === uid ? { ...u, xp, level } : u));
   };
 
-  const active7d    = allUsers.filter(u => Date.now() - (u.lastLoginAt ?? 0) < 7 * 24 * 60 * 60 * 1000).length;
-  const adminCount  = allUsers.filter(u => u.isAdmin).length;
+  const active7d   = allUsers.filter(u => Date.now() - (u.lastLoginAt ?? 0) < 7 * 24 * 60 * 60 * 1000).length;
+  const adminCount = allUsers.filter(u => u.isAdmin).length;
 
   const openMaintenance  = () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setShowMaintenance(true); };
   const openAnnouncement = () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setShowAnnouncement(true); };
@@ -49,25 +52,45 @@ export function AdminPanel({ visible, onClose, allUsers: initialUsers, loading }
       <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }}>
 
-          {/* ── Header: back as text, title left, no symmetric badge on the right ── */}
-          <View style={{ paddingHorizontal: 22, paddingTop: 6, paddingBottom: 18 }}>
-            <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8 }} style={{ marginBottom: 14 }}>
-              <Text style={{ color: theme.subtext, fontSize: 13, fontWeight: '700' }}>‹ Kembali</Text>
-            </TouchableOpacity>
+          {/* ── Header with tinted wash, matches Profile screen language ── */}
+          <View>
+            <LinearGradient
+              colors={[`${theme.accent}1c`, `${theme.accent}00`]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0.9, y: 1 }}
+              style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 200 }}
+              pointerEvents="none"
+            />
 
-            <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '700', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 4 }}>
-              Khusus admin
-            </Text>
-            <Text style={{ color: theme.text, fontWeight: '900', fontSize: 27, letterSpacing: -0.7 }}>
-              Dashboard
-            </Text>
+            <View style={{ paddingHorizontal: 22, paddingTop: 6, paddingBottom: 4 }}>
+              <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8 }} style={{ marginBottom: 16 }}>
+                <Text style={{ color: theme.subtext, fontSize: 13, fontWeight: '700' }}>‹ Kembali</Text>
+              </TouchableOpacity>
 
-            {/* Stats as a sentence, not three cards */}
-            <Text style={{ color: theme.subtext, fontSize: 13, marginTop: 10, lineHeight: 19 }}>
-              <Text style={{ color: theme.text, fontWeight: '900', fontSize: 15 }}>{allUsers.length}</Text> user terdaftar ·{' '}
-              <Text style={{ color: theme.accent, fontWeight: '800' }}>{active7d}</Text> aktif 7 hari ·{' '}
-              <Text style={{ color: theme.text, fontWeight: '800' }}>{adminCount}</Text> admin
-            </Text>
+              <Text style={{ color: theme.accent, fontSize: 10, fontWeight: '800', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 6 }}>
+                Khusus admin
+              </Text>
+              <Text style={{ color: theme.text, fontWeight: '900', fontSize: 30, letterSpacing: -0.8, marginBottom: 18 }}>
+                Dashboard
+              </Text>
+
+              {/* Three colored numeral stats — each its own visual weight,
+                  not three identical tiles and not one flat sentence */}
+              <View style={{ flexDirection: 'row', gap: 26, marginBottom: 22 }}>
+                <View>
+                  <Text style={{ color: theme.text, fontWeight: '900', fontSize: 30, letterSpacing: -1 }}>{allUsers.length}</Text>
+                  <Text style={{ color: theme.subtext, fontSize: 10.5, fontWeight: '600', marginTop: 2 }}>user terdaftar</Text>
+                </View>
+                <View>
+                  <Text style={{ color: theme.accent, fontWeight: '900', fontSize: 30, letterSpacing: -1 }}>{active7d}</Text>
+                  <Text style={{ color: theme.subtext, fontSize: 10.5, fontWeight: '600', marginTop: 2 }}>aktif 7 hari</Text>
+                </View>
+                <View>
+                  <Text style={{ color: '#e0a93f', fontWeight: '900', fontSize: 30, letterSpacing: -1 }}>{adminCount}</Text>
+                  <Text style={{ color: theme.subtext, fontSize: 10.5, fontWeight: '600', marginTop: 2 }}>admin</Text>
+                </View>
+              </View>
+            </View>
           </View>
 
           <FlatList
@@ -80,15 +103,27 @@ export function AdminPanel({ visible, onClose, allUsers: initialUsers, loading }
             windowSize={5}
             ListHeaderComponent={() => (
               <>
-                {/* ── Quick actions: two unequal stacked text-links ── */}
-                <View style={{ paddingHorizontal: 22, marginBottom: 30, gap: 14 }}>
-                  <TouchableOpacity onPress={openMaintenance} activeOpacity={0.7}>
-                    <Text style={{ color: '#e15c5c', fontWeight: '900', fontSize: 19, letterSpacing: -0.3 }}>
-                      Mode maintenance
-                    </Text>
-                    <Text style={{ color: theme.subtext, fontSize: 11.5, marginTop: 2 }}>
-                      Matikan akses sementara untuk semua user
-                    </Text>
+                {/* ── Maintenance gets a tinted danger strip behind it so it
+                    reads as a real actionable control, not floating text ── */}
+                <View style={{ paddingHorizontal: 22, marginBottom: 28 }}>
+                  <TouchableOpacity onPress={openMaintenance} activeOpacity={0.75}>
+                    <LinearGradient
+                      colors={[`${DANGER}22`, `${DANGER}06`]}
+                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                      style={{
+                        borderRadius: 14,
+                        borderLeftWidth: 3, borderLeftColor: DANGER,
+                        paddingHorizontal: 16, paddingVertical: 14,
+                        marginBottom: 14,
+                      }}
+                    >
+                      <Text style={{ color: DANGER, fontWeight: '900', fontSize: 17, letterSpacing: -0.3 }}>
+                        Mode maintenance
+                      </Text>
+                      <Text style={{ color: theme.subtext, fontSize: 11.5, marginTop: 3 }}>
+                        Matikan akses sementara untuk semua user
+                      </Text>
+                    </LinearGradient>
                   </TouchableOpacity>
 
                   <TouchableOpacity onPress={openAnnouncement} activeOpacity={0.7}>
@@ -130,7 +165,11 @@ export function AdminPanel({ visible, onClose, allUsers: initialUsers, loading }
               >
                 <Image
                   source={{ uri: item.photoURL ?? `https://ui-avatars.com/api/?name=${encodeURIComponent(item.displayName ?? 'User')}` }}
-                  style={{ width: 38, height: 38, borderRadius: 6 }}
+                  style={{
+                    width: 40, height: 40, borderRadius: 7,
+                    borderWidth: item.isAdmin ? 1.5 : 0,
+                    borderColor: theme.accent,
+                  }}
                 />
 
                 <View style={{ flex: 1 }}>
@@ -139,21 +178,32 @@ export function AdminPanel({ visible, onClose, allUsers: initialUsers, loading }
                       {item.displayName}
                     </Text>
                     {item.isAdmin && (
-                      <Text style={{ color: theme.accent, fontSize: 9.5, fontWeight: '900', fontStyle: 'italic' }}>
-                        admin
+                      <Text style={{
+                        color: theme.bg, backgroundColor: theme.accent,
+                        fontSize: 8.5, fontWeight: '900',
+                        paddingHorizontal: 5, paddingVertical: 1.5, borderRadius: 3,
+                        overflow: 'hidden',
+                      }}>
+                        ADMIN
                       </Text>
                     )}
                   </View>
-                  <Text style={{ color: theme.subtext, fontSize: 10.5, marginTop: 1 }} numberOfLines={1}>
+                  <Text style={{ color: theme.subtext, fontSize: 10.5, marginTop: 2 }} numberOfLines={1}>
                     {item.email}
                   </Text>
                 </View>
 
-                {/* Level as a plain number pair, right-aligned, no pill */}
+                {/* Level in a small filled chip — not bare text, not a big pill */}
                 <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={{ color: theme.text, fontWeight: '900', fontSize: 15 }}>
-                    {item.level ?? 1}
-                  </Text>
+                  <View style={{
+                    backgroundColor: `${theme.accent}1c`,
+                    paddingHorizontal: 8, paddingVertical: 3,
+                    borderRadius: 6, marginBottom: 3,
+                  }}>
+                    <Text style={{ color: theme.accent, fontWeight: '900', fontSize: 12.5 }}>
+                      Lv.{item.level ?? 1}
+                    </Text>
+                  </View>
                   <Text style={{ color: theme.subtext, fontSize: 9.5 }}>
                     {(item.xp ?? 0).toLocaleString('id-ID')} xp
                   </Text>
@@ -164,6 +214,19 @@ export function AdminPanel({ visible, onClose, allUsers: initialUsers, loading }
               loading ? (
                 <View style={{ paddingHorizontal: 22, paddingVertical: 40 }}>
                   <Text style={{ color: theme.subtext, fontWeight: '600', fontSize: 13 }}>Memuat data…</Text>
+                </View>
+              ) : null
+            }
+            ListFooterComponent={
+              allUsers.length > 0 ? (
+                <View style={{ paddingHorizontal: 22, marginTop: 36 }}>
+                  <Text style={{
+                    color: `${theme.accent}10`,
+                    fontSize: 46, fontWeight: '900',
+                    letterSpacing: -2, lineHeight: 46,
+                  }}>
+                    ADMIN PANEL
+                  </Text>
                 </View>
               ) : null
             }
