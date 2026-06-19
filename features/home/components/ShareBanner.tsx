@@ -16,7 +16,7 @@ interface Props {
 export function ShareBanner({ theme, onCopySuccess }: Props) {
   const handleCopy = async () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    await Clipboard.setStringAsync('https://nefusoft.eu.cc');
+    await Clipboard.setStringAsync('https://nefusoft.app');
     onCopySuccess();
   };
 
@@ -34,7 +34,7 @@ export function ShareBanner({ theme, onCopySuccess }: Props) {
     <View style={{
       marginTop: 36,
       paddingHorizontal: 22, paddingVertical: 22,
-      borderTopWidth: 1, borderBottomWidth: 1,
+      borderTopWidth: 1,
       borderColor: `${theme.subtext}15`,
     }}>
       <Text style={{
