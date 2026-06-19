@@ -20,13 +20,13 @@ export default function HomeScrollCard({ anime, index, width = 108, metaOverride
   const meta = metaOverride ?? [anime.lastch, anime.type].filter(Boolean).join(' · ');
 
   return (
-    <View style={{ width, position: 'relative' }}>
-      {/* Nomor urut — mengambang di atas poster, sedikit overflow ke luar */}
+    <View style={{ width }}>
+      {/* Nomor urut — di atas poster sebagai baris sendiri, bukan absolute negative
+          (yang sebelumnya ke-clip sama scroll container) */}
       <Text style={{
-        position: 'absolute', top: -22, left: -2,
-        color: `${theme.accent}55`,
-        fontSize: 15, fontWeight: '900', fontStyle: 'italic',
-        zIndex: 2,
+        color: `${theme.accent}70`,
+        fontSize: 14, fontWeight: '900', fontStyle: 'italic',
+        marginBottom: 4,
       }}>
         {String(index + 1).padStart(2, '0')}
       </Text>
@@ -56,4 +56,3 @@ export default function HomeScrollCard({ anime, index, width = 108, metaOverride
     </View>
   );
 }
-
