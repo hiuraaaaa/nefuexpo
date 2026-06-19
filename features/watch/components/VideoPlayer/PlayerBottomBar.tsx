@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { View, Text, TouchableOpacity, PanResponder } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -31,6 +31,10 @@ export function PlayerBottomBar({
   const [scrubbing, setScrubbing] = useState(false);
   const [scrubVal, setScrubVal]   = useState(0);
 
+  // FIX BUG 1 & 4: Ukur lebar bar yang sesungguhnya via onLayout
+  const barWidthRef = useRef(300); // fallback default, akan di-update onLayout
+  const BAR_PADDING = 14; // paddingHorizontal
+
   const BAR_H      = 3;
   const BAR_H_ACT  = 5;
   const THUMB_SIZE = 14;
@@ -39,36 +43,59 @@ export function PlayerBottomBar({
     ? Math.min((scrubbing ? scrubVal : position) / duration, 1)
     : 0;
 
+  const calcRaw = useCallback((locationX: number): number => {
+    // locationX = posisi relatif ke View yang punya panHandlers
+    // kurangi padding kiri, bagi dengan lebar efektif bar
+    const effectiveWidth = barWidthRef.current - BAR_PADDING * 2;
+    const relX = locationX - BAR_PADDING;
+    return Math.max(0, Math.min(1, relX / effectiveWidth));
+  }, []);
+
   const panResponder = PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder:  () => true,
+
     onPanResponderGrant: (e, gs) => {
+      // FIX BUG 3: Init scrubVal ke posisi touch saat ini, bukan 0
+      const raw = calcRaw(e.nativeEvent.locationX);
+      const initVal = raw * duration;
+      setScrubVal(initVal);
       setScrubbing(true);
       resetControlsTimer();
     },
+
     onPanResponderMove: (e, gs) => {
-      // width approximation — full width minus padding
-      const barWidth = 280;
-      const raw = Math.max(0, Math.min(1, gs.moveX / barWidth));
+      // FIX BUG 1 & 2: Pakai locationX (relatif ke elemen) bukan gs.moveX (koordinat layar absolut)
+      const raw = calcRaw(e.nativeEvent.locationX);
       setScrubVal(raw * duration);
     },
+
     onPanResponderRelease: (e, gs) => {
-      onSlidingComplete(scrubVal);
+      // Pakai nilai scrubVal terbaru via callback agar tidak stale closure
+      setScrubVal(prev => {
+        onSlidingComplete(prev);
+        return prev;
+      });
       setScrubbing(false);
       resetControlsTimer();
     },
+
     onPanResponderTerminate: () => setScrubbing(false),
   });
 
   return (
     <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, paddingBottom: 10 }}>
 
-      {/* Progress bar — thick, menempel bottom, no horizontal padding */}
+      {/* Progress bar */}
       <View
+        onLayout={(e) => {
+          // FIX BUG 1: Simpan lebar aktual dari layout, bukan hardcode
+          barWidthRef.current = e.nativeEvent.layout.width;
+        }}
         style={{
           height: scrubbing ? BAR_H_ACT + 12 : BAR_H + 12,
           justifyContent: 'center',
-          paddingHorizontal: 14,
+          paddingHorizontal: BAR_PADDING,
         }}
         {...panResponder.panHandlers}
       >
@@ -92,7 +119,8 @@ export function PlayerBottomBar({
         {scrubbing && (
           <View style={{
             position: 'absolute',
-            left: 14 + progress * (/* bar width approx */ 300 - THUMB_SIZE),
+            // FIX BUG 4: Pakai barWidthRef.current yang real, bukan hardcode 300
+            left: BAR_PADDING + progress * (barWidthRef.current - BAR_PADDING * 2 - THUMB_SIZE),
             width: THUMB_SIZE,
             height: THUMB_SIZE,
             borderRadius: THUMB_SIZE / 2,
@@ -113,13 +141,13 @@ export function PlayerBottomBar({
         paddingHorizontal: 14,
         marginTop: -2,
       }}>
-        {/* Timestamp — kiri, beda opacity */}
+        {/* Timestamp */}
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 3 }}>
           <Text style={{
             color: '#fff', fontSize: 12, fontWeight: '700',
             fontVariant: ['tabular-nums'],
           }}>
-            {formatTime(position)}
+            {formatTime(scrubbing ? scrubVal : position)}
           </Text>
           <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: '500' }}>
             /
@@ -143,7 +171,6 @@ export function PlayerBottomBar({
             </TouchableOpacity>
           )}
 
-          {/* Quality — monospace, no background, accent color */}
           <TouchableOpacity
             onPress={() => { Haptics.selectionAsync(); onQualityPress(); resetControlsTimer(); }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
