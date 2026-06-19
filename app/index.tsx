@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, Dimensions,
   StatusBar, ScrollView, BackHandler,
@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
+import * as SplashScreen from 'expo-splash-screen';
 import Constants from 'expo-constants';
 import Animated, {
   useSharedValue, useAnimatedStyle,
@@ -17,6 +18,7 @@ import Animated, {
 import { COLORS, LOGO_URL } from '@/constants';
 import { api } from '@/hooks/api/api';
 import { signInWithGoogle, onAuthStateChanged } from '@/hooks/auth';
+import auth from '@react-native-firebase/auth';
 import { Anime } from '@/types';
 import { storageMain } from '@/hooks/storage/storage';
 import { prefetchHome } from '@/hooks/prefetch';
@@ -90,11 +92,17 @@ const PosterColumn = React.memo(({ items, offsetY, duration }: {
 });
 
 // ── Loading Screen ─────────────────────────────────────────────────────────────
-// Logo di-preload via expo-image sebelum screen ini render,
-// jadi ga ada flash hitam antara splash → loading icon.
+// FIX: Selalu render dari frame pertama supaya tidak ada celah hitam.
+// SplashScreen.hideAsync() dipanggil di sini setelah komponen ini mount.
 function LoadingScreen({ logoReady }: { logoReady: boolean }) {
   const scale   = useSharedValue(1);
   const opacity = useSharedValue(0.6);
+
+  // FIX: Hide splash screen segera saat LoadingScreen mount,
+  // sehingga transisi langsung: Expo Splash → LoadingScreen (hitam) tanpa flash.
+  useEffect(() => {
+    SplashScreen.hideAsync().catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!logoReady) return;
@@ -110,20 +118,17 @@ function LoadingScreen({ logoReady }: { logoReady: boolean }) {
 
   const logoStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
-    opacity:   logoReady ? opacity.value : 0, // sembunyikan sampai ready
+    opacity:   logoReady ? opacity.value : 0,
   }));
 
   return (
-    // Tidak pakai FadeIn di sini — biarkan langsung visible supaya
-    // background hitam langsung ada sejak frame pertama (= extended splash).
-    // Yang di-fade-in cuma logo-nya, setelah image preload selesai.
-    <View
-      style={{
-        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-        backgroundColor: '#08080a',
-        alignItems: 'center', justifyContent: 'center', zIndex: 100,
-      }}
-    >
+    <View style={{
+      position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+      // FIX: Pastikan background hitam langsung ada sejak frame pertama
+      // Ini yang mencegah flash hitam antara Expo splash dan app content
+      backgroundColor: '#08080a',
+      alignItems: 'center', justifyContent: 'center', zIndex: 100,
+    }}>
       <Animated.View
         style={logoStyle}
         entering={logoReady ? FadeIn.duration(300) : undefined}
@@ -248,14 +253,24 @@ function DisclaimerScreen({ onAccept, onDecline }: {
 // ── Login Screen ──────────────────────────────────────────────────────────────
 function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
   const [loading, setLoading] = useState(false);
+  // FIX: Tampilkan error kalau login gagal
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   const handleGoogle = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setLoading(true);
+    setLoginError(null);
     try {
       const user = await signInWithGoogle();
-      if (user) onSuccess();
-    } catch {}
+      if (user) {
+        onSuccess();
+      } else {
+        // signInWithGoogle return null = user cancel atau gagal
+        setLoginError('Login dibatalkan. Coba lagi.');
+      }
+    } catch {
+      setLoginError('Gagal login. Periksa koneksi dan coba lagi.');
+    }
     setLoading(false);
   };
 
@@ -293,6 +308,22 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
           <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, lineHeight: 20, marginBottom: 40 }}>
             Masuk untuk simpan progress,{'\n'}favorit, dan XP kamu.
           </Text>
+
+          {/* FIX: Tampilkan pesan error kalau login gagal */}
+          {loginError && (
+            <Animated.View
+              entering={FadeIn.duration(200)}
+              style={{
+                backgroundColor: 'rgba(230,57,70,0.12)',
+                borderWidth: 1, borderColor: 'rgba(230,57,70,0.3)',
+                borderRadius: 10, padding: 12, marginBottom: 16,
+              }}
+            >
+              <Text style={{ color: '#e63946', fontSize: 12, fontWeight: '700', textAlign: 'center' }}>
+                {loginError}
+              </Text>
+            </Animated.View>
+          )}
 
           <TouchableOpacity
             onPress={handleGoogle}
@@ -332,8 +363,6 @@ export default function WelcomeScreen() {
   const router = useRouter();
   const [step, setStep]           = useState<Step>('loading');
   const [posters, setPosters]     = useState<Anime[]>([]);
-  // State ini true setelah logo image selesai di-prefetch ke cache expo-image.
-  // Mencegah flash hitam antara splash screen → loading icon muncul.
   const [logoReady, setLogoReady] = useState(false);
 
   const overlayOpacity = useSharedValue(1);
@@ -345,22 +374,34 @@ export default function WelcomeScreen() {
     [posters]
   );
 
-  // Prefetch logo ke cache expo-image segera saat mount.
-  // Setelah ready, baru munculkan logo dengan fade-in yang mulus.
+  // Prefetch logo
   useEffect(() => {
     Image.prefetch(LOGO_URL)
       .then(() => setLogoReady(true))
-      .catch(() => setLogoReady(true)); // fallback: tetap tampil meski gagal
+      .catch(() => setLogoReady(true));
   }, []);
 
-  // ── Cek auth state ──────────────────────────────────────────────────────
+  // ── FIX: Auto Login ──────────────────────────────────────────────────────
+  // Cek auth().currentUser dulu secara synchronous — kalau udah ada sesi aktif
+  // (user pernah login), langsung redirect tanpa tunggu welcome screen render.
+  // Ini bikin "auto login" terasa instan.
   useEffect(() => {
+    // Cek synchronous dulu (dari cache lokal Firebase)
+    const syncUser = auth().currentUser;
+    if (syncUser) {
+      router.replace('/(tabs)');
+      return;
+    }
+
+    // Kalau null, tunggu Firebase restore session dari storage async
     const unsub = onAuthStateChanged(async (user) => {
       if (user) {
+        // FIX: User sudah login sebelumnya — langsung ke tabs, skip semua welcome flow
         router.replace('/(tabs)');
         return;
       }
 
+      // User belum login — load posters sambil background fetch
       try {
         const timeout  = new Promise<void>(r => setTimeout(r, MAX_LOAD_MS));
         const fetchAll = async () => {
@@ -378,6 +419,7 @@ export default function WelcomeScreen() {
       contentOpacity.value = withTiming(1, { duration: 600 });
       contentY.value       = withSpring(0, { damping: 16, stiffness: 100 });
     });
+
     return unsub;
   }, []);
 
@@ -391,7 +433,10 @@ export default function WelcomeScreen() {
 
   const handleMulaiNonton = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setStep('disclaimer');
+    // FIX: Cek apakah user sudah pernah accept disclaimer
+    // Kalau sudah, langsung ke login — disclaimer tidak perlu ditampilkan lagi
+    const sudahAccept = storageMain.getBoolean(DISCLAIMER_KEY);
+    setStep(sudahAccept ? 'login' : 'disclaimer');
   }, []);
 
   const handleDisclaimerAccept = useCallback(() => {
@@ -498,8 +543,9 @@ export default function WelcomeScreen() {
         backgroundColor: '#08080a', pointerEvents: 'none',
       }, overlayStyle]} />
 
-      {/* Loading screen — selalu render saat step === 'loading',
-          tapi logonya baru muncul setelah preload selesai */}
+      {/* FIX: LoadingScreen selalu ada saat step === 'loading'.
+          SplashScreen.hideAsync() dipanggil di dalam LoadingScreen saat mount
+          sehingga transisi Expo Splash → LoadingScreen hitam mulus tanpa flash. */}
       {step === 'loading' && <LoadingScreen logoReady={logoReady} />}
 
       {step === 'disclaimer' && (
