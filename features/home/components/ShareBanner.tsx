@@ -1,8 +1,10 @@
+// features/home/components/ShareBanner.tsx
+//
+// Editorial: tanpa rounded card, tanpa background image overlay,
+// tanpa pill button dengan Ionicons. Dua CTA jadi underline links
+// bersebelahan, konsisten sama HeroBanner CTA "Tonton Sekarang".
 import React from 'react';
 import { View, Text, TouchableOpacity, Share } from 'react-native';
-import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 
@@ -30,44 +32,45 @@ export function ShareBanner({ theme, onCopySuccess }: Props) {
 
   return (
     <View style={{
-      marginHorizontal: 16, marginTop: 16,
-      borderRadius: 16, overflow: 'hidden',
-      backgroundColor: theme.card,
-      borderWidth: 1, borderColor: theme.border,
+      marginTop: 36,
+      paddingHorizontal: 22, paddingVertical: 22,
+      borderTopWidth: 1, borderBottomWidth: 1,
+      borderColor: `${theme.subtext}15`,
     }}>
-      <Image
-        source={{ uri: 'https://raw.githubusercontent.com/alip-jmbd/alipp/main/bc.jpg' }}
-        style={{ position: 'absolute', width: '100%', height: '100%', opacity: 0.15 }}
-        contentFit="cover"
-      />
-      <LinearGradient
-        colors={[theme.accentDim, 'transparent']}
-        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-      />
-      <View style={{ padding: 18 }}>
-        <Text style={{ color: theme.text, fontWeight: '900', fontSize: 13, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 3 }}>
-          Sebarkan Keseruan Ini!
-        </Text>
-        <Text style={{ color: theme.subtext, fontSize: 11, marginBottom: 14 }}>
-          Ajak teman-temanmu marathon anime favorit bareng di NefuSoft.
-        </Text>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <TouchableOpacity
-            onPress={handleCopy}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 9, borderRadius: 999, backgroundColor: theme.border, borderWidth: 1, borderColor: theme.border }}
-          >
-            <Ionicons name="copy-outline" size={12} color={theme.subtext} />
-            <Text style={{ color: theme.text, fontWeight: '800', fontSize: 11 }}>Salin Link</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={handleShare}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 9, borderRadius: 999, backgroundColor: theme.border, borderWidth: 1, borderColor: theme.border }}
-          >
-            <Ionicons name="share-outline" size={12} color={theme.subtext} />
-            <Text style={{ color: theme.text, fontWeight: '800', fontSize: 11 }}>Lainnya</Text>
-          </TouchableOpacity>
-        </View>
+      <Text style={{
+        color: theme.subtext, fontSize: 9, fontWeight: '800',
+        letterSpacing: 2.5, textTransform: 'uppercase', marginBottom: 6,
+      }}>
+        Ajak Teman
+      </Text>
+      <Text style={{
+        color: theme.text, fontSize: 19, fontWeight: '900',
+        letterSpacing: -0.5, lineHeight: 24, marginBottom: 8,
+      }}>
+        Sebarkan Keseruan Ini
+      </Text>
+      <Text style={{ color: theme.subtext, fontSize: 11.5, lineHeight: 17, marginBottom: 20 }}>
+        Ajak teman-temanmu marathon anime favorit bareng di NefuSoft.
+      </Text>
+
+      <View style={{ flexDirection: 'row', gap: 28 }}>
+        <TouchableOpacity
+          onPress={handleCopy}
+          style={{ borderBottomWidth: 2, borderBottomColor: theme.accent, paddingBottom: 6 }}
+        >
+          <Text style={{ color: theme.text, fontWeight: '900', fontSize: 12.5, letterSpacing: 0.3 }}>
+            SALIN LINK
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={handleShare}
+          style={{ borderBottomWidth: 2, borderBottomColor: `${theme.subtext}40`, paddingBottom: 6 }}
+        >
+          <Text style={{ color: theme.subtext, fontWeight: '900', fontSize: 12.5, letterSpacing: 0.3 }}>
+            BAGIKAN
+          </Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
