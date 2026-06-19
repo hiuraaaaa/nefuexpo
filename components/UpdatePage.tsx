@@ -16,11 +16,9 @@ const { width } = Dimensions.get('window');
 interface Props {
   storeUrl?: string;
   latestVersion?: string;
-  // FIX: Callback baru — dipanggil sesaat setelah download link dibuka
-  onDownloadStart?: () => void;
 }
 
-export default function UpdatePage({ storeUrl, latestVersion, onDownloadStart }: Props) {
+export default function UpdatePage({ storeUrl, latestVersion }: Props) {
   const floatY  = useSharedValue(0);
   const scale   = useSharedValue(0.8);
   const opacity = useSharedValue(0);
@@ -39,13 +37,12 @@ export default function UpdatePage({ storeUrl, latestVersion, onDownloadStart }:
     opacity: opacity.value,
   }));
 
-  // FIX: Buka URL download, lalu panggil onDownloadStart agar _layout bisa exitApp
+  // FIX: Auto-close dihapus — cuma buka URL download, app tetap kebuka.
   const handleUpdate = async () => {
     if (!storeUrl) return;
     try {
       await Linking.openURL(storeUrl);
     } catch {}
-    onDownloadStart?.();
   };
 
   return (
@@ -91,8 +88,9 @@ export default function UpdatePage({ storeUrl, latestVersion, onDownloadStart }:
           <Text style={s.btnText}>Update & Install Sekarang</Text>
         </TouchableOpacity>
 
+        {/* FIX: Hint lama soal auto-close dihapus karena fiturnya udah gak ada */}
         <Text style={s.hint}>
-          App akan otomatis ditutup setelah download dimulai
+          Download akan dibuka lewat browser/download manager
         </Text>
       </Animated.View>
     </Animated.View>
