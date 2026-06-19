@@ -1,8 +1,8 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { useEffect, useState, useCallback, Component, ReactNode } from 'react';
-import { Text, ScrollView, TouchableOpacity, AppState, AppStateStatus } from 'react-native';
+import { useEffect, useState, useCallback, useRef, Component, ReactNode } from 'react';
+import { Text, ScrollView, TouchableOpacity, AppState, AppStateStatus, BackHandler } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import Constants from 'expo-constants';
 import { initSession } from '@/hooks/api/api';
@@ -64,7 +64,15 @@ function AppLayout() {
   const [maintenance, setMaintenance] = useState<MaintenanceData | null>(null);
   const [adminUser, setAdminUser]     = useState(false);
   const [isOffline, setIsOffline]     = useState(false);
-  const [updateInfo, setUpdateInfo]    = useState<{ storeUrl: string; latestVersion: string } | null>(null);
+  const [updateInfo, setUpdateInfo]   = useState<{ storeUrl: string; latestVersion: string } | null>(null);
+
+  // FIX: Track apakah SplashScreen sudah di-hide, supaya tidak dipanggil dua kali
+  const splashHiddenRef = useRef(false);
+  const hideSplash = useCallback(async () => {
+    if (splashHiddenRef.current) return;
+    splashHiddenRef.current = true;
+    try { await SplashScreen.hideAsync(); } catch {}
+  }, []);
 
   useEffect(() => { loadSavedTheme(); refreshDomain(); initSession(); }, []);
   useEffect(() => { rescheduleNotifs(); }, []);
@@ -72,20 +80,15 @@ function AppLayout() {
 
   // ── Offline detection ──────────────────────────────────────────────────────
   useEffect(() => {
-    // Check initial state
     NetInfo.fetch().then(state => {
       setIsOffline(!state.isConnected);
     });
-
-    // Listen perubahan koneksi
     const unsub = NetInfo.addEventListener(state => {
       setIsOffline(!state.isConnected);
     });
-
     return unsub;
   }, []);
 
-  // Re-check saat app kembali ke foreground
   useEffect(() => {
     const handler = (nextState: AppStateStatus) => {
       if (nextState === 'active') {
@@ -100,7 +103,7 @@ function AppLayout() {
   useEffect(() => {
     const checkUpdate = async () => {
       try {
-        const res  = await fetch(
+        const res = await fetch(
           'https://api.github.com/repos/hiuraaaaa/nefuexpo/releases/latest',
           { headers: { 'Accept': 'application/vnd.github.v3+json' } }
         );
@@ -153,8 +156,10 @@ function AppLayout() {
   const statusBarStyle  = theme.tint === 'light' ? 'dark' : 'light';
   const systemBarsStyle = theme.tint === 'light' ? 'dark' : 'light';
 
-  // Offline — prioritas tertinggi
+  // FIX: Untuk layar maintenance/offline/update — hide splash di sini
+  // karena app/index.tsx tidak akan pernah render di kasus ini
   if (isOffline) {
+    hideSplash();
     return (
       <>
         <SystemBars style="light" />
@@ -164,18 +169,27 @@ function AppLayout() {
     );
   }
 
-  // Update required
   if (updateInfo) {
+    hideSplash();
     return (
       <>
         <SystemBars style="light" />
         <StatusBar style="light" />
-        <UpdatePage storeUrl={updateInfo.storeUrl} latestVersion={updateInfo.latestVersion} />
+        {/* FIX: Kirim callback onDownloadStart agar app bisa auto-close */}
+        <UpdatePage
+          storeUrl={updateInfo.storeUrl}
+          latestVersion={updateInfo.latestVersion}
+          onDownloadStart={() => {
+            // Tunggu sebentar supaya browser/download manager sempat terbuka
+            setTimeout(() => BackHandler.exitApp(), 1500);
+          }}
+        />
       </>
     );
   }
 
   if (maintenance) {
+    hideSplash();
     return (
       <>
         <SystemBars style={systemBarsStyle} />
@@ -185,6 +199,7 @@ function AppLayout() {
     );
   }
 
+  // Normal flow: splash akan di-hide oleh app/index.tsx setelah LoadingScreen render
   return (
     <>
       <SystemBars style={systemBarsStyle} />
