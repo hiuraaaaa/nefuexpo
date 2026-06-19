@@ -1,17 +1,13 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, ScrollView, RefreshControl,
   StatusBar, TouchableOpacity,
 } from 'react-native';
-import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { useTheme } from '@/hooks/theme';
-import { getAnimeSlug } from '@/hooks/api/api';
-import { Anime } from '@/types';
-import AnimeCard from '@/components/AnimeCard';
 import SearchModal from '@/components/SearchModal';
 import { HorizontalCardSkeleton, RankSkeleton } from '@/components/Skeleton';
 import { useNavigateAnime } from '@/hooks/useNavigateAnime';
@@ -20,6 +16,7 @@ import {
   useHomeData, todayLabel,
   HeroBanner, ShareBanner, SectionHeader,
   AnnouncementBanner, MovieRankItem, NobarFAB,
+  HomeScrollCard,
 } from '@/features/home';
 
 export default function HomeScreen() {
@@ -30,9 +27,6 @@ export default function HomeScreen() {
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [copyToast, setCopyToast]   = useState(false);
-
-  const ongoingRef = useRef<ScrollView>(null);
-  const todayRef   = useRef<ScrollView>(null);
 
   const accentTextColor = theme.tint === 'light' ? '#fff' : '#000';
 
@@ -101,76 +95,72 @@ export default function HomeScreen() {
         />
 
         {/* Terbaru */}
-        <View style={{ marginTop: 28 }}>
+        <View style={{ marginTop: 36 }}>
           <SectionHeader
             title="Terbaru"
-            subtitle="Anime baru diupload"
+            subtitle="Baru diupload"
             onPress={() => router.push('/(tabs)/ongoing')}
             theme={theme}
           />
-          <View style={{ paddingHorizontal: 16 }}>
-            <ScrollView
-              ref={ongoingRef} horizontal
-              showsHorizontalScrollIndicator={false}
-              snapToInterval={110} decelerationRate="fast" snapToAlignment="start"
-              contentContainerStyle={{ gap: 10 }}
-            >
-              {isLoading
-                ? [...Array(6)].map((_, i) => <HorizontalCardSkeleton key={i} />)
-                : ongoing.map(item => (
-                  <TouchableOpacity key={item.id} onPress={() => goToAnime(item)} activeOpacity={0.85}>
-                    <AnimeCard anime={item} width={100} />
-                  </TouchableOpacity>
-                ))
-              }
-            </ScrollView>
-          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            snapToInterval={124} decelerationRate="fast" snapToAlignment="start"
+            contentContainerStyle={{ gap: 16, paddingHorizontal: 22, paddingTop: 4 }}
+          >
+            {isLoading
+              ? [...Array(6)].map((_, i) => <HorizontalCardSkeleton key={i} />)
+              : ongoing.map((item, i) => (
+                <TouchableOpacity key={item.id} onPress={() => goToAnime(item)} activeOpacity={0.8}>
+                  <HomeScrollCard anime={item} index={i} theme={theme} />
+                </TouchableOpacity>
+              ))
+            }
+          </ScrollView>
         </View>
 
         {/* Tayang Hari Ini */}
-        <View style={{ marginTop: 28 }}>
+        <View style={{ marginTop: 36 }}>
           <SectionHeader
             title={`Hari ${todayLabel}`}
-            subtitle="Tayang hari ini"
+            subtitle="Jadwal rilis"
             onPress={() => router.push('/(tabs)/schedule')}
             theme={theme}
           />
-          <View style={{ paddingHorizontal: 16 }}>
-            {isLoading ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
-                {[...Array(6)].map((_, i) => <HorizontalCardSkeleton key={i} />)}
-              </ScrollView>
-            ) : todayAnime.length === 0 ? (
-              <View style={{ paddingVertical: 20, alignItems: 'center' }}>
-                <Text style={{ color: theme.subtext, fontSize: 12, fontWeight: '700' }}>Tidak ada anime hari ini</Text>
-              </View>
-            ) : (
-              <ScrollView
-                ref={todayRef} horizontal
-                showsHorizontalScrollIndicator={false}
-                snapToInterval={110} decelerationRate="fast" snapToAlignment="start"
-                contentContainerStyle={{ gap: 10 }}
-              >
-                {todayAnime.map(item => (
-                  <TouchableOpacity key={item.id} onPress={() => goToAnime(item)} activeOpacity={0.85}>
-                    <AnimeCard anime={item} width={100} />
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            )}
-          </View>
+          {isLoading ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingHorizontal: 22, paddingTop: 4 }}>
+              {[...Array(6)].map((_, i) => <HorizontalCardSkeleton key={i} />)}
+            </ScrollView>
+          ) : todayAnime.length === 0 ? (
+            <View style={{ paddingHorizontal: 22, paddingVertical: 24 }}>
+              <Text style={{ color: theme.subtext, fontSize: 12, fontWeight: '600' }}>Tidak ada anime hari ini</Text>
+            </View>
+          ) : (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={124} decelerationRate="fast" snapToAlignment="start"
+              contentContainerStyle={{ gap: 16, paddingHorizontal: 22, paddingTop: 4 }}
+            >
+              {todayAnime.map((item, i) => (
+                <TouchableOpacity key={item.id} onPress={() => goToAnime(item)} activeOpacity={0.8}>
+                  <HomeScrollCard anime={item} index={i} theme={theme} />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
         </View>
 
         {/* Movies */}
-        <View style={{ marginTop: 28, paddingHorizontal: 16 }}>
+        <View style={{ marginTop: 36 }}>
           <SectionHeader
             title="Movies"
-            subtitle="Film anime terpopuler"
+            subtitle="Terpopuler"
             onPress={() => router.push('/(tabs)/ongoing')}
             theme={theme}
           />
           {isLoading
-            ? [...Array(5)].map((_, i) => <RankSkeleton key={i} />)
+            ? <View style={{ paddingHorizontal: 22 }}>{[...Array(5)].map((_, i) => <RankSkeleton key={i} />)}</View>
             : movies.slice(0, 10).map((anime, index) => (
                 <MovieRankItem
                   key={anime.id}
