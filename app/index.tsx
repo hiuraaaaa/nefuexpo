@@ -3,7 +3,7 @@ import {
   View, Text, TouchableOpacity, Dimensions,
   StatusBar, ScrollView, BackHandler,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useRootNavigationState } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
@@ -361,6 +361,9 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function WelcomeScreen() {
   const router = useRouter();
+  // FIX: Dipakai untuk gate navigasi — jangan replace() sebelum Root Layout
+  // (Stack di _layout.tsx) selesai mount & ke-attach ke navigation container.
+  const rootNavigationState = useRootNavigationState();
   const [step, setStep]           = useState<Step>('loading');
   const [posters, setPosters]     = useState<Anime[]>([]);
   const [logoReady, setLogoReady] = useState(false);
@@ -385,7 +388,16 @@ export default function WelcomeScreen() {
   // Cek auth().currentUser dulu secara synchronous — kalau udah ada sesi aktif
   // (user pernah login), langsung redirect tanpa tunggu welcome screen render.
   // Ini bikin "auto login" terasa instan.
+  //
+  // FIX (crash): auth().currentUser resolve synchronous dari cache Firebase,
+  // jadi efek ini bisa nembak router.replace() SEBELUM Root Layout (Stack)
+  // selesai mount & register ke navigation container expo-router → crash
+  // "Attempted to navigate before mounting the Root Layout component".
+  // Solusinya: gate dengan rootNavigationState?.key, baru navigasi kalau
+  // navigator beneran udah ready.
   useEffect(() => {
+    if (!rootNavigationState?.key) return; // ⛔ navigator belum siap, jangan navigasi dulu
+
     // Cek synchronous dulu (dari cache lokal Firebase)
     const syncUser = auth().currentUser;
     if (syncUser) {
@@ -421,7 +433,7 @@ export default function WelcomeScreen() {
     });
 
     return unsub;
-  }, []);
+  }, [rootNavigationState?.key]);
 
   const goMain = useCallback(() => router.replace('/(tabs)'), [router]);
 
