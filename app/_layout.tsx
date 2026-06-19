@@ -2,7 +2,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useEffect, useState, useCallback, useRef, Component, ReactNode } from 'react';
-import { Text, ScrollView, TouchableOpacity, AppState, AppStateStatus, BackHandler } from 'react-native';
+import { Text, ScrollView, TouchableOpacity, AppState, AppStateStatus } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import Constants from 'expo-constants';
 import { initSession } from '@/hooks/api/api';
@@ -175,14 +175,11 @@ function AppLayout() {
       <>
         <SystemBars style="light" />
         <StatusBar style="light" />
-        {/* FIX: Kirim callback onDownloadStart agar app bisa auto-close */}
+        {/* FIX: Auto-close (BackHandler.exitApp setelah download dimulai) dihapus.
+            User yang mutusin sendiri kapan nutup app setelah update di-download. */}
         <UpdatePage
           storeUrl={updateInfo.storeUrl}
           latestVersion={updateInfo.latestVersion}
-          onDownloadStart={() => {
-            // Tunggu sebentar supaya browser/download manager sempat terbuka
-            setTimeout(() => BackHandler.exitApp(), 1500);
-          }}
         />
       </>
     );
