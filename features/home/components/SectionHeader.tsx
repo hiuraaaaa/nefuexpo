@@ -1,3 +1,7 @@
+// features/home/components/SectionHeader.tsx
+//
+// Dua-layer typography: eyebrow kecil uppercase + title besar.
+// Link kanan teks polos "Semua →", bukan chevron icon dalam circle.
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 
@@ -10,12 +14,31 @@ interface Props {
 
 export function SectionHeader({ title, subtitle, onPress, theme }: Props) {
   return (
-    <TouchableOpacity onPress={onPress} style={{ paddingHorizontal: 16, marginBottom: 14 }} activeOpacity={0.7}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        <Text style={{ color: theme.text, fontWeight: '900', fontSize: 16, textTransform: 'uppercase', letterSpacing: -0.5 }}>{title}</Text>
-        <Text style={{ color: theme.subtext, fontSize: 16, fontWeight: '900' }}>›</Text>
+    <View style={{
+      paddingHorizontal: 22, marginBottom: 16,
+      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end',
+    }}>
+      <View>
+        <Text style={{
+          color: theme.subtext, fontSize: 9, fontWeight: '800',
+          letterSpacing: 2.5, textTransform: 'uppercase', marginBottom: 4,
+        }}>
+          {subtitle}
+        </Text>
+        <Text style={{
+          color: theme.text, fontSize: 22, fontWeight: '900', letterSpacing: -0.6,
+        }}>
+          {title}
+        </Text>
       </View>
-      <Text style={{ color: theme.subtext, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, marginTop: 2 }}>{subtitle}</Text>
-    </TouchableOpacity>
+
+      <TouchableOpacity onPress={onPress} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+        <Text style={{
+          color: theme.accent, fontSize: 11, fontWeight: '800', paddingBottom: 3,
+        }}>
+          Semua →
+        </Text>
+      </TouchableOpacity>
+    </View>
   );
 }
