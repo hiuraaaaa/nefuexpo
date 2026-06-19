@@ -43,7 +43,7 @@ export default function ExploreScreen() {
 
   // ── Header editorial ──────────────────────────────────────────────────────
   const ListHeader = (
-    <View style={{ marginBottom: 18 }}>
+    <View style={{ marginBottom: 18, marginTop: 4 }}>
       {!query && (
         <GenreFilter
           genres={genres}
@@ -53,9 +53,6 @@ export default function ExploreScreen() {
           theme={theme}
         />
       )}
-
-      {/* Divider tipis */}
-      <View style={{ height: 1, backgroundColor: `${theme.subtext}18`, marginHorizontal: 22, marginBottom: 16 }} />
 
       {/* Context label — query atau genre atau default */}
       {query.length > 0 ? (
@@ -142,22 +139,7 @@ export default function ExploreScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }} edges={['top']}>
 
-      {/* ── Header ── */}
-      <View style={{ paddingHorizontal: 22, paddingTop: 8, paddingBottom: 4 }}>
-        <Text style={{
-          color: theme.subtext, fontSize: 9, fontWeight: '800',
-          letterSpacing: 3, textTransform: 'uppercase', marginBottom: 3,
-        }}>
-          Temukan
-        </Text>
-        <Text style={{
-          color: theme.text, fontWeight: '900', fontSize: 30, letterSpacing: -1,
-        }}>
-          Anime
-        </Text>
-      </View>
-
-      {/* ── Search bar ── */}
+      {/* ── Header + Search (menyatu — judul "Anime" ADALAH input search) ── */}
       <SearchBar
         value={query}
         onChangeText={handleQueryChange}
