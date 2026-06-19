@@ -1,9 +1,12 @@
+// features/home/components/MovieRankItem.tsx
+//
+// List row editorial — nomor besar italic, separator garis tipis antar
+// item, poster kecil flush kiri. Tidak ada rounded card / background
+// image blur / drop shadow.
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { Anime } from '@/types';
 
 interface Props {
@@ -14,55 +17,54 @@ interface Props {
 }
 
 export function MovieRankItem({ anime, index, onPress, theme }: Props) {
-  const scale     = useSharedValue(1);
-  const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  const isTop = index < 3;
+  const scoreNum = anime.score != null ? parseFloat(String(anime.score)) : null;
 
   return (
-    <Animated.View style={animStyle}>
-      <TouchableOpacity
-        onPress={onPress}
-        onPressIn={() => { scale.value = withSpring(0.97, { damping: 15, stiffness: 300 }); Haptics.selectionAsync(); }}
-        onPressOut={() => { scale.value = withSpring(1, { damping: 12 }); }}
-        activeOpacity={1}
-        style={{
-          marginBottom: 12, borderRadius: 16, overflow: 'hidden',
-          flexDirection: 'row', alignItems: 'center', height: 88, paddingHorizontal: 16,
-          backgroundColor: theme.card, borderWidth: 1,
-          borderColor: index < 3 ? theme.accentDim : theme.border,
-        }}
-      >
-        <Image
-          source={{ uri: anime.image_cover || anime.image_poster }}
-          style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '55%', opacity: 0.6 }}
-          contentFit="cover"
-        />
-        <LinearGradient
-          colors={[theme.card, theme.card, 'transparent']}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-          style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '75%' }}
-        />
-        <View style={{
-          width: 40, height: 40, borderRadius: 20,
-          alignItems: 'center', justifyContent: 'center', marginRight: 16, zIndex: 1,
-          backgroundColor: index < 3 ? theme.accent : theme.border,
-          borderWidth: index < 3 ? 0 : 1, borderColor: theme.border,
-        }}>
-          <Text style={{
-            fontWeight: '900', fontSize: 14,
-            color: index < 3 ? (theme.tint === 'light' ? '#fff' : '#000') : theme.subtext,
-          }}>
-            {index + 1}
-          </Text>
-        </View>
-        <View style={{ flex: 1, zIndex: 1 }}>
-          <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13 }} numberOfLines={1}>{anime.title}</Text>
-          {anime.year ? (
-            <Text style={{ color: theme.subtext, fontSize: 10, marginTop: 3 }}>
-              {anime.year}{anime.studio ? ` · ${anime.studio}` : ''}
-            </Text>
-          ) : null}
-        </View>
-      </TouchableOpacity>
-    </Animated.View>
+    <TouchableOpacity
+      onPress={() => { Haptics.selectionAsync(); onPress(); }}
+      activeOpacity={0.7}
+      style={{
+        flexDirection: 'row', alignItems: 'center',
+        paddingVertical: 16, paddingHorizontal: 22,
+        borderTopWidth: index === 0 ? 0 : 1,
+        borderTopColor: `${theme.subtext}15`,
+        gap: 16,
+      }}
+    >
+      {/* Nomor besar — redup kalau bukan top 3 */}
+      <Text style={{
+        fontSize: 26, fontWeight: '900', fontStyle: 'italic',
+        color: isTop ? theme.accent : `${theme.subtext}30`,
+        minWidth: 38,
+      }}>
+        {String(index + 1).padStart(2, '0')}
+      </Text>
+
+      {/* Poster kecil */}
+      <Image
+        source={{ uri: anime.image_poster, priority: 'normal' }}
+        style={{ width: 48, aspectRatio: 2 / 3 }}
+        contentFit="cover"
+        recyclingKey={anime.id}
+      />
+
+      {/* Info */}
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: theme.text, fontSize: 13.5, fontWeight: '800', lineHeight: 17 }} numberOfLines={2}>
+          {anime.title}
+        </Text>
+        <Text style={{ color: theme.subtext, fontSize: 10.5, fontWeight: '600', marginTop: 4 }} numberOfLines={1}>
+          {[anime.studio, anime.year].filter(Boolean).join(' · ')}
+        </Text>
+      </View>
+
+      {/* Score */}
+      {scoreNum != null && (
+        <Text style={{ color: theme.accent, fontSize: 11, fontWeight: '900', fontStyle: 'italic' }}>
+          {anime.score}
+        </Text>
+      )}
+    </TouchableOpacity>
   );
 }
