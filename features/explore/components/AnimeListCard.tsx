@@ -1,9 +1,7 @@
 // features/explore/components/AnimeListCard.tsx
 //
-// Signature: adopsi pattern LibraryListItem — poster flush ke left edge,
-// left border tebal sebagai hierarchy cue bukan card shadow,
-// nomor urut italic di kanan gantiin icon, score teks bold italic.
-// Tidak ada card wrapper / borderRadius / backgroundColor card.
+// v2: spacing lebih lega, poster lebih besar, genre dipisah dari meta row,
+// score jadi badge kecil bukan teks polos, edge weight lebih kontras.
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Image } from 'expo-image';
@@ -22,10 +20,13 @@ export default function AnimeListCard({ item, index, onPress, theme }: Props) {
     ? item.genre.split(',').map(g => g.trim()).filter(Boolean).slice(0, 2)
     : [];
 
-  // Edge weight tapers — item pertama paling berat, quiet hierarchy
+  const scoreNum = item.score != null ? parseFloat(String(item.score)) : null;
+  const isHighScore = scoreNum != null && scoreNum >= 7.5;
+
+  // Edge weight tapers across first few — quiet hierarchy tanpa featured treatment
   const edgeWidth  = index === 0 ? 4 : index <= 2 ? 3 : 2;
   // Odd rows nudge kanan sedikit — breaks perfectly-flush alignment
-  const marginLeft = index % 2 === 0 ? 0 : 8;
+  const marginLeft = index % 2 === 0 ? 0 : 10;
 
   return (
     <Animated.View
@@ -37,76 +38,81 @@ export default function AnimeListCard({ item, index, onPress, theme }: Props) {
         style={{
           flexDirection: 'row',
           marginLeft,
-          marginBottom: 18,
+          marginBottom: 30,
           borderLeftWidth: edgeWidth,
-          borderLeftColor: item.score && parseFloat(item.score) >= 7.5
-            ? theme.accent
-            : `${theme.accent}55`,
+          borderLeftColor: isHighScore ? theme.accent : `${theme.accent}45`,
         }}
       >
-        {/* Poster — flush terhadap border kiri, tidak ada padding */}
-        <View style={{ width: 72, aspectRatio: 2 / 3 }}>
+        {/* Poster — lebih besar dari v1, masih flush ke border kiri */}
+        <View style={{ width: 92, aspectRatio: 2 / 3 }}>
           <Image
             source={{ uri: item.image_poster, priority: 'normal' }}
             style={{ width: '100%', height: '100%' }}
             contentFit="cover"
           />
-          {/* Status badge di sudut poster — bukan di luar card */}
           {item.status === 'Ongoing' && (
             <View style={{
               position: 'absolute', bottom: 0, left: 0, right: 0,
               backgroundColor: `${theme.accent}CC`,
-              paddingVertical: 2, alignItems: 'center',
+              paddingVertical: 3, alignItems: 'center',
             }}>
-              <Text style={{ color: theme.bg, fontSize: 7, fontWeight: '900', letterSpacing: 0.5 }}>
+              <Text style={{ color: theme.bg, fontSize: 7.5, fontWeight: '900', letterSpacing: 0.5 }}>
                 ONGOING
               </Text>
             </View>
           )}
         </View>
 
-        {/* Kolom teks */}
-        <View style={{ flex: 1, paddingLeft: 13, paddingVertical: 2, justifyContent: 'center', gap: 4 }}>
+        {/* Kolom teks — lebih banyak breathing room antar baris */}
+        <View style={{ flex: 1, paddingLeft: 15, paddingVertical: 3, justifyContent: 'center' }}>
           {/* Judul */}
           <Text
-            style={{ color: theme.text, fontSize: 14, fontWeight: '800', lineHeight: 19 }}
+            style={{ color: theme.text, fontSize: 15, fontWeight: '800', lineHeight: 20 }}
             numberOfLines={2}
           >
             {item.title}
           </Text>
 
-          {/* Studio · Eps — satu baris, bukan chips terpisah */}
-          <Text style={{ color: theme.subtext, fontSize: 10.5, fontWeight: '500' }} numberOfLines={1}>
+          {/* Studio · Eps · Tahun */}
+          <Text style={{ color: theme.subtext, fontSize: 11, fontWeight: '500', marginTop: 7 }} numberOfLines={1}>
             {[item.studio, item.total_episode ? `${item.total_episode} eps` : null, item.year]
               .filter(Boolean).join('  ·  ')}
           </Text>
 
-          {/* Genre — teks inline, bukan chips */}
+          {/* Genre — baris terpisah sendiri, tidak numpuk sama meta */}
           {genres.length > 0 && (
-            <Text style={{ color: `${theme.subtext}99`, fontSize: 10, fontWeight: '600', letterSpacing: 0.2 }}>
-              {genres.join(' / ')}
+            <Text style={{
+              color: theme.accent, fontSize: 10.5, fontWeight: '700',
+              letterSpacing: 0.2, marginTop: 6,
+            }}>
+              {genres.join('  /  ')}
             </Text>
           )}
 
-          {/* Score — teks italic bold, bukan ⭐ icon */}
-          {item.score != null && (
-            <Text style={{
-              color: theme.accent,
-              fontSize: 11,
-              fontWeight: '800',
-              fontStyle: 'italic',
-              marginTop: 1,
+          {/* Score — badge kecil, bukan teks polos */}
+          {scoreNum != null && (
+            <View style={{
+              flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start',
+              marginTop: 9,
+              paddingHorizontal: 7, paddingVertical: 2.5,
+              borderWidth: 1, borderColor: isHighScore ? theme.accent : `${theme.subtext}40`,
+              borderRadius: 4,
             }}>
-              {item.score}
-            </Text>
+              <Text style={{
+                color: isHighScore ? theme.accent : theme.subtext,
+                fontSize: 10.5, fontWeight: '900', fontStyle: 'italic',
+              }}>
+                {item.score}
+              </Text>
+            </View>
           )}
         </View>
 
-        {/* Nomor urut italic di kanan — gantiin icon */}
-        <View style={{ paddingHorizontal: 12, justifyContent: 'center', alignItems: 'center' }}>
+        {/* Nomor urut — lebih besar, jadi focal point yang lebih kuat */}
+        <View style={{ paddingHorizontal: 14, justifyContent: 'center', alignItems: 'center' }}>
           <Text style={{
-            color: `${theme.accent}50`,
-            fontSize: 18,
+            color: `${theme.accent}60`,
+            fontSize: 22,
             fontWeight: '900',
             fontStyle: 'italic',
           }}>
