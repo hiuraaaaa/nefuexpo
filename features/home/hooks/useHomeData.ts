@@ -1,11 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Dimensions, ScrollView } from 'react-native';
+
 import firestore from '@react-native-firebase/firestore';
 import { api, shuffleArray } from '@/hooks/api/api';
 import { getHomeCache, clearHomeCache, prefetchHome } from '@/hooks/prefetch';
 import { Anime, ScheduleDay } from '@/types';
 
-const { width } = Dimensions.get('window');
 
 const getTodayKey = (): string => {
   const days = ['MINGGU', 'SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU'];
