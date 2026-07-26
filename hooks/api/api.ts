@@ -216,8 +216,8 @@ const fetchRekomendasi = async (): Promise<ApiResponse<Anime[]>> => {
   return { status: true, data: list.map(mapAnime) };
 };
 
-const fetchComplete = async (page = 0, type: string = 'all'): Promise<ApiResponse<Anime[]>> => {
-  const json = await safeGet<any>('/home/ongoing.php', { page: page + 1, type });
+const fetchComplete = async (page = 0): Promise<ApiResponse<Anime[]>> => {
+  const json = await safeGet<any>('/home/ongoing.php', { page: page + 1, type: 'all' });
   const list: any[] = Array.isArray(json) ? json : (json?.data ?? []);
   return { status: true, data: list.map(mapAnime) };
 };
@@ -383,7 +383,7 @@ export const api = {
   search:      (q: string, page = 0)     => fetchSearch(q, page),
   searchLocal: (q: string)               => fetchAnimeListSearch(q),
   ongoing:     (page = 0)                => fetchOngoing(page),
-  complete:    (page = 0, type: string = 'all') => fetchComplete(page, type),
+  complete:    (page = 0)                => fetchComplete(page),
   movie:       (page = 0)                => fetchMovie(page),
   schedule:    ()                        => fetchSchedule(),
   rekomendasi: ()                        => fetchRekomendasi(),
