@@ -1,7 +1,8 @@
 // features/home/components/MovieRankItem.tsx
 //
-// List row editorial — separator garis tipis antar item, poster kecil
-// flush kiri, badge rating di kanan (data rekomendasi selalu punya score).
+// List row editorial — nomor besar italic, separator garis tipis antar
+// item, poster kecil flush kiri. Tidak ada rounded card / background
+// image blur / drop shadow.
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Image } from 'expo-image';
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export function MovieRankItem({ anime, index, onPress, theme }: Props) {
+  const isTop = index < 3;
   const scoreNum = anime.score != null ? parseFloat(String(anime.score)) : null;
 
   return (
@@ -30,6 +32,15 @@ export function MovieRankItem({ anime, index, onPress, theme }: Props) {
         gap: 16,
       }}
     >
+      {/* Nomor besar — redup kalau bukan top 3 */}
+      <Text style={{
+        fontSize: 26, fontWeight: '900', fontStyle: 'italic',
+        color: isTop ? theme.accent : `${theme.subtext}30`,
+        minWidth: 38,
+      }}>
+        {String(index + 1).padStart(2, '0')}
+      </Text>
+
       {/* Poster kecil */}
       <Image
         source={{ uri: anime.image_poster, priority: 'normal' }}
@@ -43,19 +54,16 @@ export function MovieRankItem({ anime, index, onPress, theme }: Props) {
         <Text style={{ color: theme.text, fontSize: 13.5, fontWeight: '800', lineHeight: 17 }} numberOfLines={2}>
           {anime.title}
         </Text>
-        {(anime.total_episode || anime.status) && (
-          <Text style={{ color: theme.subtext, fontSize: 10.5, fontWeight: '600', marginTop: 4 }} numberOfLines={1}>
-            {[anime.total_episode ? `${anime.total_episode} Eps` : null, anime.status].filter(Boolean).join(' · ')}
-          </Text>
-        )}
+        <Text style={{ color: theme.subtext, fontSize: 10.5, fontWeight: '600', marginTop: 4 }} numberOfLines={1}>
+          {[anime.studio, anime.year].filter(Boolean).join(' · ')}
+        </Text>
       </View>
 
-      {/* Rating — cuma tampil kalau datanya beneran ada */}
+      {/* Score */}
       {scoreNum != null && (
-        <View style={{ alignItems: 'center', minWidth: 34 }}>
-          <Text style={{ color: theme.accent, fontSize: 13, fontWeight: '900' }}>★</Text>
-          <Text style={{ color: theme.accent, fontSize: 11, fontWeight: '900' }}>{anime.score}</Text>
-        </View>
+        <Text style={{ color: theme.accent, fontSize: 11, fontWeight: '900', fontStyle: 'italic' }}>
+          {anime.score}
+        </Text>
       )}
     </TouchableOpacity>
   );
