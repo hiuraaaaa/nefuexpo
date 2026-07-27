@@ -20,13 +20,13 @@ export function SectionHeader({ title, subtitle, onPress, theme }: Props) {
     }}>
       <View>
         <Text style={{
-          color: theme.subtext, fontSize: 9, fontWeight: '800',
-          letterSpacing: 2.5, textTransform: 'uppercase', marginBottom: 4,
+          color: theme.subtext, fontSize: 9, fontFamily: 'JetBrainsMono_600SemiBold',
+          letterSpacing: 2, textTransform: 'uppercase', marginBottom: 5,
         }}>
           {subtitle}
         </Text>
         <Text style={{
-          color: theme.text, fontSize: 22, fontWeight: '900', letterSpacing: -0.6,
+          color: theme.text, fontSize: 20, fontFamily: 'Unbounded_700Bold', letterSpacing: -0.3,
         }}>
           {title}
         </Text>
@@ -34,7 +34,7 @@ export function SectionHeader({ title, subtitle, onPress, theme }: Props) {
 
       <TouchableOpacity onPress={onPress} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
         <Text style={{
-          color: theme.accent, fontSize: 11, fontWeight: '800', paddingBottom: 3,
+          color: theme.accent, fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', paddingBottom: 3,
         }}>
           Semua →
         </Text>
