@@ -50,7 +50,8 @@ export default function HomeScreen() {
   const accentTextColor = theme.tint === 'light' ? '#fff' : '#000';
 
   const {
-    ongoing, movies, todayAnime,
+    ongoing, ongoingType, ongoingTabLoading, changeOngoingType,
+    recommendations, todayAnime,
     isLoading, refreshing, onRefresh,
     visibleAnnouncements, dismissAnnouncement,
   } = useHomeData();
@@ -112,14 +113,38 @@ export default function HomeScreen() {
           }}
         />
 
-        {/* Terbaru */}
+        {/* Ongoing */}
         <View style={{ marginTop: 28 }}>
           <SectionHeader
-            title="Terbaru"
-            subtitle="Anime baru diupload"
+            title="Ongoing"
+            subtitle="Anime yang sedang tayang"
             onPress={() => router.push('/(tabs)/ongoing')}
             theme={theme}
           />
+          <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: H_PADDING, marginBottom: 12 }}>
+            {([
+              { id: 'all', label: 'Semua' },
+              { id: 'anime', label: 'Anime' },
+              { id: 'donghua', label: 'Donghua' },
+            ] as const).map(tab => {
+              const active = ongoingType === tab.id;
+              return (
+                <TouchableOpacity
+                  key={tab.id}
+                  onPress={() => { Haptics.selectionAsync(); changeOngoingType(tab.id); }}
+                  activeOpacity={0.8}
+                  style={{
+                    paddingHorizontal: 16, paddingVertical: 6, borderRadius: 999,
+                    backgroundColor: active ? theme.accent : `${theme.subtext}15`,
+                  }}
+                >
+                  <Text style={{ color: active ? accentTextColor : theme.subtext, fontSize: 11, fontWeight: '800' }}>
+                    {tab.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
           <View style={{ paddingLeft: H_PADDING }}>
             <ScrollView
               ref={ongoingRef} horizontal
@@ -130,7 +155,7 @@ export default function HomeScreen() {
               snapToAlignment="start"
               contentContainerStyle={{ gap: CARD_GAP, paddingRight: H_PADDING }}
             >
-              {isLoading
+              {(isLoading || ongoingTabLoading)
                 ? [...Array(6)].map((_, i) => <HorizontalCardSkeleton key={i} />)
                 : ongoing.map(item => (
                   <TouchableOpacity key={item.id} onPress={() => goToAnime(item)} activeOpacity={0.85}>
@@ -179,17 +204,17 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Movies */}
+        {/* Rekomendasi */}
         <View style={{ marginTop: 28, paddingHorizontal: H_PADDING }}>
           <SectionHeader
-            title="Movies"
-            subtitle="Film anime terpopuler"
+            title="Rekomendasi"
+            subtitle="Pilihan untuk kamu"
             onPress={() => router.push('/(tabs)/ongoing')}
             theme={theme}
           />
           {isLoading
             ? [...Array(5)].map((_, i) => <RankSkeleton key={i} />)
-            : movies.slice(0, 10).map((anime, index) => (
+            : recommendations.slice(0, 10).map((anime, index) => (
                 <MovieRankItem
                   key={anime.id}
                   anime={anime}
