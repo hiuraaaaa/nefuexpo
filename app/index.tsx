@@ -17,7 +17,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { COLORS, LOGO_URL } from '@/constants';
 import { api } from '@/hooks/api/api';
-import { signInWithGoogle } from '@/hooks/auth';
+import { signInWithGoogle, onAuthStateChanged } from '@/hooks/auth';
 import { Anime } from '@/types';
 import { storageMain } from '@/hooks/storage/storage';
 import { prefetchHome } from '@/hooks/prefetch';
@@ -381,11 +381,34 @@ export default function WelcomeScreen() {
   }, []);
 
   // ── Load posters lalu tampilkan welcome screen ───────────────────────────
-  // FIX: Auto-login dihapus total. Dulu di sini ada cek auth().currentUser +
-  // onAuthStateChanged yang langsung router.replace('/(tabs)') kalau user
-  // udah pernah login — itu sumber crash "navigate before mounting Root
-  // Layout" / "getState of undefined". Sekarang flow selalu lurus:
-  // loading -> welcome -> (disclaimer) -> login, gak ada redirect otomatis.
+  // Auto-login: cek sesi Firebase yang udah ada, TAPI dilakukan di dalam
+  // effect async ini (setelah beberapa await), bukan sinkron di awal mount.
+  // Itu yang bikin crash "navigate before mounting Root Layout" sebelumnya —
+  // router.replace() kepanggil kepagian sebelum Stack navigator siap.
+  // onAuthStateChanged dipakai (bukan getCurrentUser() langsung) supaya
+  // nunggu Firebase beneran selesai restore sesi persisted-nya dulu.
+  const hasNavigatedRef = useRef(false);
+
+  const waitForAuthState = useCallback((): Promise<any> => {
+    return new Promise(resolve => {
+      let settled = false;
+      const unsub = onAuthStateChanged(user => {
+        if (settled) return;
+        settled = true;
+        unsub();
+        resolve(user);
+      });
+      // Guard: kalau Firebase gak pernah fire (edge case), anggap logged-out
+      // setelah 2.5s biar gak nge-hang selamanya di loading screen.
+      setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        unsub();
+        resolve(null);
+      }, 2500);
+    });
+  }, []);
+
   useEffect(() => {
     (async () => {
       try {
@@ -399,6 +422,18 @@ export default function WelcomeScreen() {
         };
         await Promise.race([fetchAll(), timeout]);
       } catch {}
+
+      const existingUser = await waitForAuthState();
+      if (existingUser && !hasNavigatedRef.current) {
+        hasNavigatedRef.current = true;
+        // Satu tick tambahan biar navigasi kejadian setelah render commit,
+        // bukan di tengah-tengah proses mount.
+        requestAnimationFrame(() => {
+          try { SplashScreen.hideAsync().catch(() => {}); } catch {}
+          router.replace('/(tabs)');
+        });
+        return;
+      }
 
       setStep('welcome');
       overlayOpacity.value = withTiming(0, { duration: 400 });
