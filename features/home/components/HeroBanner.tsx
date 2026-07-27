@@ -1,18 +1,17 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LOGO_URL } from '@/constants';
 import { Anime } from '@/types';
 import { HeroSkeleton } from '@/components/Skeleton';
 
-// FIX: Tidak ada lagi Dimensions.get di module level.
-// HERO_HEIGHT dihitung di dalam komponen pakai useWindowDimensions
-// supaya otomatis update saat rotasi / resize (tablet, foldable).
-// Export HERO_HEIGHT sebagai fungsi supaya luar komponen bisa hitung juga.
-export const calcHeroHeight = (w: number) => w * 0.85;
+const HALO_GLOW = require('@/assets/generated/hero-halo.png');
+
+// Layout kompak (bukan full-bleed cinematic lagi): poster + info di samping,
+// halo glow di belakang, dot progress bentuk crescent — bukan angka "1/8".
+export const calcHeroHeight = (w: number) => 210 + Math.max(0, (w - 380) * 0.15);
 
 interface Props {
   items: Anime[];
@@ -24,7 +23,6 @@ interface Props {
 }
 
 export function HeroBanner({ items, isLoading, insetTop, theme, onPressAnime, onPressSearch }: Props) {
-  // FIX: useWindowDimensions → reaktif terhadap rotasi & resize
   const { width } = useWindowDimensions();
   const HERO_HEIGHT = calcHeroHeight(width);
 
@@ -32,103 +30,128 @@ export function HeroBanner({ items, isLoading, insetTop, theme, onPressAnime, on
   const [index, setIndex] = useState(0);
   const accentTextColor = theme.tint === 'light' ? '#fff' : '#000';
 
-  // FIX: Gunakan width dari closure useEffect (akan refresh saat width berubah)
   useEffect(() => {
     if (items.length === 0) return;
     const itv = setInterval(() => {
       setIndex(p => {
         const next = (p + 1) % items.length;
-        // FIX: width dari parent scope useWindowDimensions — selalu fresh
         heroRef.current?.scrollTo({ x: next * width, animated: true });
         return next;
       });
     }, 6000);
     return () => clearInterval(itv);
-    // FIX: width masuk dependency array → auto-restart interval kalau layar dirotate
   }, [items.length, width]);
 
-  const handleNext = () => {
-    const next = (index + 1) % items.length;
-    setIndex(next);
-    heroRef.current?.scrollTo({ x: next * width, animated: true });
+  const goTo = (i: number) => {
+    setIndex(i);
+    heroRef.current?.scrollTo({ x: i * width, animated: true });
     Haptics.selectionAsync();
   };
 
   return (
-    // FIX: width dan HERO_HEIGHT dari useWindowDimensions, bukan modul-level Dimensions
-    <View style={{ width, height: HERO_HEIGHT, backgroundColor: theme.card }}>
+    <View style={{ width, backgroundColor: theme.bg, paddingTop: insetTop + 10 }}>
       {/* Top bar */}
       <View style={{
-        position: 'absolute', top: 0, left: 0, right: 0, zIndex: 30,
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        paddingHorizontal: 20, paddingTop: insetTop + 10, paddingBottom: 10,
+        paddingHorizontal: 20, paddingBottom: 6,
       }}>
-        <Image source={{ uri: LOGO_URL }} style={{ width: 40, height: 40 }} contentFit="contain" />
+        <Image source={{ uri: LOGO_URL }} style={{ width: 32, height: 32 }} contentFit="contain" />
         <TouchableOpacity
           onPress={() => { Haptics.selectionAsync(); onPressSearch(); }}
-          style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.4)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}
+          style={{
+            width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center',
+            backgroundColor: `${theme.subtext}12`, borderWidth: 1, borderColor: theme.border,
+          }}
         >
-          <Ionicons name="search-outline" size={18} color="rgba(255,255,255,0.9)" />
+          <Ionicons name="search-outline" size={16} color={theme.text} />
         </TouchableOpacity>
       </View>
 
       {isLoading ? <HeroSkeleton /> : (
-        <>
+        <View style={{ height: HERO_HEIGHT }}>
           <ScrollView
             ref={heroRef}
             horizontal pagingEnabled scrollEnabled={false}
             showsHorizontalScrollIndicator={false}
-            // FIX: style pakai width dari hook, bukan konstanta stale
             style={{ width, height: '100%' }}
           >
             {items.map((a, i) => (
-              // FIX: setiap item pakai width dari hook
-              <TouchableOpacity key={i} activeOpacity={0.9} onPress={() => onPressAnime(a)} style={{ width, height: HERO_HEIGHT }}>
+              <View key={i} style={{ width, height: HERO_HEIGHT, paddingHorizontal: 24 }}>
+                {/* Halo glow — signature Lunar, di belakang poster */}
                 <Image
-                  source={{ uri: a.image_cover || a.image_poster }}
-                  style={{ width: '100%', height: '100%', opacity: 0.65 }}
-                  contentFit="cover"
+                  source={HALO_GLOW}
+                  style={{
+                    position: 'absolute', top: -70, left: -40,
+                    width: 340, height: 340,
+                  }}
+                  contentFit="contain"
+                  pointerEvents="none"
                 />
-                <LinearGradient
-                  colors={['transparent', `${theme.bg}88`, theme.bg]}
-                  locations={[0.3, 0.65, 1]}
-                  style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '70%' }}
-                />
-                <View style={{ position: 'absolute', bottom: 28, left: 20, right: 20, flexDirection: 'row', alignItems: 'flex-end', gap: 14 }}>
+
+                <TouchableOpacity
+                  activeOpacity={0.88}
+                  onPress={() => onPressAnime(a)}
+                  style={{ flex: 1, flexDirection: 'row', alignItems: 'flex-end', gap: 16 }}
+                >
                   <Image
                     source={{ uri: a.image_poster }}
-                    style={{ width: 80, aspectRatio: 3 / 4.2, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}
+                    style={{
+                      width: 118, aspectRatio: 3 / 4.3, borderRadius: 14,
+                      borderWidth: 1, borderColor: theme.border,
+                    }}
                     contentFit="cover"
                   />
-                  <View style={{ flex: 1, marginBottom: 4, gap: 6 }}>
-                    <Text style={{ color: '#fff', fontFamily: 'Unbounded_700Bold', fontSize: 16, lineHeight: 21 }} numberOfLines={2}>{a.title}</Text>
-                    <Text style={{ color: 'rgba(255,255,255,0.55)', fontFamily: 'PlusJakartaSans_400Regular', fontSize: 10, lineHeight: 14 }} numberOfLines={2}>{a.synopsis}</Text>
-                    <TouchableOpacity
-                      onPress={() => onPressAnime(a)}
-                      onPressIn={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
-                      style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: theme.accent, paddingHorizontal: 18, paddingVertical: 8, borderRadius: 999, alignSelf: 'flex-start', marginTop: 4 }}
+                  <View style={{ flex: 1, gap: 8, paddingBottom: 4 }}>
+                    <Text style={{
+                      color: theme.accent, fontFamily: 'JetBrainsMono_600SemiBold',
+                      fontSize: 9, letterSpacing: 1.5, textTransform: 'uppercase',
+                    }}>
+                      Tayang Musim Ini
+                    </Text>
+                    <Text
+                      style={{ color: theme.text, fontFamily: 'Unbounded_700Bold', fontSize: 16, lineHeight: 21 }}
+                      numberOfLines={3}
                     >
-                      <Ionicons name="play" size={11} color={accentTextColor} />
-                      <Text style={{ color: accentTextColor, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 11, letterSpacing: 0.5 }}>TONTON</Text>
-                    </TouchableOpacity>
+                      {a.title}
+                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 2 }}>
+                      <TouchableOpacity
+                        onPress={() => onPressAnime(a)}
+                        onPressIn={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
+                        style={{
+                          flexDirection: 'row', alignItems: 'center', gap: 6,
+                          backgroundColor: theme.accent, paddingHorizontal: 16, paddingVertical: 9,
+                          borderRadius: 999,
+                        }}
+                      >
+                        <Ionicons name="play" size={11} color={accentTextColor} />
+                        <Text style={{ color: accentTextColor, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 11, letterSpacing: 0.3 }}>
+                          Tonton
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                </View>
-              </TouchableOpacity>
+                </TouchableOpacity>
+              </View>
             ))}
           </ScrollView>
 
-          {items.length > 0 && (
-            <View style={{ position: 'absolute', bottom: 28, right: 20, flexDirection: 'row', alignItems: 'center', gap: 6, zIndex: 20 }}>
-              <Text style={{ color: 'rgba(255,255,255,0.7)', fontFamily: 'JetBrainsMono_600SemiBold', fontSize: 10 }}>{index + 1} / {items.length}</Text>
-              <TouchableOpacity
-                onPress={handleNext}
-                style={{ width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.15)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}
-              >
-                <Ionicons name="chevron-forward" size={14} color="#fff" />
-              </TouchableOpacity>
+          {/* Moon-dot progress — bukan angka "1/8" */}
+          {items.length > 1 && (
+            <View style={{
+              position: 'absolute', bottom: 4, left: 24 + 118 + 16, flexDirection: 'row', gap: 5, alignItems: 'center',
+            }}>
+              {items.slice(0, 8).map((_, i) => (
+                <TouchableOpacity key={i} onPress={() => goTo(i)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
+                  <View style={{
+                    width: i === index ? 16 : 6, height: 6, borderRadius: 3,
+                    backgroundColor: i === index ? theme.accent : `${theme.subtext}40`,
+                  }} />
+                </TouchableOpacity>
+              ))}
             </View>
           )}
-        </>
+        </View>
       )}
     </View>
   );
