@@ -19,6 +19,10 @@ import { SystemBars } from 'react-native-edge-to-edge';
 import { useRouter } from 'expo-router';
 import { RoomProvider } from '@/contexts/RoomContext';
 import { rescheduleNotifs, useNotifTapHandler, sendTestNotif } from '@/hooks/notifications';
+import { useFonts } from 'expo-font';
+import { Unbounded_500Medium, Unbounded_700Bold } from '@expo-google-fonts/unbounded';
+import { PlusJakartaSans_400Regular, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans';
+import { JetBrainsMono_500Medium, JetBrainsMono_600SemiBold } from '@expo-google-fonts/jetbrains-mono';
 import '../global.css';
 
 SplashScreen.preventAutoHideAsync();
@@ -229,6 +233,20 @@ function AppLayout() {
 
 // ─── Root ─────────────────────────────────────────────────────────────────────
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    Unbounded_500Medium,
+    Unbounded_700Bold,
+    PlusJakartaSans_400Regular,
+    PlusJakartaSans_600SemiBold,
+    PlusJakartaSans_700Bold,
+    JetBrainsMono_500Medium,
+    JetBrainsMono_600SemiBold,
+  });
+
+  // Splash tetap kelihatan (preventAutoHideAsync sudah dipanggil di atas)
+  // sampai font custom selesai dimuat — biar gak ada "flash" font default dulu.
+  if (!fontsLoaded) return null;
+
   return (
     <RootErrorBoundary>
       <GestureHandlerRootView style={{ flex: 1 }}>
