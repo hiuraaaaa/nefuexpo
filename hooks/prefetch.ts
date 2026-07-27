@@ -9,10 +9,10 @@ import { api } from '@/hooks/api/api';
 const TTL_MS = 5 * 60 * 1000; // 5 menit
 
 type HomeCache = {
-  ongoing:    any[];
-  movies:     any[];
-  schedule:   any;
-  fetchedAt:  number;
+  ongoing:        any[];
+  recommendations: any[];
+  schedule:       any;
+  fetchedAt:      number;
 };
 
 let cache: HomeCache | null = null;
@@ -25,12 +25,14 @@ export const prefetchHome = (): void => {
   if (inflight) return;
 
   inflight = api.home()
-    .then(([_rekom, ongRes, _comp, movRes, schedRes]) => {
+    .then(([rekomRes, _ong, compRes, _mov, schedRes]) => {
+      const sortedRekom = (rekomRes.data || []).slice()
+        .sort((a: any, b: any) => (parseFloat(String(b.score)) || 0) - (parseFloat(String(a.score)) || 0));
       cache = {
-        ongoing:   ongRes.data   || [],
-        movies:    movRes.data   || [],
-        schedule:  schedRes.data || {},
-        fetchedAt: Date.now(),
+        ongoing:         compRes.data  || [],
+        recommendations: sortedRekom,
+        schedule:        schedRes.data || {},
+        fetchedAt:       Date.now(),
       };
     })
     .catch(() => {})
