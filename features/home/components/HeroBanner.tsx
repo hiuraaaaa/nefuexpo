@@ -101,15 +101,15 @@ export function HeroBanner({ items, isLoading, insetTop, theme, onPressAnime, on
                     contentFit="cover"
                   />
                   <View style={{ flex: 1, marginBottom: 4, gap: 6 }}>
-                    <Text style={{ color: '#fff', fontWeight: '900', fontSize: 17, lineHeight: 22 }} numberOfLines={2}>{a.title}</Text>
-                    <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 10, lineHeight: 14 }} numberOfLines={2}>{a.synopsis}</Text>
+                    <Text style={{ color: '#fff', fontFamily: 'Unbounded_700Bold', fontSize: 16, lineHeight: 21 }} numberOfLines={2}>{a.title}</Text>
+                    <Text style={{ color: 'rgba(255,255,255,0.55)', fontFamily: 'PlusJakartaSans_400Regular', fontSize: 10, lineHeight: 14 }} numberOfLines={2}>{a.synopsis}</Text>
                     <TouchableOpacity
                       onPress={() => onPressAnime(a)}
                       onPressIn={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
-                      style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: theme.accent, paddingHorizontal: 18, paddingVertical: 8, borderRadius: 6, alignSelf: 'flex-start', marginTop: 4 }}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: theme.accent, paddingHorizontal: 18, paddingVertical: 8, borderRadius: 999, alignSelf: 'flex-start', marginTop: 4 }}
                     >
                       <Ionicons name="play" size={11} color={accentTextColor} />
-                      <Text style={{ color: accentTextColor, fontWeight: '900', fontSize: 11, letterSpacing: 0.5 }}>TONTON</Text>
+                      <Text style={{ color: accentTextColor, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 11, letterSpacing: 0.5 }}>TONTON</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -119,7 +119,7 @@ export function HeroBanner({ items, isLoading, insetTop, theme, onPressAnime, on
 
           {items.length > 0 && (
             <View style={{ position: 'absolute', bottom: 28, right: 20, flexDirection: 'row', alignItems: 'center', gap: 6, zIndex: 20 }}>
-              <Text style={{ color: 'rgba(255,255,255,0.7)', fontWeight: '800', fontSize: 10 }}>{index + 1} / {items.length}</Text>
+              <Text style={{ color: 'rgba(255,255,255,0.7)', fontFamily: 'JetBrainsMono_600SemiBold', fontSize: 10 }}>{index + 1} / {items.length}</Text>
               <TouchableOpacity
                 onPress={handleNext}
                 style={{ width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.15)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}
