@@ -21,6 +21,18 @@ export type Theme = {
 
 export const THEMES: Theme[] = [
   {
+    id: 'lunar',
+    name: 'Lunar',
+    bg: '#05050a',
+    card: '#101018',
+    accent: '#3b6fe0',
+    accentDim: 'rgba(59,111,224,0.18)',
+    border: 'rgba(159,216,255,0.08)',
+    text: '#f1f3f9',
+    subtext: '#7c8299',
+    tint: 'dark',
+  },
+  {
     id: 'gold',
     name: 'Gold',
     bg: '#0a0a0c',
