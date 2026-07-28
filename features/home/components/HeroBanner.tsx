@@ -7,10 +7,8 @@ import { LOGO_URL } from '@/constants';
 import { Anime } from '@/types';
 import { HeroSkeleton } from '@/components/Skeleton';
 
-const HALO_GLOW = require('@/assets/generated/hero-halo.png');
-
 // Layout kompak (bukan full-bleed cinematic lagi): poster + info di samping,
-// halo glow di belakang, dot progress bentuk crescent — bukan angka "1/8".
+// dot progress bentuk crescent — bukan angka "1/8".
 export const calcHeroHeight = (w: number) => 210 + Math.max(0, (w - 380) * 0.15);
 
 interface Props {
@@ -77,17 +75,6 @@ export function HeroBanner({ items, isLoading, insetTop, theme, onPressAnime, on
           >
             {items.map((a, i) => (
               <View key={i} style={{ width, height: HERO_HEIGHT, paddingHorizontal: 24 }}>
-                {/* Halo glow — signature Lunar, di belakang poster */}
-                <Image
-                  source={HALO_GLOW}
-                  style={{
-                    position: 'absolute', top: -70, left: -40,
-                    width: 340, height: 340,
-                  }}
-                  contentFit="contain"
-                  pointerEvents="none"
-                />
-
                 <TouchableOpacity
                   activeOpacity={0.88}
                   onPress={() => onPressAnime(a)}
