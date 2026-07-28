@@ -13,13 +13,13 @@ import { getAnimeSlug } from '@/hooks/api/api';
 import { Anime } from '@/types';
 import AnimeCard from '@/components/AnimeCard';
 import SearchModal from '@/components/SearchModal';
-import { HorizontalCardSkeleton, RankSkeleton } from '@/components/Skeleton';
+import { HorizontalCardSkeleton } from '@/components/Skeleton';
 import { useNavigateAnime } from '@/hooks/useNavigateAnime';
 
 import {
   useHomeData, todayLabel,
   HeroBanner, ShareBanner, SectionHeader,
-  AnnouncementBanner, MovieRankItem, NobarFAB,
+  AnnouncementBanner, NobarFAB,
 } from '@/features/home';
 
 export default function HomeScreen() {
@@ -160,7 +160,7 @@ export default function HomeScreen() {
                 : ongoing.map(item => (
                   <TouchableOpacity key={item.id} onPress={() => goToAnime(item)} activeOpacity={0.85}>
                     {/* FIX: width dinamis berdasarkan layar */}
-                    <AnimeCard anime={item} width={CARD_W} />
+                    <AnimeCard anime={item} width={CARD_W} theme={theme} />
                   </TouchableOpacity>
                 ))
               }
@@ -196,7 +196,7 @@ export default function HomeScreen() {
               >
                 {todayAnime.map(item => (
                   <TouchableOpacity key={item.id} onPress={() => goToAnime(item)} activeOpacity={0.85}>
-                    <AnimeCard anime={item} width={CARD_W} />
+                    <AnimeCard anime={item} width={CARD_W} theme={theme} />
                   </TouchableOpacity>
                 ))}
               </ScrollView>
@@ -205,32 +205,45 @@ export default function HomeScreen() {
         </View>
 
         {/* Rekomendasi */}
-        <View style={{ marginTop: 28, paddingHorizontal: H_PADDING }}>
+        <View style={{ marginTop: 28 }}>
           <SectionHeader
             title="Rekomendasi"
             subtitle="Pilihan untuk kamu"
             onPress={() => router.push('/(tabs)/ongoing')}
             theme={theme}
           />
-          {isLoading
-            ? [...Array(5)].map((_, i) => <RankSkeleton key={i} />)
-            : recommendations.slice(0, 10).map((anime, index) => (
-                <MovieRankItem
-                  key={anime.id}
-                  anime={anime}
-                  index={index}
-                  onPress={() => goToAnime(anime)}
-                  theme={theme}
-                />
-              ))
-          }
+          <View style={{ paddingLeft: H_PADDING }}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={SNAP_INTERVAL}
+              decelerationRate="fast"
+              snapToAlignment="start"
+              contentContainerStyle={{ gap: CARD_GAP, paddingRight: H_PADDING }}
+            >
+              {isLoading
+                ? [...Array(6)].map((_, i) => <HorizontalCardSkeleton key={i} />)
+                : recommendations.slice(0, 10).map(anime => (
+                  <TouchableOpacity key={anime.id} onPress={() => goToAnime(anime)} activeOpacity={0.85}>
+                    <AnimeCard
+                      anime={anime}
+                      width={CARD_W}
+                      theme={theme}
+                      scoreLabel={anime.score ? String(anime.score) : undefined}
+                      metaLabel={[anime.total_episode ? `${anime.total_episode} Eps` : null, anime.status].filter(Boolean).join(' · ')}
+                    />
+                  </TouchableOpacity>
+                ))
+              }
+            </ScrollView>
+          </View>
         </View>
       </ScrollView>
 
       {/* Nobar FAB */}
       <NobarFAB insetBottom={insets.bottom} />
 
-      <SearchModal visible={searchOpen} onClose={() => setSearchOpen(false)} />
+      <SearchModal visible={searchOpen} onClose={() => setSearchOpen(false)} theme={theme} />
     </View>
   );
 }
