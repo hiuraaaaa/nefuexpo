@@ -345,8 +345,42 @@ const fetchAnimeListSearch = async (q: string): Promise<ApiResponse<Anime[]>> =>
   return { status: true, data: res.data.filter(a => a.title.toLowerCase().includes(lower)) };
 };
 
-const fetchGenre       = async (): Promise<ApiResponse<Genre[]>>              => ({ status: true, data: [] });
-const fetchGenreFilter = async (_ids: string[], _page = 0): Promise<ApiResponse<Anime[]>> => ({ status: true, data: [] });
+const fetchGenre = async (): Promise<ApiResponse<Genre[]>> => {
+  const [rekom, ong, comp] = await Promise.all([
+    fetchRekomendasi(),
+    fetchOngoing(0),
+    fetchComplete(0),
+  ]);
+  const pool = [...rekom.data, ...ong.data, ...comp.data];
+  const unique = new Set<string>();
+  for (const anime of pool) {
+    (anime.genre ?? '').split(',').map(g => g.trim()).filter(Boolean).forEach(g => unique.add(g));
+  }
+  const list: Genre[] = [...unique].sort((a, b) => a.localeCompare(b)).map(name => ({
+    id: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+    name,
+  }));
+  return { status: true, data: list };
+};
+
+const fetchGenreFilter = async (ids: string[], page = 0): Promise<ApiResponse<Anime[]>> => {
+  const [ong, comp] = await Promise.all([fetchOngoing(0), fetchComplete(0)]);
+  const byId = new Map<string, Anime>();
+  for (const anime of [...ong.data, ...comp.data]) byId.set(anime.id, anime);
+  const pool = [...byId.values()];
+
+  const wantedIds = new Set(ids);
+  const matches = pool.filter(anime => {
+    const animeGenreIds = (anime.genre ?? '').split(',')
+      .map(g => g.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-'))
+      .filter(Boolean);
+    return animeGenreIds.some(g => wantedIds.has(g));
+  });
+
+  const PAGE_SIZE = 20;
+  const start = page * PAGE_SIZE;
+  return { status: true, data: matches.slice(start, start + PAGE_SIZE) };
+};
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
