@@ -2,7 +2,7 @@
 //
 // Signature: tab strip editorial — active word besar & cerah, inactive kecil
 // & redup, underline offset ke kiri di bawah active (persis LibraryHeader).
-// Tidak ada pill bubble, tidak ada border radius 20, tidak ada card wrapper.
+// Font disamain ke set Lunar (Unbounded utk active, PlusJakartaSans utk inactive).
 import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import * as Haptics from 'expo-haptics';
@@ -35,9 +35,9 @@ export default function GenreFilter({ genres, selectedGenres, onToggle, onClearA
         >
           <Text style={{
             color: allActive ? theme.text : theme.subtext,
-            fontWeight: '900',
-            fontSize: allActive ? 16 : 12,
-            letterSpacing: -0.3,
+            fontFamily: allActive ? 'Unbounded_700Bold' : 'PlusJakartaSans_600SemiBold',
+            fontSize: allActive ? 15 : 12,
+            letterSpacing: -0.2,
           }}>
             Semua
           </Text>
@@ -62,9 +62,9 @@ export default function GenreFilter({ genres, selectedGenres, onToggle, onClearA
             >
               <Text style={{
                 color: active ? theme.text : theme.subtext,
-                fontWeight: active ? '900' : '600',
-                fontSize: active ? 16 : 12,
-                letterSpacing: -0.3,
+                fontFamily: active ? 'Unbounded_700Bold' : 'PlusJakartaSans_600SemiBold',
+                fontSize: active ? 15 : 12,
+                letterSpacing: -0.2,
               }}>
                 {g.name}
               </Text>
@@ -72,7 +72,7 @@ export default function GenreFilter({ genres, selectedGenres, onToggle, onClearA
                 <View style={{
                   height: 3,
                   // Width tidak seragam — ikutin panjang teks approximate
-                  width: g.name.length * 7.5,
+                  width: g.name.length * 7.2,
                   backgroundColor: theme.accent,
                   borderRadius: 2,
                   marginTop: 5,
