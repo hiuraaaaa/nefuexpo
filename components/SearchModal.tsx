@@ -12,7 +12,6 @@ import Animated, {
   withTiming, withSpring, FadeIn,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { COLORS } from '@/constants';
 import { api, getAnimeSlug } from '@/hooks/api/api';
 import { Anime } from '@/types';
 import { getSearchHistory, addSearchHistory, clearSearchHistory } from '@/hooks/storage/storage';
@@ -21,11 +20,12 @@ import TraceMoeModal from '@/components/TraceMoeModal';
 interface Props {
   visible: boolean;
   onClose: () => void;
+  theme: any;
 }
 
 // ─── Result Item ──────────────────────────────────────────────────────────────
-const ResultItem = React.memo(({ item, query, onPress }: {
-  item: Anime; query: string; onPress: () => void;
+const ResultItem = React.memo(({ item, query, onPress, theme }: {
+  item: Anime; query: string; onPress: () => void; theme: any;
 }) => {
   const scale = useSharedValue(1);
   const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
@@ -40,62 +40,69 @@ const ResultItem = React.memo(({ item, query, onPress }: {
     ? [title.slice(0, idx), title.slice(idx, idx + query.length), title.slice(idx + query.length)]
     : null;
 
+  // FIX: nilai status asli dari API itu "Ongoing"/"Completed" (bukan ALL-CAPS),
+  // sebelumnya dibandingkan ke 'ONGOING'/'COMPLETED' jadi selalu gak match.
   const statusColor =
-    item.status === 'ONGOING'   ? '#4ade80' :
-    item.status === 'COMPLETED' ? COLORS.gold :
-    'rgba(255,255,255,0.3)';
+    item.status === 'Ongoing'   ? '#4ade80' :
+    item.status === 'Completed' ? theme.subtext :
+    `${theme.subtext}50`;
 
   return (
     <TouchableOpacity onPress={onPress} onPressIn={onPressIn} onPressOut={onPressOut} activeOpacity={1}>
-      <Animated.View style={[styles.resultItem, animStyle]}>
-        {/* ✅ expo-image — lebih cepat, support caching */}
+      <Animated.View style={[styles.resultItem, { backgroundColor: theme.card }, animStyle]}>
         <Image
           source={{ uri: item.image_poster, priority: "normal" }}
           style={styles.resultThumb}
           contentFit="cover"
         />
         <View style={{ flex: 1 }}>
-          <Text style={styles.resultTitle} numberOfLines={2}>
+          <Text style={[styles.resultTitle, { color: theme.subtext, fontFamily: 'PlusJakartaSans_700Bold' }]} numberOfLines={2}>
             {highlighted ? (
               <>
-                <Text style={{ color: 'rgba(255,255,255,0.55)' }}>{highlighted[0]}</Text>
-                <Text style={{ color: COLORS.gold, fontWeight: '800' }}>{highlighted[1]}</Text>
-                <Text style={{ color: 'rgba(255,255,255,0.55)' }}>{highlighted[2]}</Text>
+                <Text style={{ color: theme.subtext }}>{highlighted[0]}</Text>
+                <Text style={{ color: theme.accent }}>{highlighted[1]}</Text>
+                <Text style={{ color: theme.subtext }}>{highlighted[2]}</Text>
               </>
             ) : title}
           </Text>
           <View style={styles.resultMeta}>
-            {item.type ? <Text style={styles.metaChip}>{item.type}</Text> : null}
+            {item.type ? (
+              <Text style={[styles.metaChip, { color: theme.subtext, backgroundColor: `${theme.subtext}15`, fontFamily: 'JetBrainsMono_500Medium' }]}>
+                {item.type}
+              </Text>
+            ) : null}
             {item.status ? (
               <View style={[styles.statusChip, { borderColor: statusColor }]}>
                 <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-                <Text style={[styles.metaText, { color: statusColor }]}>
-                  {item.status === 'ONGOING' ? 'Ongoing' : item.status === 'COMPLETED' ? 'Completed' : item.status}
+                <Text style={[styles.metaText, { color: statusColor, fontFamily: 'JetBrainsMono_500Medium' }]}>
+                  {item.status}
                 </Text>
               </View>
             ) : null}
           </View>
           {item.studio ? (
-            <Text style={styles.studioText} numberOfLines={1}>{item.studio}</Text>
+            <Text style={[styles.studioText, { color: theme.subtext, fontFamily: 'PlusJakartaSans_400Regular' }]} numberOfLines={1}>
+              {item.studio}
+            </Text>
           ) : null}
         </View>
-        <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.2)" />
+        <Ionicons name="chevron-forward" size={14} color={`${theme.subtext}50`} />
       </Animated.View>
     </TouchableOpacity>
   );
 });
 
 // ─── History Item ─────────────────────────────────────────────────────────────
-const HistoryItem = React.memo(({ term, onPress }: { term: string; onPress: () => void }) => (
-  <TouchableOpacity onPress={onPress} style={styles.historyItem}>
-    <Ionicons name="time-outline" size={15} color="rgba(255,255,255,0.3)" />
-    <Text style={styles.historyText} numberOfLines={1}>{term}</Text>
-    <Ionicons name="arrow-up-back-outline" size={13} color="rgba(255,255,255,0.2)" />
+const HistoryItem = React.memo(({ term, onPress, theme }: { term: string; onPress: () => void; theme: any }) => (
+  <TouchableOpacity onPress={onPress} style={[styles.historyItem, { borderBottomColor: theme.border }]}>
+    <Ionicons name="time-outline" size={15} color={`${theme.subtext}80`} />
+    <Text style={[styles.historyText, { color: theme.subtext, fontFamily: 'PlusJakartaSans_600SemiBold' }]} numberOfLines={1}>{term}</Text>
+    <Ionicons name="arrow-up-back-outline" size={13} color={`${theme.subtext}50`} />
   </TouchableOpacity>
 ));
 
 // ─── Main Modal ───────────────────────────────────────────────────────────────
-export default function SearchModal({ visible, onClose }: Props) {
+export default function SearchModal({ visible, onClose, theme }: Props) {
   const router = useRouter();
 
   const [query, setQuery]     = useState('');
@@ -108,7 +115,6 @@ export default function SearchModal({ visible, onClose }: Props) {
   const focusRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef  = useRef<TextInput>(null);
 
-  // ✅ reanimated opacity — lebih smooth di Hermes
   const opacity = useSharedValue(0);
   const overlayStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
 
@@ -116,7 +122,6 @@ export default function SearchModal({ visible, onClose }: Props) {
     if (visible) {
       opacity.value = withTiming(1, { duration: 200 });
       loadHistory();
-      // ✅ track ref biar bisa di-cleanup kalau modal tutup sebelum 200ms
       focusRef.current = setTimeout(() => inputRef.current?.focus(), 200);
     } else {
       opacity.value = withTiming(0, { duration: 150 });
@@ -134,7 +139,6 @@ export default function SearchModal({ visible, onClose }: Props) {
     setHistory(h);
   };
 
-  // Debounce search
   useEffect(() => {
     if (query.length < 3) { setResults([]); return; }
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -168,8 +172,8 @@ export default function SearchModal({ visible, onClose }: Props) {
   }, []);
 
   const renderResult = useCallback(({ item }: { item: Anime }) => (
-    <ResultItem item={item} query={query} onPress={() => go(item)} />
-  ), [query, go]);
+    <ResultItem item={item} query={query} onPress={() => go(item)} theme={theme} />
+  ), [query, go, theme]);
 
   const showHistory = query.length === 0 && history.length > 0;
   const showEmpty   = query.length >= 3 && !loading && results.length === 0;
@@ -177,24 +181,24 @@ export default function SearchModal({ visible, onClose }: Props) {
   return (
     <Modal visible={visible} animationType="none" transparent onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <Animated.View style={[styles.overlay, overlayStyle]}>
+        <Animated.View style={[styles.overlay, { backgroundColor: `${theme.bg}F7` }, overlayStyle]}>
 
           {/* ── Search bar ── */}
-          <View style={styles.searchBar}>
-            <Ionicons name="search-outline" size={20} color={COLORS.gold} />
+          <View style={[styles.searchBar, { borderBottomColor: theme.border }]}>
+            <Ionicons name="search-outline" size={20} color={theme.accent} />
             <TextInput
               ref={inputRef}
-              style={styles.input}
+              style={[styles.input, { color: theme.text, fontFamily: 'PlusJakartaSans_600SemiBold' }]}
               placeholder="Cari anime..."
-              placeholderTextColor="rgba(255,255,255,0.25)"
+              placeholderTextColor={`${theme.subtext}60`}
               value={query}
               onChangeText={setQuery}
               returnKeyType="search"
-              selectionColor={COLORS.gold}
+              selectionColor={theme.accent}
             />
             {query.length > 0 && (
               <TouchableOpacity onPress={() => setQuery('')} style={styles.clearBtn}>
-                <Ionicons name="close-circle" size={18} color="rgba(255,255,255,0.3)" />
+                <Ionicons name="close-circle" size={18} color={`${theme.subtext}80`} />
               </TouchableOpacity>
             )}
             <TouchableOpacity
@@ -204,39 +208,41 @@ export default function SearchModal({ visible, onClose }: Props) {
               }}
               style={styles.clearBtn}
             >
-              <Ionicons name="scan-outline" size={20} color={COLORS.gold} />
+              <Ionicons name="scan-outline" size={20} color={theme.accent} />
             </TouchableOpacity>
-            <View style={styles.divider} />
+            <View style={[styles.divider, { backgroundColor: theme.border }]} />
             <TouchableOpacity onPress={onClose} style={styles.cancelBtn}>
-              <Text style={styles.cancelText}>Batal</Text>
+              <Text style={[styles.cancelText, { color: theme.accent, fontFamily: 'PlusJakartaSans_600SemiBold' }]}>Batal</Text>
             </TouchableOpacity>
           </View>
 
           {/* ── Content ── */}
           {loading ? (
             <View style={styles.centered}>
-              <ActivityIndicator color={COLORS.gold} size="small" />
-              <Text style={styles.loadingText}>Mencari...</Text>
+              <ActivityIndicator color={theme.accent} size="small" />
+              <Text style={[styles.loadingText, { color: theme.subtext, fontFamily: 'PlusJakartaSans_400Regular' }]}>Mencari...</Text>
             </View>
 
           ) : showHistory ? (
             <Animated.View entering={FadeIn.duration(200)} style={{ paddingHorizontal: 16, paddingTop: 8 }}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Pencarian terakhir</Text>
+                <Text style={[styles.sectionTitle, { color: theme.subtext, fontFamily: 'JetBrainsMono_600SemiBold' }]}>
+                  Pencarian terakhir
+                </Text>
                 <TouchableOpacity onPress={handleClearHistory}>
-                  <Text style={styles.clearText}>Hapus semua</Text>
+                  <Text style={[styles.clearText, { color: theme.accent, fontFamily: 'PlusJakartaSans_600SemiBold' }]}>Hapus semua</Text>
                 </TouchableOpacity>
               </View>
               {history.map((term, i) => (
-                <HistoryItem key={i} term={term} onPress={() => handleHistoryTap(term)} />
+                <HistoryItem key={i} term={term} onPress={() => handleHistoryTap(term)} theme={theme} />
               ))}
             </Animated.View>
 
           ) : showEmpty ? (
             <View style={styles.centered}>
-              <Ionicons name="search-outline" size={40} color="rgba(255,255,255,0.08)" />
-              <Text style={styles.emptyText}>Anime tidak ditemukan</Text>
-              <Text style={styles.emptySubText}>Coba kata kunci lain</Text>
+              <Ionicons name="search-outline" size={40} color={`${theme.subtext}20`} />
+              <Text style={[styles.emptyText, { color: theme.subtext, fontFamily: 'PlusJakartaSans_700Bold' }]}>Anime tidak ditemukan</Text>
+              <Text style={[styles.emptySubText, { color: `${theme.subtext}90` }]}>Coba kata kunci lain</Text>
             </View>
 
           ) : (
@@ -263,153 +269,48 @@ export default function SearchModal({ visible, onClose }: Props) {
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+// ─── Styles (layout-only; warna dioverride inline via theme) ─────────────────
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(10,10,12,0.97)',
-  },
+  overlay: { flex: 1 },
   searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 10,
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 16, paddingVertical: 12, gap: 10,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.06)',
   },
-  input: {
-    flex: 1,
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    paddingVertical: 0,
-  },
-  clearBtn: {
-    padding: 2,
-  },
-  divider: {
-    width: 1,
-    height: 18,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
-  cancelBtn: {
-    paddingLeft: 4,
-  },
-  cancelText: {
-    color: COLORS.gold,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  loadingText: {
-    color: 'rgba(255,255,255,0.3)',
-    fontSize: 12,
-    marginTop: 4,
-  },
+  input: { flex: 1, fontSize: 16, paddingVertical: 0 },
+  clearBtn: { padding: 2 },
+  divider: { width: 1, height: 18 },
+  cancelBtn: { paddingLeft: 4 },
+  cancelText: { fontSize: 14 },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
+  loadingText: { fontSize: 12, marginTop: 4 },
   sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8,
   },
-  sectionTitle: {
-    color: 'rgba(255,255,255,0.35)',
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-  },
-  clearText: {
-    color: COLORS.gold,
-    fontSize: 11,
-    fontWeight: '600',
-  },
+  sectionTitle: { fontSize: 10, letterSpacing: 1.5, textTransform: 'uppercase' },
+  clearText: { fontSize: 11 },
   historyItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.04)',
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 10, borderBottomWidth: 1,
   },
-  historyText: {
-    flex: 1,
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 13,
-    fontWeight: '500',
-  },
+  historyText: { flex: 1, fontSize: 13 },
   resultItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: COLORS.card,
-    borderRadius: 10,
-    padding: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    borderRadius: 10, padding: 10,
   },
-  resultThumb: {
-    width: 44,
-    aspectRatio: 3 / 4.5,
-    borderRadius: 6,
-  },
-  resultTitle: {
-    color: 'rgba(255,255,255,0.55)',
-    fontSize: 13,
-    fontWeight: '600',
-    lineHeight: 18,
-    marginBottom: 4,
-  },
-  resultMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    flexWrap: 'wrap',
-  },
+  resultThumb: { width: 44, aspectRatio: 3 / 4.5, borderRadius: 6 },
+  resultTitle: { fontSize: 13, lineHeight: 18, marginBottom: 4 },
+  resultMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   metaChip: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: 10,
-    fontWeight: '600',
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
+    fontSize: 9.5, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
   },
   statusChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    borderWidth: 1,
-    borderRadius: 4,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    borderWidth: 1, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2,
   },
-  statusDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-  },
-  metaText: {
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  studioText: {
-    color: 'rgba(255,255,255,0.25)',
-    fontSize: 10,
-    marginTop: 3,
-  },
-  emptyText: {
-    color: 'rgba(255,255,255,0.2)',
-    fontSize: 15,
-    fontWeight: '700',
-    marginTop: 8,
-  },
-  emptySubText: {
-    color: 'rgba(255,255,255,0.12)',
-    fontSize: 12,
-  },
+  statusDot: { width: 4, height: 4, borderRadius: 2 },
+  metaText: { fontSize: 9.5 },
+  studioText: { fontSize: 10, marginTop: 3 },
+  emptyText: { fontSize: 15, marginTop: 8 },
+  emptySubText: { fontSize: 12 },
 });
